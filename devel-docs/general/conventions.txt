@@ -1,0 +1,24 @@
+    Соглашения, принятые в рамках проекта KEDR.
+
+Упорядоченности нет, соглащения пишутся по мере обсуждения/вспоминания обсужденного.
+
+1. Расположение и имена установленных файлов на целевой системе:
+
+-user space library libkedr_$(libname).so:
+    $(prefix)/lib/libkedr_$(libname).so
+
+-user space include file $(filename).h из подпакета $(pkg_name):
+    $(prefix)/include/kedr/$(pkg_name)/$(filename).h
+
+-kernel space include file $(filename).h из подпакета $(pkg_name):
+    $(prefix)/include/kedr/$(pkg_name)/$(filename).h
+    +защита всех kernel данных через "ifdef __KERNEL__"
+
+    возможно существование include файла, часть данных которого предназначена
+    только для user space, а часть - только для kernel space (а часть данных может быть общая)
+
+-kernel module kedr_$(module_name).ko:
+	$(prefix)/lib/modules/`uname -r`/misc/kedr_$(module_name).ko
+
+-symvers файл для kernel module, экспортирущего функции для внешнего использования:
+	$(prefix)/lib/modules/`uname -r`/symvers/kedr_$(module_name).symvers
