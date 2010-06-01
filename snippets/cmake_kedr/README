@@ -1,0 +1,12 @@
+﻿Заготовка для CMake архитектуры сборки KEDR.
+
+В CMake модуле FindKbuild реализована общая подготовка проекта к использованию kbuild system:
+выставляются переменные KBUILD_VERSION_STRING, KBUILD_BUILD_DIR, KBUILD_INCLUDE_DIR, которые затем можно использовать для make и kbuild
+файлов для сборки kernel module.
+
+В CMake модуле kbuild_system реализованы функции, которые позволяют собирать kernel module по аналогии с обычными c-программами:
+kbuild_add_module ~ add_executable
+kbuild_add_directories ~ include_libraries
+kbuild_use_symbols ~ target_link_libraries
+ 
+Для примера, показана сборка controller'а с использованием функций из модуля kbuild_system.
