@@ -1,0 +1,7 @@
+# Names and IP addresses of the machines. Names may contain only 
+# [A-Za-z0-9_-]
+
+F12     192.168.56.2
+U1004   192.168.56.3
+OS113   192.168.56.4
+    
