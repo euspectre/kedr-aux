@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ########################################################################
 # This script launches the build system for each machine specified in.
 # 'machines.list' (each line has the form "NAME IP_ADDRESS").
@@ -90,6 +90,16 @@ APPEND_REVISION=""
 # The exact value of this parameter does not matter, it is only checked 
 # whether it is empty or not.
 MANAGE_VM=""
+
+# If both this parameter and 'manage_vm' have non-empty values, the build 
+# system will attempt to restore the latest snapshot of each virtual machine
+# before starting the machine.
+# If 'manage_vm' is empty, the parameter is ignored (as if it were empty 
+# too).
+#
+# The exact value of this parameter does not matter, it is only checked 
+# whether it is empty or not.
+RESTORE_CURRENT_SNAPSHOT=""
 
 # If this is not empty, the build system will send an archive containing 
 # the logs to the subscribers. The addresses of the subscribers will be read
@@ -196,6 +206,9 @@ loadConfiguration()
             "manage_vm")
                 MANAGE_VM=${PAR_VALUE}
                 ;;
+            "restore_current_snapshot")
+                RESTORE_CURRENT_SNAPSHOT=${PAR_VALUE}
+                ;;
             "email_logs")
                 EMAIL_LOGS=${PAR_VALUE}
                 ;;
@@ -298,7 +311,7 @@ preparePackage()
 
     ARCHIVE_DIR="${ARCHIVE_NAME}"
 
-    cd ${SRC_DIR} && hg archive --type=files "${WORK_DIR}/${ARCHIVE_DIR}" >> "${MAIN_LOG}" 2>&1
+    cd ${SRC_DIR} && hg archive --type=files "../${ARCHIVE_DIR}" >> "${MAIN_LOG}" 2>&1
     if test $? -ne 0; then
         cd "${WORK_DIR}"
         printMessage "Failed to prepare the source package\n"
@@ -453,32 +466,33 @@ doTarget()
 	if test -n "${MANAGE_VM}"; then
 	# Revert to the current snapshot, start the machine, etc.
 	{
-		VBoxManage snapshot ${vm_name} restorecurrent
+        if test -n "${RESTORE_CURRENT_SNAPSHOT}"; then
+		    VBoxManage snapshot ${vm_name} restorecurrent
+    		if test $? -ne 0; then
+    			printf "Warning: failed to restore current snapshot for machine \"${vm_name}\"\n"
+            fi
+        fi
+		VBoxHeadless --startvm ${vm_name} --vrdp=off &
+		VBOX_HEADLESS_PID=$!
+		# $! is the pid of the last backgroud process launched 
+		# from this shell.
+		
+		# Wait a little...
+		sleep 3
+		# ... and check if 'VboxHeadless' is actually running (in case
+		# of an error, it will stop immediately).
+		ps -e | grep ${VBOX_HEADLESS_PID} > /dev/null
 		if test $? -ne 0; then
-			printf "Failed to restore current snapshot for machine \"${vm_name}\"\n"
-		else	
-			VBoxHeadless --startvm ${vm_name} --vrdp=off &
-			VBOX_HEADLESS_PID=$!
-			# $! is the pid of the last backgroud process launched 
-			# from this shell.
+			printf "Failed to launch VBoxHeadless tool\n"
+		else
+			# Wait some more and hope the machine will start before 
+			# we finish sleeping
+			sleep ${VM_TIMEOUT}
 			
-			# Wait a little...
-			sleep 3
-			# ... and check if 'VboxHeadless' is actually running (in case
-			# of an error, it will stop immediately).
-			ps -e | grep ${VBOX_HEADLESS_PID} > /dev/null
+			# If the machine has not started up yet, give it some more time
+			ping -c 1 ${vm_ip} > /dev/null
 			if test $? -ne 0; then
-				printf "Failed to launch VBoxHeadless tool\n"
-			else
-				# Wait some more and hope the machine will start before 
-				# we finish sleeping
 				sleep ${VM_TIMEOUT}
-				
-				# If the machine has not started up yet, give it some more time
-				ping -c 1 ${vm_ip} > /dev/null
-				if test $? -ne 0; then
-					sleep ${VM_TIMEOUT}
-				fi
 			fi
 		fi
 	} >> "${MAIN_LOG}" 2>&1
