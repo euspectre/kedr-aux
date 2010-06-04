@@ -32,6 +32,9 @@ MAIN_LOG="${RESULT_DIR}/host_main.log"
 # Summary
 SUMMARY_FILE="${RESULT_DIR}/summary.txt"
 
+# Archive containing the results
+RESULT_ARCHIVE=""
+
 # Main directory on the target machine to operate in
 # (will be set by preparePackage())
 TARGET_DIR=""
@@ -629,6 +632,41 @@ processResults()
 }
 
 ########################################################################
+# Send the resuls by email to the subscribers
+########################################################################
+emailResults()
+{
+    cd "${WORK_DIR}" || exit 1
+    bsMailerConf="bs_mailer.conf"
+    rm -rf ${bsMailerConf}
+    
+    which bs_mailer > /dev/null 2>&1
+    if test $? -ne 0; then
+        printMessage "bs_mailer application is not found.\n"
+        printMessage "Its sources should be distributed with the build system\n"
+        printMessage "Please make sure it is installed and 'bs_mailer' executable is in \$PATH.\n"
+        exit 1
+    fi
+    
+    if test ! -f "${bsMailerConf}.in"; then
+        printMessage "${bsMailerConf}.in is missing\n"
+        exit 1
+    fi
+    
+    cat "${bsMailerConf}.in" | sed -e "s#@RESULT_ARCHIVE@#${RESULT_ARCHIVE}#" > "${bsMailerConf}"
+    if test $? -ne 0; then
+        printMessage "Failed to generate ${bsMailerConf} from ${bsMailerConf}.in\n"
+        exit 1
+    fi
+    
+    bs_mailer ${bsMailerConf} >> "${MAIN_LOG}" 2>&1
+    if test $? -ne 0; then
+        printMessage "Failed to email the results to the subscribers\n"
+        exit 1
+    fi
+}
+
+########################################################################
 # main
 ########################################################################
 rm -rf "${RESULT_DIR}"
@@ -652,8 +690,8 @@ printf "Build system started at: ${CURRENT_DATE}\n\n"
 # Check if Mercurial is available.
 which hg > /dev/null 2>&1
 if test $? -ne 0; then
-    printf "Mercurial version control system is not found.\n"
-    printf "Please make sure it is installed and 'hg' executable is in \$PATH.\n"
+    printMessage "Mercurial version control system is not found.\n"
+    printMessage "Please make sure it is installed and 'hg' executable is in \$PATH.\n"
     exit 1
 fi
 
@@ -662,15 +700,15 @@ fi
 if test -n "${MANAGE_VM}"; then
 	which VBoxManage > /dev/null 2>&1
 	if test $? -ne 0; then
-		printf "VBoxManage executable is not found.\n"
-		printf "Please make sure VirtualBox 3.1.8 or newer is installed.\n"
+		printMessage "VBoxManage executable is not found.\n"
+		printMessage "Please make sure VirtualBox 3.1.8 or newer is installed.\n"
 		exit 1
 	fi
 	
 	which VBoxHeadless > /dev/null 2>&1
 	if test $? -ne 0; then
-		printf "VBoxHeadless executable is not found.\n"
-		printf "Please make sure VirtualBox 3.1.8 or newer is installed.\n"
+		printMessage "VBoxHeadless executable is not found.\n"
+		printMessage "Please make sure VirtualBox 3.1.8 or newer is installed.\n"
 		exit 1
 	fi
 fi
@@ -691,11 +729,14 @@ printSeparator
 processResults
 printSeparator
 
-# TODO: email the results if requested
+# Send the results by email to the subscribers if requested.
+if test -n "${EMAIL_LOGS}"; then
+    emailResults
+    printSeparator
+fi
 
+# Just in case
 rm -rf temp*
 
-#<>
-printf "Done.\n"
-#<>
+printf "Completed.\n"
 exit 0

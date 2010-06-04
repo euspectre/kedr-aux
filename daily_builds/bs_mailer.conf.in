@@ -1,0 +1,22 @@
+# Configuration file for bs_mailer application
+# !!COMPLETELY INSECURE!!
+
+# The subject of the message
+subject = [Build system] Build and test results for KEDR system
+
+# From: <...>
+sender = testlogger@rambler.ru
+
+# SMTP server settings
+server = smtp.rambler.ru
+serverUser = testlogger
+serverPass = password
+
+# Path to the text file containing the body of the message (plain text)
+bodyFile = ./results/summary.txt
+
+# Path to the attachment file
+attachmentFile = @RESULT_ARCHIVE@
+
+# Path to the file containing the list of subscribers
+subscribersFile = ./subscribers.list
