@@ -135,6 +135,17 @@ cd "${WORK_DIR}" || exitFailure
 # Use 'exitFailure' to abort this script if it does not.
 # Use 'printMessage' to output messages.
 
+########################################################################
+# Uninstall
+cd "${BUILD_DIR}" || exitFailure
+make uninstall >> "${LOG_FILE}" 2>&1
+if test $? -ne 0; then
+    printMessage "Failed to uninstall the system\n"
+    exitFailure
+fi
+printSeparator
+
 #######################################################################
+printMessage "Done.\n"
 exit 0
 
