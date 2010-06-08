@@ -1,0 +1,21 @@
+Usage example:
+
+./usage_kernel_functions.sh > results/<system_name>.txt
+
+Output contains list of functons, used by that modules, which are currently running on the OS.
+Numbers corresponding to each function represent number of modules which use this function.
+
+Auxiliary scripts:
+
+./imported_functions.pl <ko-file>
+
+Output list of kernel functions, used by module, representing by this file.
+
+./imported_functions_for_modules.pl <list of modules>
+
+Output list of functions, used by modules in the given list.
+
+./modules_list.pl
+
+Output list of modules, which is currently running.
+Similar to `lsmod` output, but only modules list.
