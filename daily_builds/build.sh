@@ -112,9 +112,12 @@ RESTORE_CURRENT_SNAPSHOT=""
 # whether it is empty or not.
 EMAIL_LOGS=""
 
-# How long (in seconds) to wait for a virtual machine to start up, shut down
-# or respond to a command.
+# How long (in seconds) to wait for a virtual machine to start up or
+# shut down.
 VM_TIMEOUT=""
+
+# How long (in seconds) to wait for a virtual machine to execute a command.
+VM_MAX_TIME=3600
 
 # User name on the target virtual machine (not related to the user on the 
 # host machine that launches the build system).
@@ -218,6 +221,9 @@ loadConfiguration()
             "vm_timeout")
                 VM_TIMEOUT=${PAR_VALUE}
                 ;;
+            "vm_max_time")
+                VM_MAX_TIME=${PAR_VALUE}
+                ;;
             "vm_user")
                 VM_USER=${PAR_VALUE}
                 ;;
@@ -243,6 +249,7 @@ loadConfiguration()
     checkParam "package_name" "${PACKAGE_NAME}"
     checkParam "package_version" "${PACKAGE_VERSION}"
     checkParam "vm_timeout" "${VM_TIMEOUT}"
+    checkParam "vm_max_time" "${VM_MAX_TIME}"
     checkParam "vm_user"    "${VM_USER}"
     checkParam "vm_pass"    "${VM_PASS}"
 }
@@ -343,7 +350,11 @@ preparePackage()
 # Execute a command on the specified target machine.
 # 
 # Usage:
-# 	execCommandOnTarget <machine_ip> <command>
+# 	execCommandOnTarget <machine_ip> <command> [timeout]
+# If <timeout> is specified, the function waits as many seconds at most for
+# the command to complete. If <timeout> is not specified, ${VM_TIMEOUT} is
+# used.
+#
 # The function also uses global configuration variables (VM_USER, etc.)
 ########################################################################
 execCommandOnTarget()
@@ -356,10 +367,14 @@ execCommandOnTarget()
 	# [NB] The names are lowercase because they are used only locally
 	exec_ip=$1
 	exec_command="$2"
+    exec_timeout="$3"
+    if test -z "${exec_timeout}"; then
+        exec_timeout="${VM_TIMEOUT}"
+    fi
 	
 	{
 	printf "Executing: ${exec_command}\n"
-	expect 	-c "set timeout ${VM_TIMEOUT}" \
+	expect 	-c "set timeout ${exec_timeout}" \
 		-c "spawn ssh ${VM_USER}@${exec_ip} \"${exec_command}\"" \
 		-c "expect -ex \":\"" \
 		-c "send \"${VM_PASS}\n\"" \
@@ -527,7 +542,10 @@ doTarget()
 		uploadToTarget ${vm_ip} "${SCRIPT_FILE}" "${TARGET_DIR}"
 		
 		# Run the build, etc., on the target system
-		execCommandOnTarget ${vm_ip} "${TARGET_DIR}/${SCRIPT_FILE} ${ARCHIVE_NAME}"
+		execCommandOnTarget \
+            ${vm_ip} \
+            "${TARGET_DIR}/${SCRIPT_FILE} ${ARCHIVE_NAME}" \
+            "${VM_MAX_TIME}"
 		
 		# Collect the results
 		downloadFromTarget ${vm_ip} "${TARGET_DIR}/*.log" "${MACHINE_RESULT_DIR}/"
