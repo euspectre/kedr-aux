@@ -48,8 +48,16 @@ printSeparator()
 # script.
 exitFailure()
 {
-    printf "Errors occured\n" >> "${LOG_FILE}"
+    printf "[Build System] Errors occured\n" >> "${LOG_FILE}"
     exit 1
+}
+
+# Writes an success marker at the end of the log and stops execution of this
+# script.
+exitSuccess()
+{
+    printf "[Build System] Building and testing completed successfully\n" >> "${LOG_FILE}"
+    exit 0
 }
 
 ########################################################################
@@ -146,6 +154,4 @@ fi
 printSeparator
 
 #######################################################################
-printMessage "Done.\n"
-exit 0
-
+exitSuccess

@@ -625,8 +625,8 @@ processResults()
 			# Check if build.log file is present and find out whether it
 			# contains error verdict or not
 			if test -f "${res_dir}/${TARGET_LOG}"; then
-				tail -3 "${res_dir}/${TARGET_LOG}" | grep "Errors occured" > /dev/null
-				if test $? -eq 0; then
+				tail -3 "${res_dir}/${TARGET_LOG}" | grep "Building and testing completed successfully" > /dev/null
+				if test $? -ne 0; then
 					printf "${res_machine}: Process completed. Errors were found, see the logs for details.\n" >> "${SUMMARY_FILE}"
 				else
 					printf "${res_machine}: Process completed successfully (no errors found).\n" >> "${SUMMARY_FILE}"
