@@ -627,9 +627,9 @@ processResults()
 			if test -f "${res_dir}/${TARGET_LOG}"; then
 				tail -3 "${res_dir}/${TARGET_LOG}" | grep "Building and testing completed successfully" > /dev/null
 				if test $? -ne 0; then
-					printf "${res_machine}: Process completed. Errors were found, see the logs for details.\n" >> "${SUMMARY_FILE}"
+					printf "${res_machine}: Errors occured, see the logs for details.\n" >> "${SUMMARY_FILE}"
 				else
-					printf "${res_machine}: Process completed successfully (no errors found).\n" >> "${SUMMARY_FILE}"
+					printf "${res_machine}: Process completed successfully.\n" >> "${SUMMARY_FILE}"
 				fi
 			else
 				printf "${res_machine}: Failed to complete the process.\n" >> "${SUMMARY_FILE}"
