@@ -5,6 +5,10 @@ Usage example:
 Output contains list of functons, used by that modules, which are currently running on the OS.
 Numbers corresponding to each function represent number of modules which use this function.
 
+(NB) On some systems object files for modules are gzipped, and for purpose of preprocessing
+them are unsipped to the temporary file in the current directory.
+It is better to run scripts from the directory, where they are.
+
 Auxiliary scripts:
 
 ./imported_functions.pl <ko-file>

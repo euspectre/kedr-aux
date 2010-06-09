@@ -1,4 +1,6 @@
 my %functions = ();
+# If system store only gz-archive of module, extract this module here.
+my $temp_module_path = "temp.ko";
 for my $module (@ARGV)
 {
     #Regular path to modprobe is /sbin/modprobe, but on some systems /sbin is not in $PATH
@@ -15,6 +17,14 @@ for my $module (@ARGV)
         $module_path = "/lib/modules/`uname -r`/$module_path";
     }
     
+    my $path_is_archive = "";
+
+    if($module_path =~ /\.gz$/)
+    {
+        $path_is_archive = "yes";
+        system("gunzip -c $module_path > $temp_module_path");
+        $module_path = $temp_module_path;
+    }
     my @functions_local = `perl imported_functions.pl $module_path`;
     for my $function (@functions_local)
     {
@@ -28,6 +38,11 @@ for my $module (@ARGV)
             $functions{$function} = 1;
         }
     }
+    if($path_is_archive)
+    {
+        system("rm -f $temp_module_path");
+    }
+    
 }
 my @functions_sorted = sort {$functions{$b} <=> $functions{$a}} keys %functions;
 for my $function (@functions_sorted)

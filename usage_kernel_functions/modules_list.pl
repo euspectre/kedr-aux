@@ -1,4 +1,4 @@
-my @list = `lsmod`;
+my @list = `PATH=$PATH:/sbin lsmod`;
 shift @list; #remove header line
 for my $line (@list)
 {
