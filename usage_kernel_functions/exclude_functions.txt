@@ -1,0 +1,45 @@
+# Functions, which calls will not be controlled in the KEDR (in the near future).
+
+# With floating number of params
+printk
+sprintf
+snprintf
+seq_printf
+snd_iprintf
+# Simple string processing
+strlen
+strcpy
+strcmp
+simple_strtoul
+strlcpy
+strncmp
+# System variable
+jiffies
+# Variables for kmalloc functionality
+kmalloc_caches
+malloc_sizes
+# Something unknown
+__tracepoint_kmalloc
+# Something unknown
+__stack_chk_fail
+# Per cpu variables
+per_cpu__current_task
+per_cpu__cpu_number
+__per_cpu_offset
+# Used via macros, and it is difficult to make a mistake in using it.
+param_set_int
+param_get_int
+param_set_bool
+param_get_bool
+# Used for ftrace-design, should be implemented by hand, difficult to understand
+mcount
+# Nothing interesting - simple system-specific formulae
+msecs_to_jiffies
+# Variable(and struct type)
+pv_irq_ops
+#kernel panic functionality
+warn_slowpath_null
+warn_slowpath_fmt
+warn_on_slowpath
+#Function simply return string, describing driver.
+dev_driver_string
