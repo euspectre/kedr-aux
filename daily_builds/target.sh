@@ -116,6 +116,7 @@ if test $? -ne 0; then
 fi
 
 cmake \
+    -DCMAKE_VERBOSE_MAKEFILE="ON" \
     -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
     "${WORK_DIR}/${ARCHIVE_DIR}/sources" >> "${LOG_FILE}" 2>&1
 if test $? -ne 0; then
@@ -123,7 +124,7 @@ if test $? -ne 0; then
     exitFailure
 fi
 
-make >> "${LOG_FILE}" 2>&1
+KBUILD_VERBOSE=1 make >> "${LOG_FILE}" 2>&1
 if test $? -ne 0; then
     printMessage "Failed to build the system\n"
     exitFailure
