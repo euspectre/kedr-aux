@@ -1,0 +1,29 @@
+#Groups of synonym kernel functions
+
+copy_to_user _copy_to_user
+copy_from_user _copy_from_user
+
+_spin_lock_irq _raw_spin_lock_irq
+_spin_unlock_irq _raw_spin_unlock_irq
+
+_spin_lock _raw_spin_lock
+_spin_unlock _raw_spin_unlock
+
+_spin_lock_irqsave _raw_spin_lock_irqsave
+#_raw_spin_unlock_irqresto - because of breaking line in readelf, will be removed when fixed
+_spin_unlock_irqrestore _raw_spin_unlock_irqrestore _raw_spin_unlock_irqresto
+
+_spin_unlock_bh _raw_spin_unlock_bh
+_spin_lock_bh _raw_spin_lock_bh
+
+_spin_trylock _raw_spin_trylock
+
+_spin_trylock_bh _raw_spin_trylock_bh
+
+init_waitqueue_head __init_waitqueue_head
+
+_write_lock_bh _raw_write_lock_bh
+
+cond_resched_lock __cond_resched_lock
+
+request_module __request_module

@@ -1,9 +1,17 @@
-Usage example:
+For collect statistic from one machine:
 
 ./usage_kernel_functions.sh > results/<system_name>.txt
 
-Output contains list of functons, used by that modules, which are currently running on the OS.
-Numbers corresponding to each function represent number of modules which use this function.
+It is better to not use whitespace in <system_name>.
+
+For join statistic from several machines into one file:
+
+./concatenate_statistics.pl results/*.txt > total_usage_statistic.txt
+
+For filter resulting statistics to exclude "not interesting" symbols
+and to join statistic for symbols, which really have same meaning:
+
+cat total_usage_statistic.txt | filter_table.pl exclude_functions.txt | join_synonyms.pl synonym_functions.txt > total_usage_statistic_processed.txt
 
 (NB) On some systems object files for modules are gzipped, and for purpose of preprocessing
 them are unsipped to the temporary file in the current directory.

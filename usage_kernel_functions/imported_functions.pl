@@ -1,11 +1,10 @@
 # Take object filename,
-# and extract names of functions, exported by this object file.
+# and extract names of functions, imported by this object file.
 
-# Verify number of arguments (should be 1 - object file).
 $#ARGV == 0 or die "Usage is:\n\n\timported functions.pl object_file\n\n";
 my $filename = shift;
 
-my @table = `readelf -s $filename`;
+my @table = `readelf -Ws $filename`;
 
 for my $line (@table)
 {
