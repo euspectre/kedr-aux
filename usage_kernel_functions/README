@@ -14,8 +14,12 @@ and to join statistic for symbols, which really have same meaning:
 cat total_usage_statistic.txt | filter_table.pl exclude_functions.txt | join_synonyms.pl synonym_functions.txt > total_usage_statistic_processed.txt
 
 (NB) On some systems object files for modules are gzipped, and for purpose of preprocessing
-them are unsipped to the temporary file in the current directory.
+them are unzipped to the temporary file in the current directory.
 It is better to run scripts from the directory, where they are.
+
+For additional filtering functions, which are already covered(e.g, by call monitor payload modules):
+
+cat total_usage_statistic.txt | filter_table.pl exclude_functions.txt <kedr-dir>/sources/payloads_callm/*/covered_functions.txt | join_synonyms.pl synonym_functions.txt > not_covered.txt
 
 Auxiliary scripts:
 
