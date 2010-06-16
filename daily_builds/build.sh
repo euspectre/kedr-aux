@@ -316,15 +316,14 @@ preparePackage()
     # Append revision to the name of the package if requested.
     if test -n "${APPEND_REVISION}"; then
         REVISION=$(hg id -i ${SRC_DIR})
-        ARCHIVE_NAME="${ARCHIVE_NAME}-r${REVISION}"
+        ARCHIVE_NAME="${ARCHIVE_NAME}-${REVISION}"
     fi
 
     ARCHIVE_DIR="${ARCHIVE_NAME}"
-
-    cd ${SRC_DIR} && hg archive --type=files "../${ARCHIVE_DIR}" >> "${MAIN_LOG}" 2>&1
+    mv "${SRC_DIR}/sources" "${ARCHIVE_DIR}" >> "${MAIN_LOG}" 2>&1
     if test $? -ne 0; then
         cd "${WORK_DIR}"
-        printMessage "Failed to prepare the source package\n"
+        printMessage "Failed to arrange files in the source package\n"
         
         rm -rf "${SRC_DIR}"
         rm -rf "${ARCHIVE_DIR}"

@@ -118,7 +118,7 @@ fi
 cmake \
     -DCMAKE_VERBOSE_MAKEFILE="ON" \
     -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
-    "${WORK_DIR}/${ARCHIVE_DIR}/sources" >> "${LOG_FILE}" 2>&1
+    "${WORK_DIR}/${ARCHIVE_DIR}" >> "${LOG_FILE}" 2>&1
 if test $? -ne 0; then
     printMessage "Failed to configure the system\n"
     exitFailure
