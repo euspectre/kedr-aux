@@ -43,3 +43,12 @@ warn_slowpath_fmt
 warn_on_slowpath
 #Function simply return string, describing driver.
 dev_driver_string
+# This functions accept parameters and return value via registers. So, using only c-code them couldn't be processed correctly.
+__put_user_1
+__put_user_2
+__put_user_4
+__put_user_8
+__get_user_1
+__get_user_2
+__get_user_4
+__get_user_8
