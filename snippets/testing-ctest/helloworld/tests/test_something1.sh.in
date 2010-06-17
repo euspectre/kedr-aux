@@ -1,0 +1,14 @@
+#!/bin/bash
+
+WORK_DIR=${PWD}
+
+# A fake test that passes if called with no arguments and fails otherwise
+printf "Source directory is @CMAKE_CURRENT_SOURCE_DIR@\n"
+printf "Say \"Hi\" [1]!\n"
+
+if test $# -ne 0; then
+    # A fake failure
+    exit 1
+fi
+
+exit 0
