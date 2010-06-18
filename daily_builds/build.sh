@@ -12,7 +12,7 @@
 
 if test $# -ne 0 ; then
     printf "Usage: $0\n"
-	exit 0
+    exit 0
 fi
 
 ########################################################################
@@ -23,6 +23,10 @@ WORK_DIR=${PWD}
 CONF_FILE="${WORK_DIR}/build.conf"
 MACHINES_FILE="${WORK_DIR}/machines.list"
 SUBSCRIBERS_FILE="${WORK_DIR}/subscribers.list"
+
+# Name of the file with the names of the tests that may fail
+# (the file should be located in ${WORK_DIR})
+MAY_FAIL_FILE="may_fail.list"
 
 RESULT_DIR="${WORK_DIR}/results"
 
@@ -159,10 +163,10 @@ checkParam()
 ########################################################################
 loadConfiguration()
 {
-	if test ! -f "$1"; then
-		printMessage "Failed to open configuration file: $1\n"
-		exit 1
-	fi
+    if test ! -f "$1"; then
+        printMessage "Failed to open configuration file: $1\n"
+        exit 1
+    fi
     printMessage "Loading configuration from $1\n"
     
     OLD_IFS=${IFS}
@@ -349,7 +353,7 @@ preparePackage()
 # Execute a command on the specified target machine.
 # 
 # Usage:
-# 	execCommandOnTarget <machine_ip> <command> [timeout]
+#   execCommandOnTarget <machine_ip> <command> [timeout]
 # If <timeout> is specified, the function waits as many seconds at most for
 # the command to complete. If <timeout> is not specified, ${VM_TIMEOUT} is
 # used.
@@ -358,209 +362,210 @@ preparePackage()
 ########################################################################
 execCommandOnTarget()
 {
-	if test -z "$1$2"; then
-		printMessage "Error: IP address of the target machine and the command must not be empty\n"
-		exit 1
-	fi
-	
-	# [NB] The names are lowercase because they are used only locally
-	exec_ip=$1
-	exec_command="$2"
+    if test -z "$1$2"; then
+        printMessage "Error: IP address of the target machine and the command must not be empty\n"
+        exit 1
+    fi
+    
+    # [NB] The names are lowercase because they are used only locally
+    exec_ip=$1
+    exec_command="$2"
     exec_timeout="$3"
     if test -z "${exec_timeout}"; then
         exec_timeout="${VM_TIMEOUT}"
     fi
-	
-	{
-	printf "Executing: ${exec_command}\n"
-	expect 	-c "set timeout ${exec_timeout}" \
-		-c "spawn ssh ${VM_USER}@${exec_ip} \"${exec_command}\"" \
-		-c "expect -ex \":\"" \
-		-c "send \"${VM_PASS}\n\"" \
-		-c "expect eof"
-	} >> "${MAIN_LOG}" 2>&1
+    
+    {
+    printf "Executing: ${exec_command}\n"
+    expect  -c "set timeout ${exec_timeout}" \
+        -c "spawn ssh ${VM_USER}@${exec_ip} \"${exec_command}\"" \
+        -c "expect -ex \":\"" \
+        -c "send \"${VM_PASS}\n\"" \
+        -c "expect eof"
+    } >> "${MAIN_LOG}" 2>&1
 }
 
 ########################################################################
 # Upload a file to the specified target machine.
 # 
 # Usage:
-# 	uploadToTarget <machine_ip> <what> <where>
+#   uploadToTarget <machine_ip> <what> <where>
 # 
 # <what>  - a local path to the file to upload
 # <where> - a path on the target machine to upload the file to (must not 
-# 	contain spaces)
+#   contain spaces)
 #
 # The function also uses global configuration variables (VM_USER, etc.)
 ########################################################################
 uploadToTarget()
 {
-	if test -z "$1$2$3"; then
-		printMessage "Error: uploadToTarget(): arguments must not be empty\n"
-		exit 1
-	fi
-	
-	# [NB] The names are lowercase because they are used only locally
-	upload_ip=$1
-	upload_what="$2"
-	upload_where="$3"
-	
-	{
-	expect 	-c "set timeout ${VM_TIMEOUT}" \
-		-c "spawn scp \"${upload_what}\" ${VM_USER}@${upload_ip}:${upload_where}" \
-		-c "expect -ex \":\"" \
-		-c "send \"${VM_PASS}\n\"" \
-		-c "expect eof"
-	} >> "${MAIN_LOG}" 2>&1
+    if test -z "$1$2$3"; then
+        printMessage "Error: uploadToTarget(): arguments must not be empty\n"
+        exit 1
+    fi
+    
+    # [NB] The names are lowercase because they are used only locally
+    upload_ip=$1
+    upload_what="$2"
+    upload_where="$3"
+    
+    {
+    expect  -c "set timeout ${VM_TIMEOUT}" \
+        -c "spawn scp \"${upload_what}\" ${VM_USER}@${upload_ip}:${upload_where}" \
+        -c "expect -ex \":\"" \
+        -c "send \"${VM_PASS}\n\"" \
+        -c "expect eof"
+    } >> "${MAIN_LOG}" 2>&1
 }
 
 ########################################################################
 # Download a file from the specified target machine.
 # 
 # Usage:
-# 	downloadFromTarget <machine_ip> <what> <where>
+#   downloadFromTarget <machine_ip> <what> <where>
 # 
 # <what>  - a path on the target machine to the file to be downloaded 
-#	(must not contain spaces)
+#   (must not contain spaces)
 # <where> - a local path to place the downloaded file to.
-# 	
+#   
 #
 # The function also uses global configuration variables (VM_USER, etc.)
 ########################################################################
 downloadFromTarget()
 {
-	if test -z "$1$2$3"; then
-		printMessage "Error: downloadFromTarget(): arguments must not be empty\n"
-		exit 1
-	fi
-	
-	# [NB] The names are lowercase because they are used only locally
-	download_ip=$1
-	download_what="$2"
-	download_where="$3"
-	
-	{
-	expect 	-c "set timeout ${VM_TIMEOUT}" \
-		-c "spawn scp ${VM_USER}@${download_ip}:${download_what} \"${download_where}\"" \
-		-c "expect -ex \":\"" \
-		-c "send \"${VM_PASS}\n\"" \
-		-c "expect eof"
-	} >> "${MAIN_LOG}" 2>&1
+    if test -z "$1$2$3"; then
+        printMessage "Error: downloadFromTarget(): arguments must not be empty\n"
+        exit 1
+    fi
+    
+    # [NB] The names are lowercase because they are used only locally
+    download_ip=$1
+    download_what="$2"
+    download_where="$3"
+    
+    {
+    expect  -c "set timeout ${VM_TIMEOUT}" \
+        -c "spawn scp ${VM_USER}@${download_ip}:${download_what} \"${download_where}\"" \
+        -c "expect -ex \":\"" \
+        -c "send \"${VM_PASS}\n\"" \
+        -c "expect eof"
+    } >> "${MAIN_LOG}" 2>&1
 }
 
 ########################################################################
 # Do the building and testing on the specified target machine.
 # 
 # Usage:
-# 	doTarget <machine_name> <machine_ip>
+#   doTarget <machine_name> <machine_ip>
 # The function also uses global configuration variables (VM_USER, etc.)
 ########################################################################
 doTarget()
 {
-	if test -z "$1$2"; then
-		printMessage "Error: name and IP address of a target machine must not be empty\n"
-		exit 1
-	fi
-	
-	if test -z "${TARGET_DIR}"; then
-		printMessage "Error: main directory on the target machine is not specified\n"
-	fi
-	
-	# [NB] The names are lowercase because they are used only locally
-	vm_name=$1
-	vm_ip=$2
-	
-	printMessage "Processing target machine \"${vm_name}\" (${vm_ip})\n"
-	MACHINE_RESULT_DIR="${RESULT_DIR}/${vm_name}.result"
-	
-	# Create directory for the results
-	mkdir -p "${MACHINE_RESULT_DIR}" >> "${MAIN_LOG}" 2>&1
-	if test $? -ne 0; then
-		printMessage "Failed to create directory ${MACHINE_RESULT_DIR}\n"
-		exit 1
-	fi
-	
-	if test -n "${MANAGE_VM}"; then
-	# Revert to the current snapshot, start the machine, etc.
-	{
+    if test -z "$1$2"; then
+        printMessage "Error: name and IP address of a target machine must not be empty\n"
+        exit 1
+    fi
+    
+    if test -z "${TARGET_DIR}"; then
+        printMessage "Error: main directory on the target machine is not specified\n"
+    fi
+    
+    # [NB] The names are lowercase because they are used only locally
+    vm_name=$1
+    vm_ip=$2
+    
+    printMessage "Processing target machine \"${vm_name}\" (${vm_ip})\n"
+    MACHINE_RESULT_DIR="${RESULT_DIR}/${vm_name}.result"
+    
+    # Create directory for the results
+    mkdir -p "${MACHINE_RESULT_DIR}" >> "${MAIN_LOG}" 2>&1
+    if test $? -ne 0; then
+        printMessage "Failed to create directory ${MACHINE_RESULT_DIR}\n"
+        exit 1
+    fi
+    
+    if test -n "${MANAGE_VM}"; then
+    # Revert to the current snapshot, start the machine, etc.
+    {
         if test -n "${RESTORE_CURRENT_SNAPSHOT}"; then
-		    VBoxManage snapshot ${vm_name} restorecurrent
-    		if test $? -ne 0; then
-    			printf "Warning: failed to restore current snapshot for machine \"${vm_name}\"\n"
+            VBoxManage snapshot ${vm_name} restorecurrent
+            if test $? -ne 0; then
+                printf "Warning: failed to restore current snapshot for machine \"${vm_name}\"\n"
             fi
         fi
-		VBoxHeadless --startvm ${vm_name} --vrdp=off &
-		VBOX_HEADLESS_PID=$!
-		# $! is the pid of the last backgroud process launched 
-		# from this shell.
-		
-		# Wait a little...
-		sleep 3
-		# ... and check if 'VboxHeadless' is actually running (in case
-		# of an error, it will stop immediately).
-		ps -e | grep ${VBOX_HEADLESS_PID} > /dev/null
-		if test $? -ne 0; then
-			printf "Failed to launch VBoxHeadless tool\n"
-		else
-			# Wait some more and hope the machine will start before 
-			# we finish sleeping
-			sleep ${VM_TIMEOUT}
-			
-			# If the machine has not started up yet, give it some more time
-			ping -c 1 ${vm_ip} > /dev/null
-			if test $? -ne 0; then
-				sleep ${VM_TIMEOUT}
-			fi
-		fi
-	} >> "${MAIN_LOG}" 2>&1
-	fi
-	
-	# Check if the machine is accessible
-	ping -c 1 ${vm_ip} > /dev/null
-	if test $? -ne 0; then
-		printMessage "Machine \"${vm_name}\" (${vm_ip}) is not accessible\n"
-		
-		# Just in case
-		if test -n "${MANAGE_VM}"; then
-			printMessage "Turning off \"${vm_name}\" - just in case\n"
-			VBoxManage controlvm ${vm_name} poweroff >> "${MAIN_LOG}" 2>&1
-		fi
-	else
-		# The target machine seems to be working, so send the data there,
-		# launch the build script there and collect the results.
-		# 
-		# For now, it is not checked here whether the operations fail or not.
-		# It should be found out manually using the collected logs, etc.
-		cd "${WORK_DIR}"
-		
-		# Create a build directory and upload the sources and the target 
-		# script there
-		execCommandOnTarget ${vm_ip} "rm -rf ${TARGET_DIR}"
-		execCommandOnTarget ${vm_ip} "mkdir -p ${TARGET_DIR}"
-		uploadToTarget ${vm_ip} "${ARCHIVE_FILE}" "${TARGET_DIR}"
-		uploadToTarget ${vm_ip} "${SCRIPT_FILE}" "${TARGET_DIR}"
-		
-		# Run the build, etc., on the target system
-		execCommandOnTarget \
+        VBoxHeadless --startvm ${vm_name} --vrdp=off &
+        VBOX_HEADLESS_PID=$!
+        # $! is the pid of the last backgroud process launched 
+        # from this shell.
+        
+        # Wait a little...
+        sleep 3
+        # ... and check if 'VboxHeadless' is actually running (in case
+        # of an error, it will stop immediately).
+        ps -e | grep ${VBOX_HEADLESS_PID} > /dev/null
+        if test $? -ne 0; then
+            printf "Failed to launch VBoxHeadless tool\n"
+        else
+            # Wait some more and hope the machine will start before 
+            # we finish sleeping
+            sleep ${VM_TIMEOUT}
+            
+            # If the machine has not started up yet, give it some more time
+            ping -c 1 ${vm_ip} > /dev/null
+            if test $? -ne 0; then
+                sleep ${VM_TIMEOUT}
+            fi
+        fi
+    } >> "${MAIN_LOG}" 2>&1
+    fi
+    
+    # Check if the machine is accessible
+    ping -c 1 ${vm_ip} > /dev/null
+    if test $? -ne 0; then
+        printMessage "Machine \"${vm_name}\" (${vm_ip}) is not accessible\n"
+        
+        # Just in case
+        if test -n "${MANAGE_VM}"; then
+            printMessage "Turning off \"${vm_name}\" - just in case\n"
+            VBoxManage controlvm ${vm_name} poweroff >> "${MAIN_LOG}" 2>&1
+        fi
+    else
+        # The target machine seems to be working, so send the data there,
+        # launch the build script there and collect the results.
+        # 
+        # For now, it is not checked here whether the operations fail or not.
+        # It should be found out manually using the collected logs, etc.
+        cd "${WORK_DIR}"
+
+        # Create a build directory and upload the sources and the target 
+        # script there
+        execCommandOnTarget ${vm_ip} "rm -rf ${TARGET_DIR}"
+        execCommandOnTarget ${vm_ip} "mkdir -p ${TARGET_DIR}"
+        uploadToTarget ${vm_ip} "${ARCHIVE_FILE}" "${TARGET_DIR}"
+        uploadToTarget ${vm_ip} "${SCRIPT_FILE}" "${TARGET_DIR}"
+        uploadToTarget ${vm_ip} "${MAY_FAIL_FILE}" "${TARGET_DIR}"
+        
+        # Run the build, etc., on the target system
+        execCommandOnTarget \
             ${vm_ip} \
             "${TARGET_DIR}/${SCRIPT_FILE} ${ARCHIVE_NAME}" \
             "${VM_MAX_TIME}"
-		
-		# Collect the results
-		downloadFromTarget ${vm_ip} "${TARGET_DIR}/*.log" "${MACHINE_RESULT_DIR}/"
-		
-		if test -n "${MANAGE_VM}"; then
-			printMessage "Shutting down the target machine\n"
-			execCommandOnTarget ${vm_ip} "/sbin/shutdown -h now"
-			sleep ${VM_TIMEOUT}
-		fi	
-	fi
+        
+        # Collect the results
+        downloadFromTarget ${vm_ip} "${TARGET_DIR}/*.log" "${MACHINE_RESULT_DIR}/"
+        
+        if test -n "${MANAGE_VM}"; then
+            printMessage "Shutting down the target machine\n"
+            execCommandOnTarget ${vm_ip} "/sbin/shutdown -h now"
+            sleep ${VM_TIMEOUT}
+        fi  
+    fi
 }
 
 ########################################################################
 # Process the list of target machines.
 # Usage:
-#	processTargetMachines <machine_list_file>
+#   processTargetMachines <machine_list_file>
 # For each machine, the list file must contain its name and IP address at 
 # the same line.
 # #-comments and blank lines are ignored.
@@ -570,12 +575,12 @@ doTarget()
 ########################################################################
 processTargetMachines()
 {
-	if test ! -f "$1"; then
-		printMessage "Failed to open machine list: $1\n"
-		exit 1
-	fi
-	
-	printMessage "Machine list file: $1\n"
+    if test ! -f "$1"; then
+        printMessage "Failed to open machine list: $1\n"
+        exit 1
+    fi
+    
+    printMessage "Machine list file: $1\n"
     
     OLD_IFS=${IFS}
     IFS=$'\n'
@@ -588,7 +593,7 @@ processTargetMachines()
         if test $? -eq 1; then
             echo "${LINE}" | grep -E '^[\t ]*[A-Za-z0-9_-]{1,}[\t ]{1,}([0-9]{1,3})(\.[0-9]{1,3}){3}' > /dev/null
             if test $? -ne 0; then
-				printf "$1: syntax error in \"${LINE}\"\n"
+                printf "$1: syntax error in \"${LINE}\"\n"
                 printf "Expected the following format: NAME IP_ADDRESS\n"
                 exit 1
             fi
@@ -600,8 +605,8 @@ processTargetMachines()
             MACHINE_IP=$(echo "${LINE}" | sed -e 's/^.*[^0-9]\([0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\).*/\1/')
 
 # Process the target machine
-			printSeparator
-			doTarget "${MACHINE_NAME}" "${MACHINE_IP}" 
+            printSeparator
+            doTarget "${MACHINE_NAME}" "${MACHINE_IP}" 
 
 # End processing of the line    
         fi
@@ -616,36 +621,36 @@ processTargetMachines()
 ########################################################################
 processResults()
 {
-	cd "${RESULT_DIR}" || exit 1
-	for res_dir in *.result; do
-		if test -d "${res_dir}"; then
-			res_machine=$(echo "${res_dir}" | sed -e 's/\..*//')
-			
-			# Check if build.log file is present and find out whether it
-			# contains error verdict or not
-			if test -f "${res_dir}/${TARGET_LOG}"; then
-				tail -3 "${res_dir}/${TARGET_LOG}" | grep "Building and testing completed successfully" > /dev/null
-				if test $? -ne 0; then
-					printf "${res_machine}: Errors occured, see the logs for details.\n" >> "${SUMMARY_FILE}"
-				else
-					printf "${res_machine}: Process completed successfully.\n" >> "${SUMMARY_FILE}"
-				fi
-			else
-				printf "${res_machine}: Failed to complete the process.\n" >> "${SUMMARY_FILE}"
-			fi
-		fi
-	done
-	
-	cd "${WORK_DIR}" || exit 1
-	CURRENT_DATE=$(date)
-	printf "\nBuild system finished at ${CURRENT_DATE}\n" >> "${SUMMARY_FILE}"
-	
-	# Pack the results
-	TIMESTR=`date +%Y-%m-%d_%H-%M-%S`
-	RESULT_ARCHIVE="results-${TIMESTR}.tar.bz2"
-	rm -f *results*.bz2
-	
-	tar cjf ${RESULT_ARCHIVE} results/ || exit 1
+    cd "${RESULT_DIR}" || exit 1
+    for res_dir in *.result; do
+        if test -d "${res_dir}"; then
+            res_machine=$(echo "${res_dir}" | sed -e 's/\..*//')
+            
+            # Check if build.log file is present and find out whether it
+            # contains error verdict or not
+            if test -f "${res_dir}/${TARGET_LOG}"; then
+                tail -3 "${res_dir}/${TARGET_LOG}" | grep "Building and testing completed successfully" > /dev/null
+                if test $? -ne 0; then
+                    printf "${res_machine}: Errors occured, see the logs for details.\n" >> "${SUMMARY_FILE}"
+                else
+                    printf "${res_machine}: Process completed successfully.\n" >> "${SUMMARY_FILE}"
+                fi
+            else
+                printf "${res_machine}: Failed to complete the process.\n" >> "${SUMMARY_FILE}"
+            fi
+        fi
+    done
+    
+    cd "${WORK_DIR}" || exit 1
+    CURRENT_DATE=$(date)
+    printf "\nBuild system finished at ${CURRENT_DATE}\n" >> "${SUMMARY_FILE}"
+    
+    # Pack the results
+    TIMESTR=`date +%Y-%m-%d_%H-%M-%S`
+    RESULT_ARCHIVE="results-${TIMESTR}.tar.bz2"
+    rm -f *results*.bz2
+    
+    tar cjf ${RESULT_ARCHIVE} results/ || exit 1
 }
 
 ########################################################################
@@ -715,19 +720,19 @@ fi
 # Check if VirtualBox tools are available if virtual machine management has
 # been requested.
 if test -n "${MANAGE_VM}"; then
-	which VBoxManage > /dev/null 2>&1
-	if test $? -ne 0; then
-		printMessage "VBoxManage executable is not found.\n"
-		printMessage "Please make sure VirtualBox 3.1.8 or newer is installed.\n"
-		exit 1
-	fi
-	
-	which VBoxHeadless > /dev/null 2>&1
-	if test $? -ne 0; then
-		printMessage "VBoxHeadless executable is not found.\n"
-		printMessage "Please make sure VirtualBox 3.1.8 or newer is installed.\n"
-		exit 1
-	fi
+    which VBoxManage > /dev/null 2>&1
+    if test $? -ne 0; then
+        printMessage "VBoxManage executable is not found.\n"
+        printMessage "Please make sure VirtualBox 3.1.8 or newer is installed.\n"
+        exit 1
+    fi
+    
+    which VBoxHeadless > /dev/null 2>&1
+    if test $? -ne 0; then
+        printMessage "VBoxHeadless executable is not found.\n"
+        printMessage "Please make sure VirtualBox 3.1.8 or newer is installed.\n"
+        exit 1
+    fi
 fi
 
 # Do the work
