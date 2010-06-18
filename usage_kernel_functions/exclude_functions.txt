@@ -52,3 +52,7 @@ __get_user_1
 __get_user_2
 __get_user_4
 __get_user_8
+# This is real functions, but them used mainly as value of field in wait_queue_t struct.
+# With current controller implementation we cannot catch call to it. 
+default_wake_function
+autoremove_wake_function
