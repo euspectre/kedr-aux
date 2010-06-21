@@ -155,10 +155,7 @@ printMessage "===== Running the tests =====\n"
 # Still, using 'make check' should make no harm.
 TESTS_FAILED=0
 KBUILD_VERBOSE=1 make check >> "${LOG_FILE}" 2>&1
-if test $? -ne 0; then
-# Some of the tests have probably reported failures
-    TESTS_FAILED=$?
-fi
+TESTS_FAILED=$?
 
 # Copy the test logs to ${WORK_DIR} from where they could be automatically
 # retrieved by the host machine
@@ -174,7 +171,7 @@ if test ${TESTS_FAILED} -ne 0; then
         UNKNOWN_FAILURES=""
         for fail_record in $(cat "${TEST_FAIL_LIST}"); do
             #<>
-            printMessage "[DBG] ${fail_record}\n"
+            #printMessage "[DBG] ${fail_record}\n"
             #<>
             echo ${fail_record} | grep -q -F -f "${MAY_FAIL_FILE}"
             if test $? -ne 0; then
