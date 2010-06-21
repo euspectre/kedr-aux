@@ -1,0 +1,13 @@
+API:
+#include <linux/spinlock.h>
+void __lockfunc spin_unlock_irq(spinlock_t *lock);
+
+ABI:
+void __lockfunc _spin_unlock_irq(spinlock_t *lock)
+или
+void __lockfunc _raw_spin_unlock_irq(raw_spinlock_t *lock)
+(в зависимости от версии ядра)
+
+raw_spinlock_t* получается из &((spinlock_t *)->rlock).
+
+На многих системах функция полностью inline. Чтобы открыть ее для перехвата, можно выставить флаг CONFIG_DEBUG_SPINLOCK.
