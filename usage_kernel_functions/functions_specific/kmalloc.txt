@@ -1,0 +1,15 @@
+API: 
+#include <linux/slab.h>
+static inline void *kmalloc(size_t size, gfp_t flags);
+
+ABI:
+void *kmem_cache_alloc(struct kmem_cache *, gfp_t);
+ƒл€ случа€, когда __builtin_constant_p(size) возвращает true (т.е. size - константа времени компил€ции).
+“.к. kmalloc - static фунци€, то срабатывать данное условие будет только дл€ -O флага компил€ции
+(см. http://gcc.gnu.org/onlinedocs/gcc-4.3.2/gcc/Other-Builtins.html, __builtin_constant_p).
+'size' косвенно учитываетс€ в первом параметре(см. код).
+
+—инонимы: kmem_cache_alloc_notrace
+
+void *__kmalloc(size_t size, gfp_t flags);
+ƒл€ остальных случаев.
