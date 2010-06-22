@@ -304,7 +304,8 @@ preparePackage()
     TARGET_DIR="/tmp/${ARCHIVE_NAME}.build"
            
     cd "${WORK_DIR}"
-    printMessage "Retrieving the source code of \"${PACKAGE_NAME}\" system\n\n"
+    printMessage "Retrieving the source code of \"${PACKAGE_NAME}\" system from\n"
+    printMessage "${REPO_MAIN}\n\n"
     
     rm -rf ${SRC_DIR}
     rm -rf ${ARCHIVE_NAME}*
