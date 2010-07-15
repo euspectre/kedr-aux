@@ -18,6 +18,11 @@ fi
 ########################################################################
 # Globals
 ########################################################################
+# Newline character (to be used in IFS, etc.)
+# [NB] Using $'\n' is not POSIX-compatible but works in bash.
+NEWLINE='
+'
+
 WORK_DIR=${PWD}
 
 CONF_FILE="${WORK_DIR}/build.conf"
@@ -170,9 +175,9 @@ loadConfiguration()
     printMessage "Loading configuration from $1\n"
     
     OLD_IFS=${IFS}
-    IFS=$'\n'
+    IFS="${NEWLINE}"
 
-    for LINE in $(cat $1); do
+    for LINE in $(cat "$1"); do
         IFS=${OLD_IFS}
 
 # Ignore the line if is it blank or is a comment
@@ -241,7 +246,7 @@ loadConfiguration()
             esac
 # End processing of the line    
         fi
-        IFS=$'\n'
+        IFS="${NEWLINE}"
     done
     IFS=${OLD_IFS}
     
@@ -406,7 +411,7 @@ uploadToTarget()
     fi
     
     # [NB] The names are lowercase because they are used only locally
-    upload_ip=$1
+    upload_ip="$1"
     upload_what="$2"
     upload_where="$3"
     
@@ -440,7 +445,7 @@ downloadFromTarget()
     fi
     
     # [NB] The names are lowercase because they are used only locally
-    download_ip=$1
+    download_ip="$1"
     download_what="$2"
     download_where="$3"
     
@@ -472,8 +477,8 @@ doTarget()
     fi
     
     # [NB] The names are lowercase because they are used only locally
-    vm_name=$1
-    vm_ip=$2
+    vm_name="$1"
+    vm_ip="$2"
     
     printMessage "Processing target machine \"${vm_name}\" (${vm_ip})\n"
     MACHINE_RESULT_DIR="${RESULT_DIR}/${vm_name}.result"
@@ -584,9 +589,9 @@ processTargetMachines()
     printMessage "Machine list file: $1\n"
     
     OLD_IFS=${IFS}
-    IFS=$'\n'
+    IFS="${NEWLINE}"
 
-    for LINE in $(cat $1); do
+    for LINE in $(cat "$1"); do
         IFS=${OLD_IFS}
 
 # Ignore the line if is it blank or is a comment
@@ -611,7 +616,7 @@ processTargetMachines()
 
 # End processing of the line    
         fi
-        IFS=$'\n'
+        IFS="${NEWLINE}"
     done
     IFS=${OLD_IFS}
 }
