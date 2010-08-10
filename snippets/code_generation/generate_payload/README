@@ -163,4 +163,10 @@ __kmalloc и kfree):
 4. Fedora 12 x86_64 (2.6.31.x)                  - OK
 5. Ubuntu 10.04 x86 (2.6.32.x) (проверка выполнена и на "cp_target", и на 
    "vboxvfs")                                   - OK 
-6. Mandriva Cooker (2010) x86 (2.6.31.12)       - TODO
+6. Mandriva Cooker (2010) x86 (2.6.31.12)       - OK
+7. OpenSUSE 11.3 x86_64 (2.6.34.x)              - OK
+=======================================================================
+
+[NB] Payload "my_payload_string_ops" демонстрирует, как можно в трассу 
+выводить и строковые значения. Подробнее - в комментариях в 
+data/my_payload_string_ops.data.

@@ -9,6 +9,8 @@
 #include <linux/errno.h>	/* error codes */
 #include <linux/cdev.h>
 
+#include <linux/string.h>	/* kstrdup() */
+
 #include <asm/uaccess.h>	/* copy_*_user */
 
 #include "cfake.h"
@@ -196,6 +198,8 @@ cfake_open(struct inode *inode, struct file *filp)
 	
 	struct cfake_dev *dev = NULL;
 	
+	char* dataCopy = NULL;
+	
 	printk(KERN_WARNING "[cp_target] open() for MJ=%d and MN=%d\n", mj, mn);
 	
 	if (mj != cfake_major || mn < cfake_minor || 
@@ -229,6 +233,16 @@ cfake_open(struct inode *inode, struct file *filp)
 		}
 		memset(dev->data, 0, dev->buffer_size);
 	}
+	
+	dev->data[dev->buffer_size - 1] = 0; // just in case
+	dataCopy = kstrdup(dev->data, GFP_KERNEL);
+	if (dataCopy == NULL)
+	{
+		return -ENOMEM;
+	}
+	
+	printk(KERN_INFO "[cp_target] data: \"%s\"\n", dataCopy);
+	kfree(dataCopy);
 	return 0;
 }
 

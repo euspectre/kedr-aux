@@ -1,0 +1,69 @@
+# This module processes the calls for the following string operations:
+# kstrdup.
+
+module.name = my_payload_string_ops
+module.author = Me, me and me again
+module.license = GPL
+
+header =>>
+#include <linux/kernel.h>   /* printk() */
+#include <linux/errno.h>    /* error codes */
+
+#include <linux/string.h>
+
+#include <cp_controller/controller_common.h>
+<<
+
+# Each group corresponds to a target function.
+# 
+# Give 'returnsVoid' a non-empty value if the target function returns void.
+# Otherwise, it is not necessary to define 'returnsVoid' at all.
+# If the function returns void, 'returnType' will be ignored.
+
+#######################################################################
+[group]
+	# Name and return type of the target function
+	function.name = kstrdup
+	returnType = char *
+
+	# Names and types of the arguments of the target function
+	arg.type = const char *
+	arg.name = s
+
+	arg.type = gfp_t
+	arg.name = flags
+	
+	# The parameters to be output to the trace. 
+    
+    # [NB] If some of the parameters are nul-terminated strings and you 
+    # would like to output them to the trace as such, you should set 
+    # 'trace.param.string' to a non-empty value for these parameters and to 
+    # an empty value for the remaining ones.
+    #
+    # That is, if there are strings among the parameters, it should be 
+    # specified for EACH ONE of them whether it is a string or not.
+    #
+    # This is due to the way MiST Engine handles multi-valued parameters:
+    # if the number of values is not sufficient, the last value is 
+    # "continued", that is, used as many times as necessary.
+    
+    trace.param.type = const char *
+	trace.param.name = s
+    trace.param.string = yes
+    
+    # The remaining parameters are not meant to be output as strings.
+	trace.param.type = unsigned int
+	trace.param.name = flags
+    trace.param.string = 
+	
+	trace.param.type = void *
+	trace.param.name = returnValue
+    trace.param.string = 
+    
+    # The format string to be used for trace output.
+	# The order in which parameters will be listed in the call to
+	# a tracing function is the same as the corresponding trace.param.* 
+	# definitions are listed in this file.
+	trace.formatString = "kstrdup(\"%s\", %x), result: %p"
+# End of the group of definitions for kstrdup().
+#######################################################################
