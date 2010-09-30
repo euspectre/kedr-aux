@@ -1,0 +1,96 @@
+Total commits (new features and bug fixes): 48636 (2.6.31 - 2.6.35.5) - 
+may be duplicates.
+
+[NB] Because of merges, the summaries in the logs for main versions (2.6.3x) 
+are often listed twice => the numbers for these logs are divided by 2 before 
+adding them up to the totals (rounding - up).
+
+Fixes by keywords in summary 
+(grep -E -i '^([ \t]*[A-Za-z0-9_-\/]*[ \t]*:){1,}[ \t]*\w*[ \t]*<keyword>'):
+
+- "fix":        6281 (1554 + 9453/2)
+- "avoid":      223 (58 + 330/2)
+- "prevent":    116 (43 + 145/2)
+- "handle":     232 (65 + 333/2)
+- "correct":    296 (49 + 494/2)
+- "eliminate":  67 (9 + 115/2)
+- "always":     60 (14 + 92/2)
+- "do not":     306 (58 + 495/2)
+- "don?t":      554 (140 + 828/2)
+- "ensure":     93 (22 + 141/2)
+- "make sure":  74 (18 + 111/2)
+- "check":      469 (104 + 730/2)
+- "bug":        210 (64 + 291/2)
+
+=======================================================================
+=======================================================================
+Total commits (new features and bug fixes): 10839 (2.6.35 - 2.6.35.5) - 
+may be duplicates.
+
+Fixes by keywords in summary 
+(grep -E -i '^([ \t]*[A-Za-z0-9_-\/]*[ \t]*:){1,}[ \t]*\w*[ \t]*<keyword>'):
+
+- "fix":        1263 (114 + 2298/2)
+- "avoid":      56 (5 + 101/2)
+- "prevent":    19 (5 + 28/2)
+- "handle":     43 (5 + 75/2)
+- "correct":    44 (2 + 84/2)
+- "eliminate":  22 (0 + 44/2)
+- "always":     14 (3 + 22/2)
+- "do not":     118 (6 + 230/2)
+- "don?t":      121 (11 + 220/2)
+- "ensure":     21 (1 + 40/2)
+- "make sure":  17 (0 + 33/2)
+- "check":      106 (7 + 198/2)
+- "bug":        49 (2 + 94/2)
+
+Total: 1893
+Race conditions: 106
+
+=======================================================================
+Apart from build-specific and hardware-specific problems...
+
+=======================================================================
+Problems in error paths (resource leaks, memory access errors, ...)
+Total: 132
+
+2.6.35.5:   +++++++++
+2.6.35.4:   ++
+2.6.35.3:   no
+2.6.35.2:   ++
+2.6.35.1:   ++
+2.6.35:     +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+=======================================================================
+Information leaks and other security issues
+Total: 5
+
+2.6.35.5:   +
+2.6.35.4:   ++
+2.6.35.3:   no
+2.6.35.2:   no
+2.6.35.1:   no
+2.6.35:     ++
+
+=======================================================================
+Memory-related errors not in error paths (buffer overflows, use after free, double free, ...)
+Total: 32
+
+2.6.35.5:   +++++
+2.6.35.4:   ++++++
+2.6.35.3:   no
+2.6.35.2:   ++++
+2.6.35.1:   +++++
+2.6.35:     ++++++++++++
+
+=======================================================================
+Operations that are not allowed in atomic context 
+Total: 5
+
+2.6.35.5:   no
+2.6.35.4:   +
+2.6.35.3:   no
+2.6.35.2:   +
+2.6.35.1:   +
+2.6.35:     +
+=======================================================================
