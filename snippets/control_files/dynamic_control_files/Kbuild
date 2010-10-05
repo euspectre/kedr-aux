@@ -1,0 +1,5 @@
+module_name=dynamic_control_files_example
+
+ccflags-y := -DDEBUG
+obj-m := ${module_name}.o
+${module_name}-y := module.o
