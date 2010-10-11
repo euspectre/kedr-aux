@@ -1,5 +1,5 @@
 module_name=static_control_files_example
 
-ccflags-y := -DDEBUG
-obj-m := ${module_name}.o
-${module_name}-y := module.o
+ccflags-y := -I$(src)/.. -DDEBUG
+obj-m := $(module_name).o
+$(module_name)-y := module.o control_file.o
