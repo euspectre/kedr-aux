@@ -306,7 +306,7 @@ preparePackage()
 {
     SRC_DIR=temp_src
     ARCHIVE_NAME="${PACKAGE_NAME}-${PACKAGE_VERSION}"
-    TARGET_DIR="/tmp/${ARCHIVE_NAME}.build"
+    TARGET_DIR="/var/tmp/${ARCHIVE_NAME}.build"
            
     cd "${WORK_DIR}"
     printMessage "Retrieving the source code of \"${PACKAGE_NAME}\" system from\n"
