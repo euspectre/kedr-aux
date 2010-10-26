@@ -4,7 +4,7 @@
 1. 
 Создание копии репозитория, 
 в котором идёт разработка очередной версии системы KEDR:
-    hg clone https://itgdev.igroup.ispras.ru/hgwebdir.cgi/kedr/kedr-0.x/current/ kedr-current
+    hg clone https://itgdev.intra.ispras.ru/hgwebdir.cgi/kedr/kedr-0.x/current/ kedr-current
 
 В результате будет создан каталог 'kedr-current', содержащий копию соотв. 
 репозитория. 

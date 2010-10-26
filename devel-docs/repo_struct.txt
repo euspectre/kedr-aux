@@ -59,10 +59,10 @@ Itgdev, чтобы при ночных запусках всё было пров
 Для доступа извне к репозиторию на Itgdev (в т.ч. для clone и для работы 
 через web-интерфейс) 
 необходимо использовать след. базовый URL:
-https://itgdev.igroup.ispras.ru/hgwebdir.cgi/kedr/
+https://itgdev.intra.ispras.ru/hgwebdir.cgi/kedr/
 
 Пример. Создание копии репозитория для очередной 0.x-версии системы:
-    hg clone https://itgdev.igroup.ispras.ru/hgwebdir.cgi/kedr/kedr-0.x/current/ kedr-current
+    hg clone https://itgdev.intra.ispras.ru/hgwebdir.cgi/kedr/kedr-0.x/current/ kedr-current
 
 Копия будет создана в подкаталоге kedr-current текущего каталога на 
 локальной машине.
@@ -85,7 +85,7 @@ d:\hg_repo\kedr\
 Т.е. процесс примерно таков:
 
 1. Создаём эталонный репозиторий в каталоге, скажем, kedr-pristine:
-hg clone https://itgdev.igroup.ispras.ru/hgwebdir.cgi/kedr/kedr-0.x/current/  kedr-pristine
+hg clone https://itgdev.intra.ispras.ru/hgwebdir.cgi/kedr/kedr-0.x/current/  kedr-pristine
 
 2. Делаем working copy в каталоге, скажем, kedr-work:
 hg clone <путь_к_kedr-pristine> kedr-work
@@ -124,7 +124,7 @@ http://www.selenic.com/mercurial/wiki/
 Чтобы не захламлять репозитории KEDR, всё это нужно хранить не там, а в 
 специальном репозитории kedr-aux на Itgdev:
 
-https://itgdev.igroup.ispras.ru/hgwebdir.cgi/kedr/kedr-aux/
+https://itgdev.intra.ispras.ru/hgwebdir.cgi/kedr/kedr-aux/
 
 Этот репозиторий не публикуется на BerliOS и т.п., он доступен только в 
 ИСП. Соотв., commit messages для файлов из этого репозитория можно писать и 
