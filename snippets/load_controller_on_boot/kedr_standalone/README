@@ -1,0 +1,52 @@
+﻿Вариант KEDR'а "все-в-одном" - base, controller, payloads компилятся в один модуль, который потом очень легко загрузить,
+т.к. не надо никаких скриптов.
+
+В качестве payload модулей поддерживаются только call monitor payloads - достаточно задать список data-файлов, и 
+будет сгенерирован общий модуль, который включает в себя все необходимые replacement функции.
+
+
+Для упрощения реализации, пример использует source и binary tree из KEDR.
+Первое нужно для заголовочного файла <kedr/base/common.h>, второе - для генератора и, возможно, как источника data-файлов.
+
+Все настраиваемые опции находятся в файле common_makefile (формат - как у обычного makefile'а):
+
+kedr_source_dir - путь к исходному дереву KEDR.
+kedr_build_dir - путь к бинарному дереву KEDR (должно быть предсобрано вызовом 'make').
+payload_data_files - список data-файлов, по которым будут определятся payload'ы, включаемые в целевой модуль.
+Относительные имена файлов считаются относительно текущей директории.
+
+module_name - определяет имя целевого модуля.
+
+
+
+Для разработчика:
+
+Реализация использует исходный код от "kedr_base" "kedr_controller" и шаблоны для call monitors payloads из KEDR, незначительно модифицируя их.
+
+Для обновления "controller" функциональности на основе обновленного "controller" модуля:
+	-на основе diff отредактировать controller.c файл.
+
+Для обновления "base" функциональности на основе обновленного "base" модуля:
+	-на основе diff отредактировать base.c файл.
+
+
+Для обновления функциональности call monitor payloads на основе обновленных исходных шаблонов:
+	-из исходного templates/payload.c/document/document.tpl убрать включение <kernel/module.h>,
+		убрать строчки 
+			'MODULE_AUTHOR(...)',
+			'MODULE_LISENCE(...)',
+			'module_init(..)',
+			'module_exit(...)';
+		проверить, что имя модуля задается параметром data-файла
+			'module.name'
+		проверить, что функции инициализации и финализации модуля имеют имена 
+			'<$module.name$>_init_module' и
+			'<$module.name$>_cleanup_module' 
+		соответственно, убрать у их обявлений модификатор static;
+		заменить
+			'#include "trace_payload.h"' на 
+			'#include "trace_<$module.name$>.h"';
+		
+	-в исходном templates/trace_payload.h/document/document.tpl заменить
+			'#define TRACE_INCLUDE_FILE trace_payload' на
+			'#define TRACE_INCLUDE_FILE trace_<$module.name$>'

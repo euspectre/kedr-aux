@@ -1,0 +1,36 @@
+include $(src)/common_makefile
+# Need for list of sources file of payloads
+include $(src)/generate_sources
+
+# This subdirectory contains necessary files both for x86 and x86_64.
+ARCH_DIR := arch/x86
+
+# This auxiliary file will be generated during the build (x86 instruction 
+# tables as C code).
+INAT_TABLES_FILE := inat-tables.h
+
+# Deduce name of payloads object files from the names of sources
+payload_o_files := $(addsuffix .o, $(basename $(payload_c_files)))
+
+# <kedr/base/common.h>
+ccflags-y += -I$(kedr_source_dir)/include
+# tracepoints for payloads
+ccflags-y += -I$(src)
+# instructions set definitions
+ccflags-y += -I$(src)/$(ARCH_DIR)/include
+
+obj-m := $(module_name).o
+$(module_name)-y := controller.o base.o \
+	payloads_module_functions.o \
+	$(payload_o_files) \
+	$(ARCH_DIR)/lib/inat.o \
+	$(ARCH_DIR)/lib/insn.o
+
+$(obj)/$(ARCH_DIR)/lib/inat.o: $(obj)/$(ARCH_DIR)/lib/$(INAT_TABLES_FILE) $(src)/$(ARCH_DIR)/lib/inat.c
+
+# Note "LC_ALL=C" before awk, it is necessary. Without it, the awk script 
+# will report semantic error in the input file on some systems. This is 
+# probably due to some locale-related issues that affect separator characters,
+# string parsing, etc.
+$(obj)/$(ARCH_DIR)/lib/$(INAT_TABLES_FILE): $(src)/$(ARCH_DIR)/lib/x86-opcode-map.txt 
+	LC_ALL=C awk -f $(src)/$(ARCH_DIR)/tools/gen-insn-attr-x86.awk $< > $@
