@@ -1,0 +1,17 @@
+#Will be included into 'makefile' and 'Kbuild'
+
+# Should be set to the real KEDR directories
+# Refers to source dir of KEDR for refer to <kedr/base/common.h> header 
+# (and for simplify templates extraction)
+kedr_source_dir := /home/andrew/kedr-test/sources/
+
+# Refers to binary dir of KEDR for simplify usage of generator
+kedr_build_dir := /home/andrew/cmake-build-dir
+
+# The payloads set, which you want to use
+#payload_data_files := $(kedr_build_dir)/examples/custom_payload_callm/payload.data
+
+payload_data_files := $(wildcard $(kedr_build_dir)/payloads_callm/*/payload.data)
+
+################################
+module_name := kedr_hot

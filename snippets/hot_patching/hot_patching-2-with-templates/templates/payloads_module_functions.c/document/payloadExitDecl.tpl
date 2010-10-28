@@ -1,0 +1,1 @@
+extern void <$module.name$>_cleanup_module(void);

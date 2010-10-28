@@ -1,0 +1,44 @@
+﻿Модифицированный пример "hot_patching-2". 
+replacement функции генерируются на основе data-файлов call monitor payloads из KEDR.
+
+Для упрощения реализации, пример использует source и binary tree из KEDR.
+Первое нужно для заголовочного файла <kedr/base/common.h>, второе - для генератора и, возможно, как источника data-файлов.
+
+Все настраиваемые опции находятся в файле common_makefile (формат - как у обычного makefile'а):
+
+kedr_source_dir - путь к исходному дереву KEDR.
+kedr_build_dir - путь к бинарному дереву KEDR (должно быть предсобрано вызовом 'make').
+payload_data_files - список data-файлов, по которым будут определятся payload'ы, включаемые в целевой модуль.
+Относительные имена файлов считаются относительно текущей директории.
+
+module_name - определяет имя целевого модуля.
+
+
+
+Для разработчика:
+
+Реализация использует исходный код от "hot_patching-2" и шаблоны для call monitors payloads из KEDR, незначительно модифицируя их.
+
+Для обновления "hot_patching-2" функциональности на основе обновленного "hot_patching-2" модуля:
+	-на основе diff отредактировать patcher.c файл.
+
+Для обновления функциональности call monitor payloads на основе обновленных исходных шаблонов:
+	-из исходного templates/payload.c/document/document.tpl убрать включение <kernel/module.h>,
+		убрать строчки 
+			'MODULE_AUTHOR(...)',
+			'MODULE_LISENCE(...)',
+			'module_init(..)',
+			'module_exit(...)';
+		проверить, что имя модуля задается параметром data-файла
+			'module.name'
+		проверить, что функции инициализации и финализации модуля имеют имена 
+			'<$module.name$>_init_module' и
+			'<$module.name$>_cleanup_module' 
+		соответственно, убрать у их обявлений модификатор static;
+		заменить
+			'#include "trace_payload.h"' на 
+			'#include "trace_<$module.name$>.h"';
+		
+	-в исходном templates/trace_payload.h/document/document.tpl заменить
+			'#define TRACE_INCLUDE_FILE trace_payload' на
+			'#define TRACE_INCLUDE_FILE trace_<$module.name$>'
