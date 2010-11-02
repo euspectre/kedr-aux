@@ -17,7 +17,7 @@ generate_sources:  $(payloads_all_data)
 KBUILD_DIR := /lib/modules/`uname -r`/build
 PWD := `pwd`
 
-$(module_name).ko: patcher.c payloads_module_functions.c $(payload_c_files) $(payload_h_files)
+$(module_name).ko: patcher.c payloads_module_functions.c $(payload_c_files) $(payload_h_files) copy_arch_tree
 	make -C $(KBUILD_DIR) M=$(PWD) modules
 
 payloads_module_functions.c: $(payloads_all_data)
@@ -27,6 +27,9 @@ $(payloads_all_data): $(payload_data_files)
 	cat $^ > $@
 	printf "$(foreach payload_datafile, $^, payload.datafile = $(payload_datafile)\n)" >> $@
 
+copy_arch_tree:
+	cp -pr $(kedr_source_dir)/controller/arch ./
+
 clean:
 	make -C $(KBUILD_DIR) M=$(PWD) clean
 	rm -f $(payload_c_files) $(payload_h_files)
@@ -34,4 +37,4 @@ clean:
 	rm -f $(payloads_all_data)
 	rm -f generate_sources
 
-.PHONY: all clean
+.PHONY: all clean copy_arch_tree

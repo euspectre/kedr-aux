@@ -3,11 +3,11 @@ include $(src)/common_makefile
 include $(src)/generate_sources
 
 # This subdirectory contains necessary files both for x86 and x86_64.
-ARCH_DIR := ../arch/x86
+ARCH_DIR := ./arch/x86
 
 # This auxiliary file will be generated during the build (x86 instruction 
 # tables as C code).
-INAT_TABLES_FILE := inat-tables.c
+INAT_TABLES_FILE := inat-tables.h
 
 # Deduce name of payloads object files from the names of sources
 payload_o_files := $(addsuffix .o, $(basename $(payload_c_files)))
