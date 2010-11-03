@@ -23,7 +23,7 @@ MODULE_AUTHOR("Eugene A. Shatokhin");
 MODULE_LICENSE("GPL");
 
 /* ========== Module Parameters ========== */
-/* Name of the module to analyse. It can be passed to 'insmod' as 
+/* Name of the module to analyse. It can be passed to 'insmod' as
  * an argument, for example,
  *  /sbin/insmod hp_patcher.ko target_name="module_to_be_analysed"
  * The target module must be already loaded by the time hp_patcher begins to
@@ -42,39 +42,39 @@ struct module* target_module = NULL;
 int module_notifier_registered = 0;
 /* ================================================================ */
 
-/* 
+/*
  * The stuff related to the kprobe-based mechanism of target instrumentation.
  */
 
 /* The required value of kedr_probe.magic (see below) */
 #define KEDR_PROBE_MAGIC 0x9ED564F2
 
-/* Each kedr_probe instance corresponds to a call to some target function 
+/* Each kedr_probe instance corresponds to a call to some target function
  * made by the target module.
  */
 struct kedr_probe
 {
-    /* This is to link the probes for a particular target module 
+    /* This is to link the probes for a particular target module
      * into a list.
-     */ 
+     */
     struct list_head list;
-    
+
     /* The kernel probe will be used to break into the target driver
      * in a reasonably SMP-safe way.
      */
     struct kprobe kernel_probe;
-    
+
     /* A magic number used as a weak guarantee that the structure
-     * does not contain garbage. Can be checked, for example, when 
-     * a pointer to the structure is obtained from the pointer to 
+     * does not contain garbage. Can be checked, for example, when
+     * a pointer to the structure is obtained from the pointer to
      * struct kprobe via container_of().
      */
     unsigned int magic;
-    
+
     /* 0 if the probe is hit for the first time, non-zero otherwise */
     int was_hit_before;
-    
-    /* The addresses of the original and the replacement functions 
+
+    /* The addresses of the original and the replacement functions
      * corresponding to the call instruction where the probe is placed.
      */
     void* orig_func;
@@ -83,22 +83,22 @@ struct kedr_probe
 
 /* The list of kedr_probe instances */
 struct list_head kedr_probes;
-/* TODO: is it necessary to protect the list with a mutex? 
+/* TODO: is it necessary to protect the list with a mutex?
  * See also the notes in init().
  */
 
-/* A spinlock to guarantee proper synchronization when executing probe 
+/* A spinlock to guarantee proper synchronization when executing probe
  * handlers, removing the probes, etc.
  */
 spinlock_t kedr_probe_lock;
 
-/* TODO: Replaces the call address in the appropriate instruction. 
+/* TODO: Replaces the call address in the appropriate instruction.
  * Must be called with kedr_probe_lock held.
  */
 static void
 kedr_probe_replace_call(struct kedr_probe* kp);
 
-/* TODO: Restores the call address in the appropriate instruction. 
+/* TODO: Restores the call address in the appropriate instruction.
  * Must be called with kedr_probe_lock held.
  */
 static void
@@ -109,28 +109,28 @@ static int
 kedr_probe_pre_handler(struct kprobe* p, struct pt_regs* regs)
 {
     unsigned long flags;
-    
-    struct kedr_probe* kp = 
+
+    struct kedr_probe* kp =
         container_of(p, struct kedr_probe, kernel_probe);
     if (kp->magic != KEDR_PROBE_MAGIC)
     {
         printk(KERN_WARNING "[hp_patcher] "
 "kedr_probe_pre_handler() called for a corrupted kedr_probe structure\n");
 
-/* Not sure if there is a preferable way to indicate that something bad 
+/* Not sure if there is a preferable way to indicate that something bad
  * happened in the handler, just issue a warning and return for now.
  */
         return 0;
     }
-    
-    //<> TODO: remove when debugging is finished 
+
+    //<> TODO: remove when debugging is finished
     /*printk (KERN_INFO "[hp_patcher] "
     "Probe hit at 0x%p, call address: 0x%p, was_hit_before=%d\n",
         (void*)p->addr,
         kp->orig_func,
         kp->was_hit_before);*/
     //<>
-    
+
     spin_lock_irqsave(&kedr_probe_lock, flags);
     if (!kp->was_hit_before)
     {
@@ -155,25 +155,25 @@ static struct kedr_probe*
 kedr_probe_create(kprobe_opcode_t* addr, void* orig_func, void* repl_func)
 {
     struct kedr_probe* kp;
-    
+
     BUG_ON(addr == NULL);
     BUG_ON(orig_func == NULL);
     BUG_ON(repl_func == NULL);
-    
+
     kp = kzalloc(sizeof(struct kedr_probe), GFP_KERNEL);
-    if (kp == NULL) 
+    if (kp == NULL)
     {
         return NULL;
     }
-    
+
     /* 'was_hit_before' has been set to 0 already (by kzalloc) */
     kp->kernel_probe.addr = addr;
     kp->kernel_probe.pre_handler = kedr_probe_pre_handler;
-    
+
     kp->magic = KEDR_PROBE_MAGIC;
     kp->orig_func = orig_func;
     kp->repl_func = repl_func;
-    
+
     return kp;
 }
 
@@ -189,31 +189,31 @@ kedr_probe_destroy(struct kedr_probe* doomed)
     return;
 }
 
-/* Creates a kedr_probe instance with the specified parameters (see 
- * kedr_probe_create), tries to register the associated kprobe with the 
+/* Creates a kedr_probe instance with the specified parameters (see
+ * kedr_probe_create), tries to register the associated kprobe with the
  * kprobe system and, if OK, adds the kedr_probe to the global list.
  *
  * The function returns 0 if successful, an error code otherwise.
  */
-static int 
+static int
 kedr_probe_set(void* addr, void* orig_func, void* repl_func)
 {
     struct kedr_probe* kp = NULL;
     int result = 0;
-    
-    kp = kedr_probe_create((kprobe_opcode_t*)addr, 
+
+    kp = kedr_probe_create((kprobe_opcode_t*)addr,
         orig_func, repl_func);
     if (kp == NULL)
     {
         return -ENOMEM;
     }
-    
+
     result = register_kprobe(&kp->kernel_probe);
     if (result != 0)
     {
         goto fail;
     }
-    
+
     INIT_LIST_HEAD(&kp->list);
     list_add_tail(&kp->list, &kedr_probes);
 
@@ -231,27 +231,27 @@ kedr_probe_clear_all(void)
 {
     unsigned long flags;
     struct kedr_probe *kp, *tmp;
-    
+
     list_for_each_entry_safe (kp, tmp, &kedr_probes, list)
     {
         spin_lock_irqsave(&kedr_probe_lock, flags);
         if (kp->was_hit_before)
         {
-    /* If the probe has never been hit, the call address must remain 
+    /* If the probe has never been hit, the call address must remain
      * unchanged. Only if a hit occured, should we restore the address.
      */
             kedr_probe_restore_call(kp);
         }
         else
         {
-    /* This is to prevent call replacement if the probe is hit after 
+    /* This is to prevent call replacement if the probe is hit after
      * kedr_probe_lock is unlocked but before the corresponding kprobe
      * is unregistered.
      */
             kp->was_hit_before = 1;
         }
         spin_unlock_irqrestore(&kedr_probe_lock, flags);
-        
+
         unregister_kprobe(&kp->kernel_probe);
         list_del(&kp->list);
         kedr_probe_destroy(kp);
@@ -269,7 +269,7 @@ struct payload_entry
 
 LIST_HEAD(payload_list);
 
-int 
+int
 kedr_payload_register(struct kedr_payload *payload)
 {
     struct payload_entry *new_entry = kmalloc(sizeof(*new_entry), GFP_KERNEL);
@@ -283,7 +283,7 @@ kedr_payload_register(struct kedr_payload *payload)
     return 0;
 }
 
-void 
+void
 kedr_payload_unregister(struct kedr_payload *payload)
 {
     struct payload_entry *entry_del;
@@ -305,38 +305,37 @@ kedr_target_module_in_init(void)
     return target_module->module_init != NULL;
 }
 
-//Lists of payload 'init' and 'exit' functions
-extern int (*payloads_init[])(void);
-extern void (*payloads_exit[])(void);
-extern int payloads_n;
+// Payload 'init' and 'exit' functions
+extern int payload_init(void);
+extern void payload_cleanup(void);
 
 /* ================================================================ */
 /* Helpers */
 
 /* CALL_ADDR_FROM_OFFSET()
- * 
- * Calculate the memory address being the operand of a given instruction 
- * (usually, 'call'). 
+ *
+ * Calculate the memory address being the operand of a given instruction
+ * (usually, 'call').
  *   'insn_addr' is the address of the instruction itself,
  *   'insn_len' is length of the instruction in bytes,
  *   'offset' is the offset of the destination address from the first byte
  *   past the instruction.
- * 
+ *
  * For x86_64 architecture, the offset value is sign-extended here first.
- * 
- * "Intel x86 Instruction Set Reference" states the following 
+ *
+ * "Intel x86 Instruction Set Reference" states the following
  * concerning 'call rel32':
- * 
+ *
  * "Call near, relative, displacement relative to next instruction.
  * 32-bit displacement sign extended to 64 bits in 64-bit mode."
  * *****************************************************************
- * 
+ *
  * CALL_OFFSET_FROM_ADDR()
- * 
+ *
  * The reverse of CALL_ADDR_FROM_OFFSET: calculates the offset value
  * to be used in 'call' instruction given the address and length of the
  * instruction and the address of the destination function.
- * 
+ *
  * */
 #ifdef CONFIG_X86_64
 #  define CALL_ADDR_FROM_OFFSET(insn_addr, insn_len, offset) \
@@ -354,11 +353,11 @@ extern int payloads_n;
 /* ================================================================ */
 
 /* Decode and process the instruction ('c_insn') at
- * the address 'kaddr' - see the description of do_process_area for details. 
- * 
+ * the address 'kaddr' - see the description of do_process_area for details.
+ *
  * Check if we get past the end of the buffer [kaddr, end_kaddr)
- * 
- * The function returns the length of the instruction in bytes. 
+ *
+ * The function returns the length of the instruction in bytes.
  * 0 is returned in case of failure.
  */
 static unsigned int
@@ -366,53 +365,53 @@ do_process_insn(struct insn* c_insn, void* kaddr, void* end_kaddr,
     void** from_funcs, void** to_funcs, unsigned int nfuncs)
 {
     /* ptr to the 32-bit offset argument in the instruction */
-    u32* offset = NULL; 
-    
+    u32* offset = NULL;
+
     /* address of the function being called */
     void* addr = NULL;
-    
+
     static const unsigned char op_call = 0xe8; /* 'call <offset>' */
     static const unsigned char op_jmp  = 0xe9; /* 'jmp  <offset>' */
-    
+
     int i;
-    
+
     int result = 0;
-    
+
     BUG_ON(from_funcs == NULL || to_funcs == NULL);
-    
+
     /* Decode the instruction and populate 'insn' structure */
     kernel_insn_init(c_insn, kaddr);
     insn_get_length(c_insn);
-    
+
     if (c_insn->length == 0)
     {
         return 0;
     }
-    
+
     if (kaddr + c_insn->length > end_kaddr)
     {
     /* Note: it is OK to stop at 'end_kaddr' but no further */
         printk( KERN_WARNING "[hp_patcher] "
     "Instruction decoder stopped past the end of the section.\n");
     }
-        
-/* This call may be overkill as insn_get_length() probably has to decode 
+
+/* This call may be overkill as insn_get_length() probably has to decode
  * the instruction completely.
  * Still, to operate safely, we need insn_get_opcode() before we can access
- * c_insn->opcode. 
+ * c_insn->opcode.
  * The call is cheap anyway, no re-decoding is performed.
  */
-    insn_get_opcode(c_insn); 
+    insn_get_opcode(c_insn);
     if (c_insn->opcode.value != op_call &&
         c_insn->opcode.value != op_jmp)
     {
         /* Not a 'call' instruction, nothing to do. */
         return c_insn->length;
     }
-    
+
 /* [NB] For some reason, the decoder stores the argument of 'call' and 'jmp'
  * as 'immediate' rather than 'displacement' (as Intel manuals name it).
- * May be it is a bug, may be it is not. 
+ * May be it is a bug, may be it is not.
  * Meanwhile, I'll call this value 'offset' to avoid confusion.
  */
 
@@ -430,13 +429,13 @@ do_process_insn(struct insn* c_insn, void* kaddr, void* end_kaddr,
             c_insn->length,
             (unsigned int)c_insn->immediate.value,
             insn_offset_immediate(c_insn));
-        
+
         return c_insn->length;
     }
-    
+
     offset = (u32*)(kaddr + insn_offset_immediate(c_insn));
     addr = CALL_ADDR_FROM_OFFSET(kaddr, c_insn->length, *offset);
-    
+
     /* Check if one of the functions of interest is called */
     for (i = 0; i < nfuncs; ++i)
     {
@@ -444,11 +443,11 @@ do_process_insn(struct insn* c_insn, void* kaddr, void* end_kaddr,
         {
         /* Change the address of the function to be called */
             BUG_ON(to_funcs[i] == NULL);
-            
+
             printk( KERN_INFO "[hp_patcher] At 0x%p: "
         "setting a probe to change call address 0x%p to 0x%p\n",
                 kaddr,
-                from_funcs[i], 
+                from_funcs[i],
                 to_funcs[i]
             );
 /*
@@ -456,7 +455,7 @@ do_process_insn(struct insn* c_insn, void* kaddr, void* end_kaddr,
 (unsigned int)CALL_OFFSET_FROM_ADDR(
     kaddr, c_insn->length, to_funcs[i])
 */
-            result = kedr_probe_set(kaddr, 
+            result = kedr_probe_set(kaddr,
                 from_funcs[i], to_funcs[i]);
             if (result != 0)
             {
@@ -464,9 +463,9 @@ do_process_insn(struct insn* c_insn, void* kaddr, void* end_kaddr,
             "Failed to set a probe at 0x%p, error code is %d\n",
                 kaddr, -result);
             }
-/*          
+/*
             *offset = CALL_OFFSET_FROM_ADDR(
-                kaddr, 
+                kaddr,
                 c_insn->length,
                 to_funcs[i]
             );
@@ -474,12 +473,12 @@ do_process_insn(struct insn* c_insn, void* kaddr, void* end_kaddr,
             break;
         }
     }
-    
+
     return c_insn->length;
 }
 
 /* Process the instructions in [kbeg, kend) area.
- * Each 'call' instruction calling one of the target functions will be 
+ * Each 'call' instruction calling one of the target functions will be
  * changed so as to call the corresponding replacement function instead.
  * The addresses of target and replacement fucntions are given in
  * 'from_funcs' and 'to_funcs', respectively, the number of the elements
@@ -487,7 +486,7 @@ do_process_insn(struct insn* c_insn, void* kaddr, void* end_kaddr,
  * For each i=0..nfuncs-1, from_funcs[i] corresponds to to_funcs[i].
  */
 static void
-do_process_area(void* kbeg, void* kend, 
+do_process_area(void* kbeg, void* kend,
     void** from_funcs, void** to_funcs, unsigned int nfuncs)
 {
     struct insn c_insn; /* current instruction */
@@ -497,7 +496,7 @@ do_process_area(void* kbeg, void* kend,
     BUG_ON(kbeg == NULL);
     BUG_ON(kend == NULL);
     BUG_ON(kend < kbeg);
-        
+
     pos = kbeg;
     for (i = 0; ; ++i)
     {
@@ -506,7 +505,7 @@ do_process_area(void* kbeg, void* kend,
 
         len = do_process_insn(&c_insn, pos, kend,
             from_funcs, to_funcs, nfuncs);
-        if (len == 0)   
+        if (len == 0)
         {
             printk( KERN_WARNING "[hp_patcher] "
             "do_process_insn() returned 0\n");
@@ -517,32 +516,32 @@ do_process_area(void* kbeg, void* kend,
         {
             break;
         }
-        
+
 /* If the decoded instruction contains only zero bytes (this is the case,
  * for example, for one flavour of 'add'), skip to the first nonzero byte
- * after it. 
+ * after it.
  * This is to avoid problems if there are two or more sections in the area
- * being analysed. Such situation is very unlikely - still have to find 
- * the example. Note that ctors and dtors seem to be placed to the same 
+ * being analysed. Such situation is very unlikely - still have to find
+ * the example. Note that ctors and dtors seem to be placed to the same
  * '.text' section as the ordinary functions ('.ctors' and '.dtors' sections
  * probably contain just the lists of their addresses or something similar).
- * 
- * As we are not interested in instrumenting 'add' or the like, we can skip 
- * to the next instruction that does not begin with 0 byte. If we are 
- * actually past the last instruction in the section, we get to the next 
+ *
+ * As we are not interested in instrumenting 'add' or the like, we can skip
+ * to the next instruction that does not begin with 0 byte. If we are
+ * actually past the last instruction in the section, we get to the next
  * section or to the end of the area this way which is what we want in this
  * case.
  */
         for (k = 0; k < len; ++k)
         {
-            if (*((unsigned char*)pos + k) != 0) 
+            if (*((unsigned char*)pos + k) != 0)
             {
                 break;
             }
         }
         pos += len;
-        
-        if (k == len) 
+
+        if (k == len)
         {
             /* all bytes are zero, skip the following 0s */
             while (pos < kend && *(unsigned char*)pos == 0)
@@ -556,25 +555,25 @@ do_process_area(void* kbeg, void* kend,
             break;
         }
     }
-    
+
     return;
 }
 
-/* Changes the address of the function called by the instruction at 
+/* Changes the address of the function called by the instruction at
  * 'insn_addr'. If the original address differs from 'from_addr', the function
  * issues a warning and does nothing more. Otherwise, the address is changed
  * to 'to_addr'.
- * 
+ *
  * [NB] Currently (as of kernel 2.6.31), struct kprobe stores a copy of
  * the original call instruction without any changes. For instance, no fixup
- * is applied to the offset of the function to be called. 
+ * is applied to the offset of the function to be called.
  * As a result, the address of the original instruction is also necessary to
  * calculate the offset of the replacement function properly.
  * 'insn_addr' is the address of the stored copy of the instruction,
  * 'orig_insn_addr' is the address of the original.
  */
 static void
-change_call_address(kprobe_opcode_t* insn_addr, 
+change_call_address(kprobe_opcode_t* insn_addr,
     kprobe_opcode_t* orig_insn_addr,
     void* from_addr, void* to_addr)
 {
@@ -587,16 +586,16 @@ change_call_address(kprobe_opcode_t* insn_addr,
     struct insn c_insn;
     void* kaddr = NULL;
     void* kaddr_orig = NULL;
-    
+
     /* ptr to the 32-bit offset argument in the instruction */
-    u32* offset = NULL; 
-    
+    u32* offset = NULL;
+
     /* address of the function being called */
     void* addr = NULL;
-    
+
     kaddr = (void*)insn_addr;
     kaddr_orig = (void*)orig_insn_addr;
-    
+
     /* Decode the instruction and populate 'insn' structure */
     kernel_insn_init(&c_insn, kaddr);
 
@@ -608,7 +607,7 @@ change_call_address(kprobe_opcode_t* insn_addr,
             kaddr);
         return;
     }
-    
+
     insn_get_immediate(&c_insn);
     if (c_insn.immediate.nbytes != 4)
     {
@@ -619,17 +618,17 @@ change_call_address(kprobe_opcode_t* insn_addr,
             c_insn.immediate.nbytes);
         return;
     }
-    
+
     offset = (u32*)(kaddr + insn_offset_immediate(&c_insn));
-    
-    /* Note that the original address is used to calculate 'addr' 
+
+    /* Note that the original address is used to calculate 'addr'
      * while the address of the stored instruction is used to find the
      * position of the 'offset' ('displacement') field.
      */
     addr = CALL_ADDR_FROM_OFFSET(kaddr_orig, c_insn.length, *offset);
-    
+
     //<>
-    /*insn_get_opcode(&c_insn); 
+    /*insn_get_opcode(&c_insn);
     printk(KERN_INFO "[hp_patcher] "
 "instruction at 0x%p  (stored copy): opcode is 0x%x (should be 0xe8), "
 "offset of offset is %d byte(s), "
@@ -640,7 +639,7 @@ change_call_address(kprobe_opcode_t* insn_addr,
         (int)insn_offset_immediate(&c_insn),
         (unsigned int)(*offset));*/
     //<>
-        
+
     if (addr != from_addr)
     {
         printk(KERN_INFO "[hp_patcher] "
@@ -651,10 +650,10 @@ change_call_address(kprobe_opcode_t* insn_addr,
             from_addr);
         return;
     }
-    
+
     /* Note 'kaddr_orig' rather than 'kaddr' here */
     *offset = CALL_OFFSET_FROM_ADDR(
-        kaddr_orig, 
+        kaddr_orig,
         c_insn.length,
         to_addr);
     return;
@@ -669,7 +668,7 @@ kedr_probe_replace_call(struct kedr_probe* kp)
         kp->kernel_probe.ainsn.insn,
         *(u32*)(kp->kernel_probe.addr + 1));*/
     //<>
-    change_call_address(kp->kernel_probe.ainsn.insn, 
+    change_call_address(kp->kernel_probe.ainsn.insn,
         kp->kernel_probe.addr,
         kp->orig_func,
         kp->repl_func);
@@ -686,10 +685,10 @@ kedr_probe_restore_call(struct kedr_probe* kp)
     return;
 }
 
-/* Instruments the target module, i.e. sets kprobes to replace the calls to 
- * the target functions with calls to the replacement functions. 
+/* Instruments the target module, i.e. sets kprobes to replace the calls to
+ * the target functions with calls to the replacement functions.
  */
-static void 
+static void
 instrument_target_module(struct module* mod)
 {
     struct payload_entry *payload_entry;
@@ -702,7 +701,7 @@ instrument_target_module(struct module* mod)
         printk( KERN_INFO "[hp_patcher] Module \"%s\", "
         "processing \"init\" area\n",
             module_name(mod));
-            
+
         list_for_each_entry(payload_entry, &payload_list, list)
         {
             struct kedr_repl_table *repl_table = &payload_entry->payload->repl_table;
@@ -717,7 +716,7 @@ instrument_target_module(struct module* mod)
     printk( KERN_INFO "[hp_patcher] Module \"%s\", "
         "processing \"core\" area\n",
         module_name(mod));
-        
+
     list_for_each_entry(payload_entry, &payload_list, list)
     {
         struct kedr_repl_table *repl_table = &payload_entry->payload->repl_table;
@@ -730,7 +729,7 @@ instrument_target_module(struct module* mod)
     return;
 }
 
-/* Roll back what was changed in the target module during 
+/* Roll back what was changed in the target module during
  * the instrumentation.
  */
 static void
@@ -741,40 +740,40 @@ uninstrument_target_module(struct module* mod)
         /* Nothing to do */
         return;
     }
-    
-    printk(KERN_INFO 
+
+    printk(KERN_INFO
     "[hp_patcher] Uninstrumenting module \"%s\".\n",
         module_name(mod));
-    
+
     kedr_probe_clear_all();
     return;
 }
 
 /* ================================================================== */
-/* A callback function to catch unloading of the target module. 
+/* A callback function to catch unloading of the target module.
  * Sets target_module pointer among other things. */
-static int 
+static int
 detector_notifier_call(struct notifier_block *nb,
     unsigned long mod_state, void *vmod)
 {
     struct module *mod = (struct module *)vmod;
 
-    // We only need to handle the case where the module is going 
-    // to unload (the target module should have been loaded before 
+    // We only need to handle the case where the module is going
+    // to unload (the target module should have been loaded before
     // this patcher module)
-    
+
     if (mod_state == MODULE_STATE_GOING &&
         mod == target_module)
     {
-        /* if the target module has already been unloaded, 
+        /* if the target module has already been unloaded,
          * target_module is NULL, so (mod == target_module) will
          * be false. */
         struct payload_entry *payload_entry;
-        
-        printk(KERN_INFO 
+
+        printk(KERN_INFO
         "[hp_patcher] Module '%s' is going to unload.\n",
             module_name(mod));
-        
+
         uninstrument_target_module(mod);
         //notify payloads about unloading of target module
         list_for_each_entry(payload_entry, &payload_list, list)
@@ -782,7 +781,7 @@ detector_notifier_call(struct notifier_block *nb,
             if(payload_entry->payload->target_unload_callback)
                 payload_entry->payload->target_unload_callback(target_module);
         }
-        
+
         target_module = NULL;
     }
     return 0;
@@ -800,15 +799,13 @@ struct notifier_block detector_nb = {
 static void
 patcher_cleanup_module(void)
 {
-    int i;//for iterate payloads
-
-    /* We need to obtain mutex_lock to be sure the target module 
+    /* We need to obtain mutex_lock to be sure the target module
      * will not disappear after we unregister the notifier but before
      * we complete restoring the call addresses in it.
      */
     if (mutex_lock_interruptible(&module_mutex) != 0)
     {
-        printk(KERN_INFO 
+        printk(KERN_INFO
         "[hp_patcher] failed to lock module_mutex\n");
     }
     else
@@ -817,7 +814,7 @@ patcher_cleanup_module(void)
         {
             unregister_module_notifier(&detector_nb);
         }
-        
+
         /* if the target module is still loaded, uninstrument it */
         if (target_module != NULL)
         {
@@ -833,12 +830,12 @@ patcher_cleanup_module(void)
                     payload_entry->payload->target_unload_callback(target_module);
             }
 
-        }       
+        }
 
         mutex_unlock(&module_mutex);
     }
-    for(i = 0; i < payloads_n; i++) payloads_exit[i]();
-    
+    payload_cleanup();
+
     printk(KERN_INFO "[hp_patcher] Cleanup complete\n");
     return;
 }
@@ -848,56 +845,53 @@ static int __init
 patcher_init_module(void)
 {
     int result;
-    int i;//iterate payload modules
-    struct payload_entry *payload_entry;
 
     printk(KERN_INFO "[hp_patcher] Initializing\n");
-    
+
     //<>
-/*  printk(KERN_INFO 
+/*  printk(KERN_INFO
         "[hp_patcher] Address of __kmalloc is 0x%p\n",
         (void*)&__kmalloc);
-    printk(KERN_INFO 
+    printk(KERN_INFO
         "[hp_patcher] Address of kfree is 0x%p\n",
         (void*)&kfree);
-    printk(KERN_INFO 
+    printk(KERN_INFO
         "[hp_patcher] Address of kmem_cache_alloc is 0x%p\n",
         (void*)&kmem_cache_alloc);
-    printk(KERN_INFO 
+    printk(KERN_INFO
         "[hp_patcher] Address of kmem_cache_free is 0x%p\n",
         (void*)&kmem_cache_free);   */
     //<>
-    
+
     INIT_LIST_HEAD(&kedr_probes);
 
-    for(i = 0; i < payloads_n; i++)
+    printk(KERN_INFO "[hp_patcher] Before initialize payload");
+    result = payload_init();
+    printk(KERN_INFO "[hp_patcher] After initialize payload");
+    if(result)
     {
-        result = payloads_init[i]();
-        if(result)
-        {
-            for(;i>=0; i--) payloads_exit[i]();
-            pr_err("[hp_patcher] Cannot register all payloads.");
-            return result;//not "goto fail" because it call payloads_exit()
-        }
+        pr_err("[hp_patcher] Cannot register payload.");
+        payload_cleanup();
+        return result;//not "goto fail" because it call payload_cleanup()
     }
 
     /* When looking for the target module, module_mutex must be locked */
     result = mutex_lock_interruptible(&module_mutex);
     if (result != 0)
     {
-        printk(KERN_INFO 
+        printk(KERN_INFO
         "[hp_patcher] failed to lock module_mutex\n");
         goto fail;
     }
-    
+
     /* Check if the target is already loaded */
     target_module = find_module(target_name);
     if (target_module == NULL)
     {
-        printk(KERN_INFO 
+        printk(KERN_INFO
         "[hp_patcher] target module \"%s\" is not currently loaded\n",
             target_name);
-        
+
         result = -EINVAL;
         goto unlock_and_fail;
     }
@@ -909,30 +903,31 @@ patcher_init_module(void)
     }
     module_notifier_registered = 1;
 
-
     // Notify payloads about connecting to the target module.
     // Connecting is not the same as loading, but nevertheless...
-    list_for_each_entry(payload_entry, &payload_list, list)
     {
-        if(payload_entry->payload->target_load_callback)
-            payload_entry->payload->target_load_callback(target_module);
+        struct payload_entry *payload_entry;
+        list_for_each_entry(payload_entry, &payload_list, list)
+        {
+            if(payload_entry->payload->target_load_callback)
+                payload_entry->payload->target_load_callback(target_module);
+        }
     }
-
     /* Instrument the target */
-    /* TODO: would it be beneficial to do the instrumentation in 
+    /* TODO: would it be beneficial to do the instrumentation in
      * a  workqueue rather than wait here until it is complete?
      * Not sure.
      * + sync issues=?
      */
     instrument_target_module(target_module);
     mutex_unlock(&module_mutex);
-    
-/* [NB] Because of 'module_mutex', the target module cannot trigger unload 
+
+/* [NB] Because of 'module_mutex', the target module cannot trigger unload
  * notification before its instrumentation is complete.
  * Anyway, another mutex still may be provided to protect the list of the
  * kedr_probe instances - just in case.
  */
-    
+
     return 0; /* success */
 
 unlock_and_fail:

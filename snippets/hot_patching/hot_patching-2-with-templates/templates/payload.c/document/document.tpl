@@ -1,6 +1,7 @@
 /*********************************************************************
- * Payload: <$module.name$>
+ * Payload
  *********************************************************************/
+#include <linux/init.h>
 #include <linux/module.h>
 
 /*********************************************************************/
@@ -11,14 +12,14 @@
 
 <$if concat(fpoint.fault_code)$>#include <kedr/fault_simulation/fault_simulation.h><$endif$>
 
-<$header$>
+<$header : join(\n)$>
 
 /* To minimize the unexpected consequences of trace event-related 
  * headers and symbols, place #include directives for system headers 
  * before '#define CREATE_TRACE_POINTS' directive
  */
 #define CREATE_TRACE_POINTS
-#include "trace_<$module.name$>.h" /* trace event facilities */
+#include "trace_payload.h" /* trace event facilities */
 
 <$if concat(fpoint.fault_code)$><$if concat(fpoint.reuse_point)$>
 /*
@@ -29,6 +30,38 @@
  */
 static struct kedr_simulation_point* fake_fsim_point;
 <$endif$><$endif$>
+
+/* 
+ *   void get_caller_address(void* abs_addr, int section_id, ptrdiff_t rel_addr)
+ *
+ * Determine address of the caller for this replacement_function.
+ *
+ * All parameters should be lvalue.
+ */
+
+#define get_caller_address(abs_addr, section_id, rel_addr)      \
+do {                                                            \
+	abs_addr = __builtin_return_address(0);                     \
+	if((target_core_addr != NULL)                               \
+        && (abs_addr >= target_core_addr)                       \
+        && (abs_addr < target_core_addr + target_core_size))    \
+	{                                                           \
+		section_id = 2;                                         \
+		rel_addr = abs_addr - target_core_addr;                 \
+	}                                                           \
+	else if((target_init_addr != NULL)                          \
+        && (abs_addr >= target_init_addr)                       \
+        && (abs_addr < target_init_addr + target_init_size))    \
+	{                                                           \
+		section_id = 1;                                         \
+		rel_addr = abs_addr - target_init_addr;                 \
+	}                                                           \
+	else                                                        \
+	{                                                           \
+		section_id = 0;                                         \
+		rel_addr = abs_addr - (void*)0;                         \
+	}                                                           \
+}while(0)
 
 /*********************************************************************
  * Areas in the memory image of the target module (used to output 
@@ -131,7 +164,7 @@ static struct kedr_payload payload = {
 /*********************************************************************/
 
 void
-<$module.name$>_cleanup_module(void)
+payload_cleanup(void)
 {
 <$if concat(fpoint.fault_code)$>    int i;
     for(i = 0; i < ARRAY_SIZE(sim_points); i++)
@@ -139,12 +172,12 @@ void
 		unregister_point_i(i);
 	}<$endif$>
     kedr_payload_unregister(&payload);
-    KEDR_MSG("[<$module.name$>] Cleanup complete\n");
+    KEDR_MSG("[payload] Cleanup complete\n");
     return;
 }
 
 int __init
-<$module.name$>_init_module(void)
+payload_init(void)
 {
 <$if concat(fpoint.fault_code)$>    int i;
 <$endif$>    int result;
@@ -156,7 +189,7 @@ int __init
 	BUILD_BUG_ON( ARRAY_SIZE(sim_points) !=
 		ARRAY_SIZE(sim_point_formats));<$endif$>
 
-	KEDR_MSG("[<$module.name$>] Initializing\n");
+	KEDR_MSG("[payload] Initializing\n");
 
 <$if concat(fpoint.fault_code)$>	for(i = 0; i < ARRAY_SIZE(sim_points); i++)
 	{
@@ -164,7 +197,7 @@ int __init
 	}
 	if(i != ARRAY_SIZE(sim_points))
 	{
-		KEDR_MSG("[<$module.name$>] Failed to register simulation points\n");
+		KEDR_MSG("[payload] Failed to register simulation points\n");
 		for(--i; i>=0 ; i--)
 		{
             unregister_point_i(i);

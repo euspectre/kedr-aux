@@ -1,1 +1,0 @@
-trace_<$module.name$>.h
