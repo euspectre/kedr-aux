@@ -1,0 +1,69 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+  <title>KEDR Project</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8;charset=utf-8" />
+  <link rel="stylesheet" type="text/css" href="style/kedr-web.css" />
+</head>
+
+<body>
+
+<table id="theading" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tbody><tr>
+        
+        <td style="width: 100%; vertical-align: middle">
+        <h1 id="heading-title">
+            <span id="kedr">Under construction: KEDR</span>
+        </h1>
+        </td>
+    </tr></tbody>
+</table> 
+<!-- heading -->
+
+<div id="body">
+<table id="tmain" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tbody><tr>
+    <td id="mainsidebar">
+    	<p class="sb_head"><a href="http://sourceforge.net/news/?group_id=278360">News</a></p>
+        <ul>
+            <li><a href="http://kedr.berlios.de/kedr-doc/index.html">Online Documentation</a></li>
+            <li><a href="http://hg.berlios.de/repos/kedr">Mercurial Repository</a></li>
+        </ul>
+    </td> <!-- mainsidebar -->
+
+    <td id="maincontent" style="width: 100%">
+	<p>
+<strong>KEDR framework</strong> provides the tools to facilitate runtime analysis of kernel modules (including device drivers) in Linux. &quot;<strong>KEDR</strong>&quot; is an acronym for &quot;<strong>KE</strong>rnel-mode <strong>D</strong>rivers in <strong>R</strong>untime&quot;. The framework is intended to be used by the driver developers and may be useful for the driver certification systems as well.
+	</p>
+
+	<p>
+The tools provided by KEDR operate on a kernel module chosen by the user (<i>target module</i>). They monitor calls to the kernel functions that the module makes, perform fault simulation, etc. This may complement many existing tools for fault injection, memory checking, etc., that operate on the Linux kernel as a whole.
+	</p>
+
+	<p>
+The typical usage of KEDR is essentially as follows. The user works with the target kernel module as usual or may be runs some specific tests on it. At the same time, KEDR tools are monitoring the operation of the module, checking if it works correctly, doing fault simulation if requested, dumping the data about the actions made by the module to some kind of a trace for future analysis, etc. 
+	</p>
+
+	<p>
+KEDR framework is designed to be easy to extend and build upon. For example, the set of kernel functions to be monitored is fully customizable; fault simulation scenarios can also be provided and controlled by the user. Besides that, KEDR provides an interface to implement custom types of analysis via pluggable modules - in addition to call monitoring and fault simulation.
+	</p>
+
+	<p>
+Currently, KEDR works on x86 and x86-64 architectures. 
+	</p>
+
+	<p>
+KEDR is free software and is distributed under the terms of <a href="http://www.gnu.org/licenses/old-licenses/gpl-2.0.html">GNU General Public License Version 2</a>.
+	</p>    	
+        
+    </td> <!-- maincontent -->
+    </tr></tbody>
+</table>
+
+</div> <!-- body -->
+
+</body>
+</html>
+

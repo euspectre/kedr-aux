@@ -1,0 +1,148 @@
+/*
+ * Common CSS-stylesheet for web pages of KEDR project
+ */
+
+body 
+{ 
+	font-family: Arial, "Helvetica", sans-serif;
+	/*font-size: 10pt;*/
+	font-size: 100%;
+}
+
+h1, h2, h3, h4, h5 
+{ 
+	/*font-style: italic;*/
+	font-family: sans-serif; 
+}
+
+h1 
+{ 
+	font-size: 200%; 
+}
+
+h2 
+{ 
+	font-size: 150%; 
+}
+
+h3 
+{ 
+	font-size: 125%; 
+	text-align: left; 
+}
+
+a, a:visited 
+{ 
+	color: #0a0; 
+	text-decoration: none; 
+}
+
+a:hover 
+{ 
+	color: #0a0; 
+	text-decoration: underline; 
+}
+
+h1 a, h1 a:visited, h1 a:hover
+{
+	color: #000;
+	text-decoration: none; 
+}
+
+img
+{
+	border: none;
+}
+
+/*#sf_logo
+{
+	padding: 0em;
+	margin: 0em;
+}
+
+#sf_logo_group
+{
+	border: thin solid gray;
+	margin-left: 0.5em;
+	margin-right: 0.5em;
+	margin-top: 2em;
+	width: 160px;
+	text-align: center;
+}
+
+#mainsidebar #sf_logo_group p#hosted_by
+{
+	font-size: 100%;
+}*/
+
+img#heading-logo
+{
+	margin-right: 0.5em;
+}
+
+p 
+{ 
+	text-align: justify; 
+}
+
+td#mainsidebar
+{
+	vertical-align: top;
+	border: thin solid #ccc;
+	background-color: #f7f7f7;
+}
+
+td#maincontent
+{
+	vertical-align: top;
+	border: thin solid #ccc;
+	padding: 0.2em 0.5em 0.2em 0.5em
+}
+
+#mainsidebar p, #mainsidebar ul
+{
+	white-space: nowrap;
+	
+	padding-left: 0.5em;
+	padding-right: 0.5em;
+	padding-top: 0em;
+	padding-bottom: 0em;
+	margin-top: 0.3em;
+	margin-bottom: 0.3em;
+	
+	color: #0a0;
+}
+
+#mainsidebar p
+{
+	font-size: 125%;
+}
+
+#mainsidebar ul
+{
+	font-size: 100%;
+	list-style-type: none;
+	padding-left: 1.3em;
+}
+
+#mainsidebar li
+{
+	padding-top: 0.1em;
+	padding-bottom: 0.1em;
+}
+
+#maincontent p, #maincontent ul
+{
+	font-family: Verdana, Arial, "Helvetica", sans-serif;
+
+}
+
+#maincontent a
+{
+	color: #0a0; 
+}
+
+hr
+{
+	color: silver;
+}
