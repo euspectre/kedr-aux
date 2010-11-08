@@ -1,0 +1,41 @@
+Аналог индикатора из caller_address_filter.
+
+Не требует изменения fault simulation payloads, но требует поддержки frame pointer со стороны ядра(CONFIG_FRAME_POINTER).
+
+Индикатор сделан общим - не принимает никаких параметров от точки. Но при желании, любой существующий индикатор может быть "обновлен" до функциональности
+с адресом вызвавшего.
+
+Проверено на шаблонах KEDR из ревизии 7e1573c2db19.
+
+Use case(по аналогии с caller_address_filter):
+1. Из KEDR копируем себе пример custom_indicator_fsim.
+2. Заменяем файл indicator.data из примера на indicator.data (из этого snippet'а).
+3. Заменяем имя модуля в makefile и Kbuild на indicator_fsim_common.
+4. Собираем (make). Warning: "assignment makes integer from pointer without cast" - это нормально (в будушем должны быть доработаны шаблоны).
+
+5. -
+6. -
+7. -
+8. -
+
+9. Из KEDR копируем себе пример sample_target, собираем (make).
+
+Дальнейшие шаги могут быть в некоторой степени автоматизированы.
+
+10. Загружаем KEDR с использованием fault simulation payload common memory management (+ разрешаем tracepoint'ы для payload).
+11. Загружаем собранный индикатор.
+12. Устанавливаем индикатор для точки: echo "common" > /sys/kernel/debug/kedr_fault_simulation/__kmalloc/current_indicator
+
+13. Определяем адрес инструкции, которая следует непосредственно за вызовом kmalloc в cfake_open.
+Выйдет что-то похожее на (.text+0x60d).
+
+14. Загружаем target (./kedr_sample_target load).
+15. Складываем адрес .text секции загруженного target модуля (/sys/module/kedr_sample_target/sections/.text) и относительный адрес
+инструкции с предыдущего шага, переводим результат в десятичную систему счисления.
+
+16. Устанавливаем выражение для индикатора caller=<decimal-abs-address>:
+echo "caller=<decimal-abs-address>" > /sys/kernel/debug/kedr_fault_simulation/__kmalloc/expression
+
+17. После этого попытки записи в устройство 
+echo 1 > /dev/cfake
+будут возвращать ошибку.
