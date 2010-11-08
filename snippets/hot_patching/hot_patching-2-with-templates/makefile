@@ -1,39 +1,33 @@
 include common_makefile
-# Because next include file define its own rules, need to define 'all' rule
-all: $(module_name).ko
 
-include generate_sources
+all: $(module_name).ko
 
 payloads_all_data := payloads_all.data
 # Derived directories of the KEDR (should be corrected, if needed)
 kedr_generator := $(kedr_build_dir)/kedr_gen.install/kedr_gen
 templates_dir := ./templates
 
-
-
-generate_sources:  $(payloads_all_data)
-	$(kedr_generator) $(templates_dir)/generate_sources $< > $@
-
 KBUILD_DIR := /lib/modules/`uname -r`/build
 PWD := `pwd`
 
-$(module_name).ko: patcher.c payloads_module_functions.c $(payload_c_files) $(payload_h_files) copy_arch_tree
+$(module_name).ko: patcher.c payload.c trace_payload.h copy_arch_tree
 	make -C $(KBUILD_DIR) M=$(PWD) modules
 
-payloads_module_functions.c: $(payloads_all_data)
-	$(kedr_generator) $(templates_dir)/payloads_module_functions.c $< > $@
+payload.c: $(payloads_all_data)
+	$(kedr_generator) $(templates_dir)/payload.c $< > $@
+
+trace_payload.h: $(payloads_all_data)
+	$(kedr_generator) $(templates_dir)/trace_payload.h $< > $@
 
 $(payloads_all_data): $(payload_data_files)
 	cat $^ > $@
-	printf "$(foreach payload_datafile, $^, payload.datafile = $(payload_datafile)\n)" >> $@
 
 copy_arch_tree:
 	cp -pr $(kedr_source_dir)/controller/arch ./
 
 clean:
 	make -C $(KBUILD_DIR) M=$(PWD) clean
-	rm -f $(payload_c_files) $(payload_h_files)
-	rm -f payloads_module_functions.c
+	rm -f payload.c trace_payload.h
 	rm -f $(payloads_all_data)
 	rm -f generate_sources
 

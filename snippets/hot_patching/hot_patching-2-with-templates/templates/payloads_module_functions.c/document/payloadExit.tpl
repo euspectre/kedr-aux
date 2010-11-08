@@ -1,1 +1,0 @@
-<$module.name$>_cleanup_module

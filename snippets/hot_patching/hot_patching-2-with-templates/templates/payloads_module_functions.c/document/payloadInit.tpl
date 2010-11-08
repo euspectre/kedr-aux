@@ -1,1 +1,0 @@
-<$module.name$>_init_module

@@ -1,1 +1,0 @@
-extern int __init <$module.name$>_init_module(void);

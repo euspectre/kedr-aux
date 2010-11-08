@@ -5,7 +5,7 @@
  *********************************************************************/
 
 #undef TRACE_SYSTEM
-#define TRACE_SYSTEM <$module.name$>
+#define TRACE_SYSTEM kedr_hot
 
 #if !defined(_TRACE_PAYLOAD_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_PAYLOAD_H
@@ -22,5 +22,5 @@
 #undef TRACE_INCLUDE_FILE
 #define TRACE_INCLUDE_PATH .
 
-#define TRACE_INCLUDE_FILE trace_<$module.name$>
+#define TRACE_INCLUDE_FILE trace_payload
 #include <trace/define_trace.h>
