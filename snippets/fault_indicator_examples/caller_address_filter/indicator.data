@@ -1,0 +1,35 @@
+# This module implements indicator, which make available scenarious, using caller address of the replacement function.
+# This indicator is specialized for kmalloc fault simulation replacement function, which should be changed for use indicator.
+
+module.author = Tsyvarev
+module.license = GPL
+
+global =>>
+#include <linux/gfp.h>      /* gfp_flags constants */
+#include <linux/types.h>      /* size_t */
+<<
+
+indicator.name = kmalloc
+
+indicator.parameters.type = size_t
+indicator.parameters.name = size
+
+indicator.parameters.type = gfp_t
+indicator.parameters.name = flags
+#
+indicator.parameters.type = void*
+indicator.parameters.name = caller_address
+
+
+expression.constants.c_name = GFP_NOWAIT
+expression.constants.c_name = GFP_KERNEL
+expression.constants.c_name = GFP_USER
+expression.constants.c_name = GFP_ATOMIC
+
+expression.vars.pname = size
+expression.vars.pname = flags
+
+#
+expression.vars.name = caller
+expression.vars.value = caller_address
+
