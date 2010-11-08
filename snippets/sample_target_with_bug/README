@@ -1,0 +1,24 @@
+Модификация kedr_sample_target модуля, содержащая ошибку(логическую).
+
+Схема обнаружения с помощью KEDR:
+
+1. Пишем data-файл для fault simulation payload'а для функции cdev_add().
+Для блока функции cdev_add(), помимо указания прототипа функции, достаточно
+
+fpoint.fault_code = returnValue = -ENOMEM;
+
+2. Компилируем fault simulation payload.
+
+3. Загружаем KEDR со стандартным набором call monitor payload + собранный fault simulation payload.
+
+4. Загружаем индикатор "common", устанавливаем его для точки cdev_add, устанавливаем в качестве выражения, например, "times % 2 = 0".
+
+5. Загружаем kedr_sample_target модуль (из этой директории).
+
+6.Выгружаем модуль.
+
+7. Сохраняем трассу (через "kedr_capture_trace session").
+
+8. Выгружаем KEDR вместе с payloads.
+
+9. Проверка трассы скриптом verify_allocations.pl выявит неосвобожденную память после kmalloc().
