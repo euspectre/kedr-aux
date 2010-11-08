@@ -1,5 +1,4 @@
 # This module implements indicator, which make available scenarious, using caller address of the replacement function.
-# This indicator is specialized for kmalloc fault simulation replacement function, which should be changed for use indicator.
 
 module.author = Tsyvarev
 module.license = GPL

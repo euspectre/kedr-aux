@@ -70,6 +70,7 @@ sub get_malloc_address
 sub get_free_address
 {
     my ($line) = @_;
+    if($line =~ /arguments:\s*\(+null/) { return "0"; }
     my ($address) = ($line =~ /arguments:\s*\((\w+)/);
     if(! defined $address)
     {
@@ -124,6 +125,7 @@ foreach my $line (<STDIN>)
     elsif("$func" eq "kfree")
     {
         $address = get_free_address($line);
+        if("$address" eq "0") { next; } # free with null-argument
         if(! $allocated_adresses{$address})
         {
             log_unallocated_free $line;
