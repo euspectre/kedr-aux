@@ -51,35 +51,24 @@ sub get_function_name
     return $function;
 }
 
-# get_malloc_address($kmalloc_trace_line)
-sub get_malloc_address
-{
-    my ($line) = @_;
-    my ($address) = ($line =~ /result:\s*(\w+)/);
-    if(! defined $address)
-    {
-        log_failed_to_parse $line;
-        $address = "";
-    }
+# Maps func -> <code-which-extract-address->
+#
+# Code should use $_ as input line parameter, and set this parameter to address of allocated/freed memory.
+# In case of fail to parse, $_ should be set to 'undef'.
+# Null address should be reported as '(null)'
 
-    
-    return $address;
-}
+my %alloc_functions = (
+	"__kmalloc" => '{ /result:\\s*(\\(null\\)|\\w+)/; $_="$1"; }',
+	"krealloc" => '{ /result:\\s*(\\(null\\)|\\w+)/; $_="$1"; }',
+	"kmem_cache_alloc" => '{ /result:\\s*(\\(null\\)|\\w+)/; $_="$1"; }',
+	"kmem_cache_alloc_notrace" => '{ /result:\\s*(\\(null\\)|\\w+)/; $_="$1"; }',
+);
 
-# get_free_address($kfree_trace_line)
-sub get_free_address
-{
-    my ($line) = @_;
-    if($line =~ /arguments:\s*\(+null/) { return "0"; }
-    my ($address) = ($line =~ /arguments:\s*\((\w+)/);
-    if(! defined $address)
-    {
-        log_failed_to_parse $line;
-        $address = "";
-    }
-
-    return $address;
-}
+my %free_functions = (
+	"kfree" => '{ /arguments:\\s*\\((\\(null\\)|\\w+)/; $_="$1"; }',
+	"kmem_cache_free" => '{ /arguments:\\s*\\(\\w+,\\s*(\\(null\\)|\\w+)/; $_="$1"; }',
+	"krealloc" => '{ /arguments:\\s*\\((\\(null\\)|\\w+)/; $_="$1"; }'
+);
 
 my $unallocated_frees_filename = "unallocated_frees.txt";
 my $unfreed_allocations_filename = "unfreed_allocations.txt";
@@ -106,53 +95,56 @@ my %allocated_adresses = ();
 my $unfreed_allocations_counter = 0;
 my $unallocated_frees_counter = 0;
 
-foreach my $line (<STDIN>)
+foreach $line (<STDIN>)
 {
     chomp $line;
     my $func = get_function_name($line);
-    my $address;
-    if("$func" eq "__kmalloc" || "$func" eq "kmem_cache_alloc" || "$func" eq "kmem_cache_alloc_notrace")
+    if(defined $free_functions{$func})
     {
-        # Use same function for retrieve address
-        $address = get_malloc_address($line);
-        if($allocated_adresses{$address})
-        {
-            log_unfreed_allocation $allocated_adresses{$address};
-            $unfreed_allocations_counter++;
-        }
-        $allocated_adresses{$address} = $line;
+		$_ = $line;
+		{ eval "$free_functions{$func}"; }
+		if($@) {
+			log_to_file("exceptions.txt", "Exception: $@");
+			log_to_file("exceptions.txt", "Exception raise while parse line '$line'.\n");
+		}
+		elsif(! defined $_)
+		{
+		    log_failed_to_parse $line;
+		}
+		elsif($_ ne "(null)")
+		{
+			my $address = $_;
+		    if(! $allocated_adresses{$address})
+		    {
+		        log_unallocated_free $line;
+		        $unallocated_frees_counter++;
+		    }
+		    undef $allocated_adresses{$address};
+		}
     }
-    elsif("$func" eq "kfree")
+    if(defined $alloc_functions{$func})
     {
-        $address = get_free_address($line);
-        if("$address" eq "0") { next; } # free with null-argument
-        if(! $allocated_adresses{$address})
-        {
-            log_unallocated_free $line;
-            $unallocated_frees_counter++;
-        }
-        undef $allocated_adresses{$address};
+		$_ = $line;
+		{ eval "$alloc_functions{$func}"; }
+		if($@) {
+			log_to_file("exceptions.txt", "Exception: $@");
+			log_to_file("exceptions.txt", "Exception raise while parse line '$line'.\n");
+		}
+		elsif(! defined $_)
+		{
+		    log_failed_to_parse $line;
+		}
+		elsif($_ ne "(null)")
+		{
+			my $address = $_;
+		    if($allocated_adresses{$address})
+		    {
+		        log_unfreed_allocation $allocated_adresses{$address};
+		        $unfreed_allocations_counter++;
+		    }
+		    $allocated_adresses{$address} = $line;
+		}
     }
-    elsif("$func" eq "krealloc")
-    {
-        #similar to kfree + __kmalloc
-        $address = get_free_address($line);
-        if(! $allocated_adresses{$address})
-        {
-            log_unallocated_free $line;
-            $unallocated_frees_counter++;
-        }
-        undef $allocated_adresses{$address};
-
-        $address = get_malloc_address($line);
-        if($allocated_adresses{$address})
-        {
-            log_unfreed_allocation $allocated_adresses{$address};
-            $unfreed_allocations_counter++;
-        }
-        $allocated_adresses{$address} = $line;
-    }
-    
 }
 
 foreach my $line (values %allocated_adresses)
