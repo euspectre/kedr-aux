@@ -294,38 +294,51 @@ do_process_insn(struct insn* c_insn, void* kaddr, void* end_kaddr,
  */
 static void
 do_process_area(void* kbeg, void* kend, 
-	void** from_funcs, void** to_funcs, unsigned int nfuncs)
+    void** from_funcs, void** to_funcs, unsigned int nfuncs)
 {
-	struct insn c_insn; /* current instruction */
-	unsigned int i;
-	void* pos = NULL;
-	
-	/* TODO: provide assert-like wrapper */
-	BUG_ON(kbeg == NULL);
-	BUG_ON(kend == NULL);
-	BUG_ON(kend < kbeg);
-		
-	pos = kbeg;
-	for (i = 0; ; ++i)
-	{
-		unsigned int len;
-		unsigned int k;
+    struct insn c_insn; /* current instruction */
+    void* pos = NULL;
+    
+    BUG_ON(kbeg == NULL);
+    BUG_ON(kend == NULL);
+    BUG_ON(kend < kbeg);
+        
+    for (pos = kbeg; pos + 4 < kend; )
+    {
+        unsigned int len;
+        unsigned int k;
 
-		len = do_process_insn(&c_insn, pos, kend,
-			from_funcs, to_funcs, nfuncs);
-		if (len == 0)	
-		{
-			KEDR_MSG(COMPONENT_STRING
-				"do_process_insn() returned 0\n");
-			WARN_ON(1);
-			break;
-		}
+/* 'pos + 4 < kend' is based on another "heuristics". 'call' and 'jmp' 
+ * instructions we need to instrument are 5 bytes long on x86 and x86-64 
+ * machines. So if there are no more than 4 bytes left before the end, they
+ * cannot contain the instruction of this kind, we do not need to check 
+ * these bytes. 
+ * This allows to avoid "decoder stopped past the end of the section"
+ * conditions (see do_process_insn()). There, the decoder tries to chew 
+ * the trailing 1-2 zero bytes of the section (padding) and gets past 
+ * the end of the section.
+ * It seems that the length of the instruction that consists of zeroes
+ * only is 3 bytes (it is a flavour of 'add'), i.e. shorter than that 
+ * kind of 'call' we are instrumenting.
+ *
+ * [NB] The above check automatically handles 'pos == kend' case.
+ */
+       
+        len = do_process_insn(&c_insn, pos, kend,
+            from_funcs, to_funcs, nfuncs);
+        if (len == 0)   
+        {
+            KEDR_MSG(COMPONENT_STRING
+                "do_process_insn() returned 0\n");
+            WARN_ON(1);
+            break;
+        }
 
-		if (pos + len > kend)
-		{
-			break;
-		}
-		
+        if (pos + len > kend)
+        {
+            break;
+        }
+        
 /* If the decoded instruction contains only zero bytes (this is the case,
  * for example, for one flavour of 'add'), skip to the first nonzero byte
  * after it. 
@@ -341,44 +354,26 @@ do_process_area(void* kbeg, void* kend,
  * section or to the end of the area this way which is what we want in this
  * case.
  */
-		for (k = 0; k < len; ++k)
-		{
-			if (*((unsigned char*)pos + k) != 0) 
-			{
-				break;
-			}
-		}
-		pos += len;
-		
-		if (k == len) 
-		{
-			/* all bytes are zero, skip the following 0s */
-			while (pos < kend && *(unsigned char*)pos == 0)
-			{
-				++pos;
-			}
-		}
-
-	/* Another heuristics based on the fact that 'call' instructions we need
-	 * to instrument are 5 bytes long on x86 and x86-64 machines. So if 
-	 * there are no more than 4 bytes left before the end, they cannot 
-	 * contain the instruction of this kind, we do not need to check these
-	 * bytes. 
-	 * This allows to avoid "decoder stopped past the end of the section"
-	 * conditions (see do_process_insn()). There, the decoder tries to chew 
-	 * the trailing 1-2 zero bytes of the section (padding) and gets past 
-	 * the end of the section.
-	 * It seems that the length of the instruction that consists of zeroes
-	 * only is 3 bytes (it is a flavour of 'add'), i.e. shorter than that 
-	 * kind of 'call' we are instrumenting.
-	 */
-		if (pos + 4 >= kend)
-		{
-			break;
-		}
-	}
-	
-	return;
+        for (k = 0; k < len; ++k)
+        {
+            if (*((unsigned char*)pos + k) != 0) 
+            {
+                break;
+            }
+        }
+        pos += len;
+        
+        if (k == len) 
+        {
+            /* all bytes are zero, skip the following 0s */
+            while (pos < kend && *(unsigned char*)pos == 0)
+            {
+                ++pos;
+            }
+        }
+    }
+    
+    return;
 }
 
 /* Replace all calls to to the target functions with calls to the 

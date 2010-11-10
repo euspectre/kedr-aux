@@ -486,29 +486,44 @@ do_process_insn(struct insn* c_insn, void* kaddr, void* end_kaddr,
  * For each i=0..nfuncs-1, from_funcs[i] corresponds to to_funcs[i].
  */
 static void
-do_process_area(void* kbeg, void* kend,
+do_process_area(void* kbeg, void* kend, 
     void** from_funcs, void** to_funcs, unsigned int nfuncs)
 {
     struct insn c_insn; /* current instruction */
-    unsigned int i;
     void* pos = NULL;
-
+    
     BUG_ON(kbeg == NULL);
     BUG_ON(kend == NULL);
     BUG_ON(kend < kbeg);
-
-    pos = kbeg;
-    for (i = 0; ; ++i)
+        
+    for (pos = kbeg; pos + 4 < kend; )
     {
         unsigned int len;
         unsigned int k;
 
+/* 'pos + 4 < kend' is based on another "heuristics". 'call' and 'jmp' 
+ * instructions we need to instrument are 5 bytes long on x86 and x86-64 
+ * machines. So if there are no more than 4 bytes left before the end, they
+ * cannot contain the instruction of this kind, we do not need to check 
+ * these bytes. 
+ * This allows to avoid "decoder stopped past the end of the section"
+ * conditions (see do_process_insn()). There, the decoder tries to chew 
+ * the trailing 1-2 zero bytes of the section (padding) and gets past 
+ * the end of the section.
+ * It seems that the length of the instruction that consists of zeroes
+ * only is 3 bytes (it is a flavour of 'add'), i.e. shorter than that 
+ * kind of 'call' we are instrumenting.
+ *
+ * [NB] The above check automatically handles 'pos == kend' case.
+ */
+       
         len = do_process_insn(&c_insn, pos, kend,
             from_funcs, to_funcs, nfuncs);
-        if (len == 0)
+        if (len == 0)   
         {
             printk( KERN_WARNING "[hp_patcher] "
-            "do_process_insn() returned 0\n");
+                "do_process_insn() returned 0\n");
+            WARN_ON(1);
             break;
         }
 
@@ -516,32 +531,32 @@ do_process_area(void* kbeg, void* kend,
         {
             break;
         }
-
+        
 /* If the decoded instruction contains only zero bytes (this is the case,
  * for example, for one flavour of 'add'), skip to the first nonzero byte
- * after it.
+ * after it. 
  * This is to avoid problems if there are two or more sections in the area
- * being analysed. Such situation is very unlikely - still have to find
- * the example. Note that ctors and dtors seem to be placed to the same
+ * being analysed. Such situation is very unlikely - still have to find 
+ * the example. Note that ctors and dtors seem to be placed to the same 
  * '.text' section as the ordinary functions ('.ctors' and '.dtors' sections
  * probably contain just the lists of their addresses or something similar).
- *
- * As we are not interested in instrumenting 'add' or the like, we can skip
- * to the next instruction that does not begin with 0 byte. If we are
- * actually past the last instruction in the section, we get to the next
+ * 
+ * As we are not interested in instrumenting 'add' or the like, we can skip 
+ * to the next instruction that does not begin with 0 byte. If we are 
+ * actually past the last instruction in the section, we get to the next 
  * section or to the end of the area this way which is what we want in this
  * case.
  */
         for (k = 0; k < len; ++k)
         {
-            if (*((unsigned char*)pos + k) != 0)
+            if (*((unsigned char*)pos + k) != 0) 
             {
                 break;
             }
         }
         pos += len;
-
-        if (k == len)
+        
+        if (k == len) 
         {
             /* all bytes are zero, skip the following 0s */
             while (pos < kend && *(unsigned char*)pos == 0)
@@ -549,13 +564,8 @@ do_process_area(void* kbeg, void* kend,
                 ++pos;
             }
         }
-
-        if (pos >= kend)
-        {
-            break;
-        }
     }
-
+    
     return;
 }
 
