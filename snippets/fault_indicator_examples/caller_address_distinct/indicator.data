@@ -1,0 +1,11 @@
+# This module implements common indicator which may distinct caller addresses
+
+module.author = Tsyvarev
+module.license = GPL
+
+global =>>
+#include <linux/gfp.h>      /* gfp_flags constants */
+#include <linux/types.h>    /* size_t */
+<<
+
+indicator.name = common_with_address
