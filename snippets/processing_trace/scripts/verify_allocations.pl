@@ -62,12 +62,14 @@ my %alloc_functions = (
 	"krealloc" => '{ /result:\\s*(\\(null\\)|\\w+)/; $_="$1"; }',
 	"kmem_cache_alloc" => '{ /result:\\s*(\\(null\\)|\\w+)/; $_="$1"; }',
 	"kmem_cache_alloc_notrace" => '{ /result:\\s*(\\(null\\)|\\w+)/; $_="$1"; }',
+    "__get_free_pages" => '{ /result:\\s*(\\(null\\)|\\w+)/; $_="$1"; }',
 );
 
 my %free_functions = (
 	"kfree" => '{ /arguments:\\s*\\((\\(null\\)|\\w+)/; $_="$1"; }',
 	"kmem_cache_free" => '{ /arguments:\\s*\\(\\w+,\\s*(\\(null\\)|\\w+)/; $_="$1"; }',
-	"krealloc" => '{ /arguments:\\s*\\((\\(null\\)|\\w+)/; $_="$1"; }'
+	"krealloc" => '{ /arguments:\\s*\\((\\(null\\)|\\w+)/; $_="$1"; }',
+    "free_pages" => '{ /arguments:\\s*\\((\\(null\\)|\\w+)/; $_="$1"; }',
 );
 
 my $unallocated_frees_filename = "unallocated_frees.txt";
