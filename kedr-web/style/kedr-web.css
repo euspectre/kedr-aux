@@ -1,34 +1,30 @@
 /*
- * Common CSS-stylesheet for web pages of KEDR project
+ * Common CSS-stylesheet for the web pages of KEDR project
  */
 
-body 
+body, table
 { 
-	font-family: Arial, "Helvetica", sans-serif;
-	/*font-size: 10pt;*/
-	font-size: 100%;
+    font-family: Verdana, Arial, Helvetica, sans-serif;
+    font-size: 10pt;
+    color: #000; 
+    max-width: 70em;
+} 
+
+h2, h3, h4, h5 
+{ 
+	margin-bottom: 0em;
 }
 
-h1, h2, h3, h4, h5 
+h1
 { 
-	/*font-style: italic;*/
-	font-family: sans-serif; 
+	font-size: 18pt;
 }
 
-h1 
+h2
 { 
-	font-size: 200%; 
-}
-
-h2 
-{ 
-	font-size: 150%; 
-}
-
-h3 
-{ 
-	font-size: 125%; 
-	text-align: left; 
+	font-size: 14pt;
+	font-weight: normal;
+	margin-top: 0.3em;
 }
 
 a, a:visited 
@@ -45,7 +41,7 @@ a:hover
 
 h1 a, h1 a:visited, h1 a:hover
 {
-	color: #000;
+	color: #333;
 	text-decoration: none; 
 }
 
@@ -54,75 +50,71 @@ img
 	border: none;
 }
 
-/*#sf_logo
+#berlios_logo
 {
-	padding: 0em;
-	margin: 0em;
-}
-
-#sf_logo_group
-{
-	border: thin solid gray;
 	margin-left: 0.5em;
 	margin-right: 0.5em;
-	margin-top: 2em;
-	width: 160px;
-	text-align: center;
+	margin-top: 0em;
 }
 
-#mainsidebar #sf_logo_group p#hosted_by
-{
-	font-size: 100%;
-}*/
-
+/*
 img#heading-logo
 {
 	margin-right: 0.5em;
 }
+*/
 
 p 
 { 
 	text-align: justify; 
+	margin-bottom: 1.0em;
+	margin-top: 0.3em;
+}
+
+pre { 
+	font-size: 10pt;
+	margin-bottom: 0em;
+	margin-top: 0em;
+}
+
+#mainsidebar
+{
+	background-color: #eee; 
+	padding-top: 0.3em;
 }
 
 td#mainsidebar
 {
 	vertical-align: top;
 	border: thin solid #ccc;
-	background-color: #f7f7f7;
 }
 
 td#maincontent
 {
 	vertical-align: top;
-	border: thin solid #ccc;
-	padding: 0.2em 0.5em 0.2em 0.5em
+	border: none;
+	padding: 0em 0.5em 0em 0.5em;
 }
 
 #mainsidebar p, #mainsidebar ul
 {
 	white-space: nowrap;
-	
-	padding-left: 0.5em;
-	padding-right: 0.5em;
-	padding-top: 0em;
-	padding-bottom: 0em;
-	margin-top: 0.3em;
-	margin-bottom: 0.3em;
-	
+	padding: 0em 0.5em 0em 0.5em;
 	color: #0a0;
 }
 
 #mainsidebar p
 {
-	font-size: 125%;
+	margin-top: 0.5em;
+	margin-bottom: 0em;
 }
 
 #mainsidebar ul
 {
-	font-size: 100%;
+	font-size: 10pt;
 	list-style-type: none;
 	padding-left: 1.3em;
+	margin-top: 0.2em;
 }
 
 #mainsidebar li
@@ -131,10 +123,9 @@ td#maincontent
 	padding-bottom: 0.1em;
 }
 
-#maincontent p, #maincontent ul
+.sb_head
 {
-	font-family: Verdana, Arial, "Helvetica", sans-serif;
-
+	font-weight: bold;
 }
 
 #maincontent a

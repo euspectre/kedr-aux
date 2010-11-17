@@ -15,7 +15,7 @@
         
         <td style="width: 100%; vertical-align: middle">
         <h1 id="heading-title">
-            <span id="kedr">Under construction: KEDR</span>
+            <span id="kedr">KEDR - Runtime Analysis of Linux Kernel Modules</span>
         </h1>
         </td>
     </tr></tbody>
@@ -26,38 +26,79 @@
 <table id="tmain" width="100%" cellpadding="0" cellspacing="0" border="0">
     <tbody><tr>
     <td id="mainsidebar">
-    	<p class="sb_head"><a href="http://sourceforge.net/news/?group_id=278360">News</a></p>
-        <ul>
-            <li><a href="http://kedr.berlios.de/kedr-doc/index.html">Online Documentation</a></li>
-            <li><a href="http://hg.berlios.de/repos/kedr">Mercurial Repository</a></li>
-        </ul>
+    	
+    	<p class="sb_head"><a href="http://developer.berlios.de/news/?group_id=11780">News</a></p>
+    	<p class="sb_head"><a href="http://developer.berlios.de/projects/kedr/">Project Summary</a></p>
+    	<p class="sb_head">KEDR v.0.1</p>
+    	<ul>
+    		<li><a href="http://prdownload.berlios.de/kedr/kedr-0.1.tar.bz2">Download KEDR 0.1</a></li>
+    		<li><a href="http://kedr.berlios.de/TODO-Changelog">Change Log (!!!TODO!!!)</a></li>
+    		<li><a href="http://kedr.berlios.de/kedr-doc/index.html">Online Documentation</a></li>
+    	</ul>
+    	<p class="sb_head">Quick Links</p>
+    	<ul>
+	    	<li><a href="http://openfacts2.berlios.de/wikien/index.php/BerliosProject:KEDR">Wiki</a></li>
+	    	<li><a href="http://hg.berlios.de/repos/kedr">Mercurial Repository</a></li>
+	    	<li><a href="http://developer.berlios.de/bugs/?group_id=11780">Submit Bug Reports</a></li>
+	    	<li><a href="http://developer.berlios.de/feature/?group_id=11780">Request Features</a></li>
+	    	<li><a href="http://developer.berlios.de/mail/?group_id=11780">Mailing Lists</a></li>
+    	</ul>
+    	
+    	<div id="berlios_logo">
+    		<a href="http://developer.berlios.de" title="BerliOS Developer"> <img src="http://developer.berlios.de/bslogo.php?group_id=11780" width="124px" height="32px" alt="BerliOS Developer Logo"></img></a>
+    	</div>
     </td> <!-- mainsidebar -->
 
     <td id="maincontent" style="width: 100%">
+	<h2>About KEDR</h2>
 	<p>
-<strong>KEDR framework</strong> provides the tools to facilitate runtime analysis of kernel modules (including device drivers) in Linux. &quot;<strong>KEDR</strong>&quot; is an acronym for &quot;<strong>KE</strong>rnel-mode <strong>D</strong>rivers in <strong>R</strong>untime&quot;. The framework is intended to be used by the driver developers and may be useful for the driver certification systems as well.
+<strong>KEDR framework</strong> is an extensible system to facilitate runtime analysis of kernel modules in Linux. It allows to intercept the calls that a kernel module makes to the functions exported by other modules and by the kernel proper. KEDR-based systems can record the arguments and return values of these functions to a trace, do fault simulation according to user-defined scenarios and perform many other tasks. Such systems can be valuable assets in revealing the errors in the kernel modules, for example.
+	</p>
+	
+	<h2>More Info</h2>
+	<p>
+Detailed information about KEDR can be found in the <a href="http://kedr.berlios.de/kedr-doc/index.html">online documentation</a>. The documentation is also distributed along with the source code of the framework. In addition, <a href="http://openfacts2.berlios.de/wikien/index.php/BerliosProject:KEDR">Wiki</a> provides other useful information concerning KEDR.
+	</p>
+	
+	<p>
+To begin with KEDR, you can take a look at <a href="http://kedr.berlios.de/kedr-doc/getting_started.html"><i>Getting Started</i></a> section in the manual. It describes how to install the framework and use it for call monitoring and fault simulation, step by step.
+	</p>
+	
+	<h2>Downloads</h2>
+	<p>
+KEDR framework is distributed in the source form. The current stable version is <strong>0.1</strong> (<a href="http://prdownload.berlios.de/kedr/kedr-0.1.tar.bz2">download</a>). 
+	</p>
+	<p>
+The source archive also includes the documentation (in DocBook and HTML formats) and the examples.
 	</p>
 
+	<h2>Mercurial Repository</h2>
 	<p>
-The tools provided by KEDR operate on a kernel module chosen by the user (<i>target module</i>). They monitor calls to the kernel functions that the module makes, perform fault simulation, etc. This may complement many existing tools for fault injection, memory checking, etc., that operate on the Linux kernel as a whole.
+The latest version of KEDR sources can be found in the <a href="http://hg.berlios.de/repos/kedr">repository</a> at the project site. The repository is maintained with <a href="http://mercurial.selenic.com/">Mercurial source control management system</a>. 
 	</p>
-
+	
 	<p>
-The typical usage of KEDR is essentially as follows. The user works with the target kernel module as usual or may be runs some specific tests on it. At the same time, KEDR tools are monitoring the operation of the module, checking if it works correctly, doing fault simulation if requested, dumping the data about the actions made by the module to some kind of a trace for future analysis, etc. 
+If you would like to get a local copy of the repository, use the following command:
 	</p>
+	<pre>
+hg clone http://hg.berlios.de/repos/kedr kedr-local
+	</pre>
 
+	<h2>Bugs and Features</h2>
 	<p>
-KEDR framework is designed to be easy to extend and build upon. For example, the set of kernel functions to be monitored is fully customizable; fault simulation scenarios can also be provided and controlled by the user. Besides that, KEDR provides an interface to implement custom types of analysis via pluggable modules - in addition to call monitoring and fault simulation.
+If you have found a problem in KEDR, please report it via the <a href="http://developer.berlios.de/bugs/?group_id=11780">bug tracking system</a>. There is another tracking system for <a href="http://developer.berlios.de/feature/?group_id=11780">feature requests</a> as well.
 	</p>
-
+	
+	<h2>Mailing Lists</h2>
 	<p>
-Currently, KEDR works on x86 and x86-64 architectures. 
-	</p>
-
-	<p>
-KEDR is free software and is distributed under the terms of <a href="http://www.gnu.org/licenses/old-licenses/gpl-2.0.html">GNU General Public License Version 2</a>.
+There are the following <a href="http://developer.berlios.de/mail/?group_id=11780">mailing lists</a> related to KEDR framework:
 	</p>    	
-        
+    <ul>
+    <li><a href="https://lists.berlios.de/mailman/listinfo/kedr-announce">kedr-announce</a> - announcements about the new releases of KEDR.</li>
+    <li><a href="https://lists.berlios.de/mailman/listinfo/kedr-users">kedr-users</a> - discussion of the usage of KEDR.</li>
+    <li><a href="https://lists.berlios.de/mailman/listinfo/kedr-devel">kedr-devel</a> - the topics related to the development of KEDR.</li>
+    </ul>
+    
     </td> <!-- maincontent -->
     </tr></tbody>
 </table>
