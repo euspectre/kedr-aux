@@ -1,0 +1,223 @@
+# This module monitors the calls to DRM-related functions
+# (exported by 'drm' kernel module).
+
+module.name = cm_drm
+module.author = Hacker
+module.license = GPL
+
+header =>>
+#include <drm/drmP.h>
+<<
+#######################################################################
+
+# drm_open
+[group]
+    # Name and return type of the target function
+    function.name = drm_open
+    returnType = int
+
+    # Names and types of the arguments of the target function
+    arg.type = struct inode *
+    arg.name = inode
+    
+    arg.type = struct file *
+    arg.name = filp
+    
+    # The parameters to be output to the trace. 
+    trace.param.type = void *
+    trace.param.name = inode
+
+    trace.param.type = void *
+    trace.param.name = filp
+    
+    trace.param.type = int
+    trace.param.name = returnValue 
+
+    # The format string to be used for trace output.
+    trace.formatString = "arguments: (inode=%p, filp=%p), result: %d"
+#######################################################################
+
+# drm_release
+[group]
+    # Name and return type of the target function
+    function.name = drm_release
+    returnType = int
+
+    # Names and types of the arguments of the target function
+    arg.type = struct inode *
+    arg.name = inode
+    
+    arg.type = struct file *
+    arg.name = filp
+    
+    # The parameters to be output to the trace. 
+    trace.param.type = void *
+    trace.param.name = inode
+
+    trace.param.type = void *
+    trace.param.name = filp
+    
+    trace.param.type = int
+    trace.param.name = returnValue 
+
+    # The format string to be used for trace output.
+    trace.formatString = "arguments: (inode=%p, filp=%p), result: %d"
+#######################################################################
+
+# drm_fasync
+[group]
+    # Name and return type of the target function
+    function.name = drm_fasync
+    returnType = int
+
+    # Names and types of the arguments of the target function
+    arg.type = int
+    arg.name = fd
+    
+    arg.type = struct file *
+    arg.name = filp
+
+    arg.type = int
+    arg.name = on
+    
+    # The parameters to be output to the trace. 
+    trace.param.type = int
+    trace.param.name = fd
+
+    trace.param.type = void *
+    trace.param.name = filp
+
+    trace.param.type = int
+    trace.param.name = on
+    
+    trace.param.type = int
+    trace.param.name = returnValue 
+
+    # The format string to be used for trace output.
+    trace.formatString = "arguments: (fd=%d, filp=%p, on=%d), result: %d"
+#######################################################################
+
+# drm_poll
+[group]
+    # Name and return type of the target function
+    function.name = drm_poll
+    returnType = unsigned int
+
+    # Names and types of the arguments of the target function
+    arg.type = struct file *
+    arg.name = filp
+
+    arg.type = struct poll_table_struct *
+    arg.name = wait
+    
+    # The parameters to be output to the trace. 
+    trace.param.type = void *
+    trace.param.name = filp
+
+    trace.param.type = void *
+    trace.param.name = wait
+    
+    trace.param.type = unsigned int
+    trace.param.name = returnValue 
+
+    # The format string to be used for trace output.
+    trace.formatString = "arguments: (filp=%p, wait=%p), result: %u"
+#######################################################################
+
+# drm_ioctl
+[group]
+    # Name and return type of the target function
+    function.name = drm_ioctl
+    returnType = long
+
+    # Names and types of the arguments of the target function
+    arg.type = struct file *
+    arg.name = filp
+
+    arg.type = unsigned int
+    arg.name = cmd
+
+    arg.type = unsigned long
+    arg.name = arg
+    
+    # The parameters to be output to the trace. 
+    trace.param.type = void *
+    trace.param.name = filp
+
+    trace.param.type = unsigned int
+    trace.param.name = cmd
+
+    trace.param.type = unsigned long
+    trace.param.name = arg
+    
+    trace.param.type = long
+    trace.param.name = returnValue 
+
+    # The format string to be used for trace output.
+    trace.formatString = "arguments: (filp=%p, cmd=%u, arg=%lx), result: %ld"
+#######################################################################
+
+# drm_mmap
+[group]
+    # Name and return type of the target function
+    function.name = drm_mmap
+    returnType = int
+
+    # Names and types of the arguments of the target function
+    arg.type = struct file *
+    arg.name = filp
+
+    arg.type = struct vm_area_struct *
+    arg.name = wma
+    
+    # The parameters to be output to the trace. 
+    trace.param.type = void *
+    trace.param.name = filp
+
+    trace.param.type = struct vm_area_struct *
+    trace.param.name = wma
+    
+    trace.param.type = int
+    trace.param.name = returnValue 
+
+    # The format string to be used for trace output.
+    trace.formatString = "arguments: (filp=%p, wma=%p), result: %d"
+#######################################################################
+
+# drm_init
+[group]
+    # Name and return type of the target function
+    function.name = drm_init
+    returnType = int
+
+    # Names and types of the arguments of the target function
+    arg.type = struct drm_driver *
+    arg.name = driver
+    
+    # The parameters to be output to the trace. 
+    trace.param.type = void *
+    trace.param.name = driver
+    
+    trace.param.type = int
+    trace.param.name = returnValue 
+
+    # The format string to be used for trace output.
+    trace.formatString = "arguments: (driver=%p), result: %d"
+#######################################################################
+
+# drm_exit
+[group]
+    # Name and return type of the target function
+    function.name = drm_exit
+
+    # Names and types of the arguments of the target function
+    arg.type = struct drm_driver *
+    arg.name = driver
+    
+    # The parameters to be output to the trace. 
+    trace.param.type = void *
+    trace.param.name = driver
+    
+    # The format string to be used for trace output.
+    trace.formatString = "arguments: (driver=%p)"
+#######################################################################
