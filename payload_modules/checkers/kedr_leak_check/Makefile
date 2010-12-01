@@ -33,6 +33,15 @@ ifeq ($(KERNELRELEASE),)
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 
+all:
+	@if test ! -e "$(KEDR_INSTALL_DIR)/bin/kedr"; then \
+		printf "Failed to find KEDR installation at $(KEDR_INSTALL_DIR).\n"; \
+		printf "Please make sure KEDR_INSTALL_DIR variable contains the path "; \
+		printf "where KEDR is installed.\n"; \
+		exit 1; \
+	fi
+	$(MAKE) modules
+
 modules: $(KEDR_CORE_SYMVERS)
 	cp "$(KEDR_CORE_SYMVERS)" $(KEDR_SYMVERS_NAME)
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
