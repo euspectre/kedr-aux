@@ -35,7 +35,7 @@ PWD := $(shell pwd)
 
 all:
 	@if test ! -e "$(KEDR_INSTALL_DIR)/bin/kedr"; then \
-		printf "Failed to find KEDR installation at $(KEDR_INSTALL_DIR).\n"; \
+		printf "Failed to find KEDR installation in $(KEDR_INSTALL_DIR).\n"; \
 		printf "Please make sure KEDR_INSTALL_DIR variable contains the path "; \
 		printf "where KEDR is installed.\n"; \
 		exit 1; \
@@ -60,6 +60,8 @@ ccflags-y := -I$(src) -I$(KEDR_INSTALL_DIR)/include $(EXTRA_DEFINES)
 obj-m := $(MODULE_NAME).o
 $(MODULE_NAME)-y := \
 	payload.o \
-	kedr_stack_trace.o
+	kedr_stack_trace.o \
+	klc_output.o \
+	mbi_ops.o
 
 endif

@@ -16,6 +16,7 @@
 
 #include <linux/kernel.h>
 #include <linux/stacktrace.h>
+
 #include "kedr_stack_trace.h"
 
 void

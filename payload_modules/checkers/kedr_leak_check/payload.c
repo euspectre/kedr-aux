@@ -27,7 +27,9 @@
 
 #include <kedr/base/common.h>
 
-#include "kedr_stack_trace.h"
+#include "memblock_info.h"
+#include "klc_output.h"
+#include "mbi_ops.h"
 
 MODULE_AUTHOR("Eugene A. Shatokhin");
 MODULE_LICENSE("GPL");
@@ -46,18 +48,6 @@ unsigned int stack_depth = KEDR_STACK_DEPTH_DEFAULT;
 module_param(stack_depth, uint, S_IRUGO);
 
 /*********************************************************************
- * Areas in the memory image of the target module (used to output 
- * addresses and offsets of the calls made by the module)
- *********************************************************************/
-/* Start address and size of "core" area: .text, etc. */
-static void *target_core_addr = NULL;
-static unsigned int target_core_size = 0;
-
-/* Start address and size of "init" area: .init.text, etc. */
-static void *target_init_addr = NULL;
-static unsigned int target_init_size = 0;
-
-/*********************************************************************
  * The callbacks to be called after the target module has just been
  * loaded and, respectively, when it is about to unload.
  *********************************************************************/
@@ -65,12 +55,9 @@ static void
 target_load_callback(struct module *target_module)
 {
     BUG_ON(target_module == NULL);
-
-    target_core_addr = target_module->module_core;
-    target_core_size = target_module->core_text_size;
-
-    target_init_addr = target_module->module_init;
-    target_init_size = target_module->init_text_size;
+    
+    klc_output_clear();
+    klc_print_target_module_info(target_module);
     return;
 }
 
@@ -78,12 +65,9 @@ static void
 target_unload_callback(struct module *target_module)
 {
     BUG_ON(target_module == NULL);
-    
-    target_core_addr = NULL;
-    target_core_size = 0;
 
-    target_init_addr = NULL;
-    target_init_size = 0;
+// TODO: output what remains in the lists, destroy the objects.
+
     return;
 }
 
@@ -94,14 +78,38 @@ target_unload_callback(struct module *target_module)
 static void*
 repl___kmalloc(size_t size, gfp_t flags)
 {
-    void* returnValue;
-    
-    // TODO
-    
+    void *ret_val;
+   
     /* Call the target function */
-    returnValue = __kmalloc(size, flags);
+    ret_val = __kmalloc(size, flags);
     
-    return returnValue;
+    /* Process the allocation */
+//<> [DBG]
+    {
+        struct kedr_memblock_info *alloc_info1 = NULL;
+        struct kedr_memblock_info *alloc_info2 = NULL;
+        struct kedr_memblock_info *alloc_info3 = NULL;
+        
+        printk(KERN_INFO "[DBG] sizeof(struct kedr_memblock_info)=%zu\n",
+            sizeof(struct kedr_memblock_info));
+        
+        alloc_info2 = kedr_alloc_info_create(ret_val, size, stack_depth);
+        if (alloc_info2 == NULL) {
+            printk(KERN_ERR "[kedr_leak_check] "
+                "repl___kmalloc() - not enough memory to create "
+                "'struct kedr_memblock_info'\n");
+        } else {
+            klc_print_alloc_info(alloc_info2);
+            klc_print_dealloc_info(alloc_info2);
+        }
+        
+        /* cleanup */
+        kedr_memblock_info_destroy(alloc_info1);
+        kedr_memblock_info_destroy(alloc_info2);
+        kedr_memblock_info_destroy(alloc_info3);
+    }
+//<> [/DBG]
+    return ret_val;
 }
 
 // TODO
@@ -133,6 +141,7 @@ static void
 payload_cleanup_module(void)
 {
     kedr_payload_unregister(&payload);
+    klc_output_fini();
     
     KEDR_MSG("[kedr_leak_check] Cleanup complete\n");
     return;
@@ -141,6 +150,8 @@ payload_cleanup_module(void)
 static int __init
 payload_init_module(void)
 {
+    int ret = 0;
+    
     BUILD_BUG_ON(ARRAY_SIZE(orig_addrs) != 
         ARRAY_SIZE(repl_addrs));
 
@@ -156,7 +167,21 @@ payload_init_module(void)
         return -EINVAL;
     }
     
-    return kedr_payload_register(&payload);
+    ret = klc_output_init();
+    if (ret != 0)
+        return ret;
+    
+    ret = kedr_payload_register(&payload);
+    if (ret != 0) 
+        goto fail_reg;
+    
+// TODO: initialize storage and output subsystems if necessary
+   
+    return 0;
+
+fail_reg:
+    klc_output_fini();
+    return ret;
 }
 
 module_init(payload_init_module);
