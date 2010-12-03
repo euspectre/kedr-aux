@@ -65,9 +65,9 @@ static void
 target_unload_callback(struct module *target_module)
 {
     BUG_ON(target_module == NULL);
-
-// TODO: output what remains in the lists, destroy the objects.
-
+    
+    klc_flush_allocs();
+    klc_flush_deallocs();
     return;
 }
 
@@ -86,27 +86,13 @@ repl___kmalloc(size_t size, gfp_t flags)
     /* Process the allocation */
 //<> [DBG]
     {
-        struct kedr_memblock_info *alloc_info1 = NULL;
-        struct kedr_memblock_info *alloc_info2 = NULL;
-        struct kedr_memblock_info *alloc_info3 = NULL;
+        /*int found;
+        void *ptr;*/
+        klc_add_alloc(ret_val, size, stack_depth);
         
-        printk(KERN_INFO "[DBG] sizeof(struct kedr_memblock_info)=%zu\n",
-            sizeof(struct kedr_memblock_info));
-        
-        alloc_info2 = kedr_alloc_info_create(ret_val, size, stack_depth);
-        if (alloc_info2 == NULL) {
-            printk(KERN_ERR "[kedr_leak_check] "
-                "repl___kmalloc() - not enough memory to create "
-                "'struct kedr_memblock_info'\n");
-        } else {
-            klc_print_alloc_info(alloc_info2);
-            klc_print_dealloc_info(alloc_info2);
-        }
-        
-        /* cleanup */
-        kedr_memblock_info_destroy(alloc_info1);
-        kedr_memblock_info_destroy(alloc_info2);
-        kedr_memblock_info_destroy(alloc_info3);
+        /*ptr = (void *)&repl___kmalloc;
+        found = klc_find_and_remove_alloc(ptr);
+        printk(KERN_INFO "[DBG] found(0x%p)=%d\n", ptr, found);*/
     }
 //<> [/DBG]
     return ret_val;

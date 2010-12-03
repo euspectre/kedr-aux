@@ -78,15 +78,15 @@ klc_print_stack_trace(enum klc_output_type output_type,
 void
 klc_print_target_module_info(struct module *target_module);
 
-/* Helpers to output kedr_memblock_info structures corresponding to 
+/* Helpers to output klc_memblock_info structures corresponding to 
  * suspicious memory allocation and deallocation events.
  *
  * Cannot be used in atomic context.
  */
 void 
-klc_print_alloc_info(struct kedr_memblock_info *alloc_info);
+klc_print_alloc_info(struct klc_memblock_info *alloc_info);
 
 void 
-klc_print_dealloc_info(struct kedr_memblock_info *dealloc_info);
+klc_print_dealloc_info(struct klc_memblock_info *dealloc_info);
 
 #endif /* KLC_OUTPUT_H_1810_INCLUDED */

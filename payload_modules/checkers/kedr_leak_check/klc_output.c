@@ -111,7 +111,7 @@ klc_print_target_module_info(struct module *target_module)
 }
 
 void 
-klc_print_alloc_info(struct kedr_memblock_info *alloc_info)
+klc_print_alloc_info(struct klc_memblock_info *alloc_info)
 {
     static const char* fmt = 
         "Block at 0x%p, size: %zu; stack trace of the allocation:";
@@ -140,7 +140,7 @@ klc_print_alloc_info(struct kedr_memblock_info *alloc_info)
 }
 
 void 
-klc_print_dealloc_info(struct kedr_memblock_info *dealloc_info)
+klc_print_dealloc_info(struct klc_memblock_info *dealloc_info)
 {
     static const char* fmt = 
         "Block at 0x%p; stack trace of the deallocation:";

@@ -21,7 +21,7 @@
  * The instances of this structure are to be stored in a linked list, hence
  * 'list' field here.
  */
-struct kedr_memblock_info
+struct klc_memblock_info
 {
     struct list_head list;
     
@@ -36,9 +36,9 @@ struct kedr_memblock_info
     unsigned long stack_entries[KEDR_MAX_FRAMES];
 };
 
-/* Helpers to create and destroy 'kedr_memblock_info' structures. */
+/* Helpers to create and destroy 'klc_memblock_info' structures. */
 
-/* Creates and initializes kedr_memblock_info structure and returns 
+/* Creates and initializes klc_memblock_info structure and returns 
  * a pointer to it (or NULL if there is not enough memory). 
  * 
  * 'block_' is the pointer to the memory block, 'size_' is the size of that
@@ -51,11 +51,11 @@ struct kedr_memblock_info
  * This macro can be used in atomic context too (it uses GFP_ATOMIC flag 
  * when it allocates memory).
  */
-#define kedr_memblock_info_create(block_, size_, max_stack_depth_)  \
+#define klc_memblock_info_create(block_, size_, max_stack_depth_)  \
 ({                                                                  \
-    struct kedr_memblock_info *ptr;                                 \
-    ptr = (struct kedr_memblock_info *)kzalloc(                     \
-        sizeof(struct kedr_memblock_info),                          \
+    struct klc_memblock_info *ptr;                                 \
+    ptr = (struct klc_memblock_info *)kzalloc(                     \
+        sizeof(struct klc_memblock_info),                          \
         GFP_ATOMIC);                                                \
     if (ptr != NULL) {                                              \
         ptr->block = (block_);                                      \
@@ -68,20 +68,20 @@ struct kedr_memblock_info
     ptr;                                                            \
 })
 
-/* Helper macros to create and initialize kedr_memblock_info structures 
+/* Helper macros to create and initialize klc_memblock_info structures 
  * for memory allocation and deallocation events.
  */
-#define kedr_alloc_info_create(block_, size_, max_stack_depth_) \
-    kedr_memblock_info_create(block_, size_, max_stack_depth_)
+#define klc_alloc_info_create(block_, size_, max_stack_depth_) \
+    klc_memblock_info_create(block_, size_, max_stack_depth_)
     
-#define kedr_dealloc_info_create(block_, max_stack_depth_) \
-    kedr_memblock_info_create(block_, (size_t)(-1), max_stack_depth_)
+#define klc_dealloc_info_create(block_, max_stack_depth_) \
+    klc_memblock_info_create(block_, (size_t)(-1), max_stack_depth_)
 
-/* Destroys kedr_memblock_info structure pointed to by 'ptr'.
+/* Destroys klc_memblock_info structure pointed to by 'ptr'.
  * No-op if 'ptr' is NULL.
  * [NB] Before destroying the structure, make sure you have removed it
  * from the list if it was there.
  */
-#define kedr_memblock_info_destroy(ptr) kfree(ptr)
+#define klc_memblock_info_destroy(ptr) kfree(ptr)
 
 #endif /* MEMBLOCK_INFO_H_1734_INCLUDED */
