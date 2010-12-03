@@ -20,10 +20,12 @@
 
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/string.h>
 #include <linux/errno.h>
-/*#include <linux/mutex.h>
-#include <linux/spinlock.h>*/
-#include <linux/debugfs.h>
+#include <linux/err.h>
+#include <linux/vmalloc.h>
+
+#include <asm/uaccess.h>
 
 #include <kedr/base/common.h>
 
@@ -73,45 +75,396 @@ target_unload_callback(struct module *target_module)
 
 /*********************************************************************
  * Replacement functions
+ * 
+ * [NB] Each deallocation should be processed in a replacement function
+ * BEFORE calling the target function.
+ * Each allocation should be processed AFTER the call to the target 
+ * function.
+ * This allows to avoid some problems on multiprocessor systems. As soon
+ * as a memory block is freed, it may become the result of a new allocation
+ * made by a thread on another processor. If a deallocation is processed 
+ * after it has actually been done, a race condition could happen because 
+ * another thread could break in during that gap.
  *********************************************************************/
 
-static void*
+/*********************************************************************
+ * "kmalloc" group
+ *********************************************************************/
+static void *
 repl___kmalloc(size_t size, gfp_t flags)
 {
     void *ret_val;
-   
-    /* Call the target function */
     ret_val = __kmalloc(size, flags);
     
-    /* Process the allocation */
-//<> [DBG]
-    {
-        /*int found;
-        void *ptr;*/
+    if (ret_val != NULL)
         klc_add_alloc(ret_val, size, stack_depth);
-        
-        /*ptr = (void *)&repl___kmalloc;
-        found = klc_find_and_remove_alloc(ptr);
-        printk(KERN_INFO "[DBG] found(0x%p)=%d\n", ptr, found);*/
-    }
-//<> [/DBG]
+
     return ret_val;
 }
 
-// TODO
+static void *
+repl_krealloc(const void *p, size_t size, gfp_t flags)
+{
+    void *ret_val;
+    
+    if (size == 0 || p != NULL) {
+        /* kfree */
+        if (p != NULL && !klc_find_and_remove_alloc(p)) 
+            klc_add_bad_free(p, stack_depth);
+/* [NB] If size != 0 and p != NULL and later the allocation fails, we will
+ * need to add a fake allocation event for 'p' to the storage because 'p'
+ * is not actually freed by krealloc() in this case.
+ */
+    }
+    
+    ret_val = krealloc(p, size, flags);
+
+    if (size != 0) {
+        if (p == NULL) { 
+            /* kmalloc */
+            if (ret_val != NULL)
+                klc_add_alloc(ret_val, size, stack_depth);
+        } else {
+            /* kfree + kmalloc if everything succeeds */
+            klc_add_alloc(((ret_val != NULL) ? ret_val : p), size, stack_depth);
+            /* If the allocation failed, we return information about 'p'
+             * to the storage. A minor issue is that stack trace will 
+             * now point to this call to krealloc rather than to the call 
+             * when 'p' was allocated. Should not be much of a problem.
+             */
+        }
+    }
+    return ret_val;
+}
+
+static void*
+repl___krealloc(const void *p, size_t size, gfp_t flags)
+{
+    void *ret_val;
+    ret_val = __krealloc(p, size, flags);
+    
+    if (size == 0) /* do nothing */
+        return ret_val;
+    
+    if (p == NULL) { 
+        /* same as kmalloc */
+        if (ret_val != NULL)
+            klc_add_alloc(ret_val, size, stack_depth);
+    } else {
+        /* this part is more tricky as __krealloc may or may not call
+         * kmalloc and, in addition, it does not free 'p'.
+         */
+        if (ret_val != NULL && ret_val != p) /* allocation has been done */
+            klc_add_alloc(ret_val, size, stack_depth);
+    }
+    return ret_val;
+}
+
+static void
+repl_kfree(void *p)
+{
+    /* This is done before actually calling kfree(), because once the 
+     * memory block pointed to by 'p' is freed, some other CPU might 
+     * call an allocation function, get this address as a result and
+     * add it to the storage before klc_find_and_remove_alloc() is called
+     * below, which would make a mess.
+     */
+    if (p != NULL && !klc_find_and_remove_alloc(p)) 
+        klc_add_bad_free(p, stack_depth);
+    
+    kfree(p);
+    return;
+}
+
+static void
+repl_kzfree(void *p)
+{
+    if (p != NULL && !klc_find_and_remove_alloc(p)) 
+        klc_add_bad_free(p, stack_depth);
+    
+    kzfree(p);
+    return;
+}
+
+static void *
+repl_kmem_cache_alloc(struct kmem_cache *mc, gfp_t flags) 
+{
+    void *ret_val;
+    ret_val = kmem_cache_alloc(mc, flags);
+
+    if (ret_val != NULL)
+        klc_add_alloc(ret_val, (size_t)kmem_cache_size(mc), stack_depth);
+    
+    return ret_val;
+}
+
+#ifdef KEDR_HAVE_KMCA_NOTRACE 
+static void *
+repl_kmem_cache_alloc_notrace(struct kmem_cache *mc, gfp_t flags) 
+{
+    void *ret_val;
+    ret_val = kmem_cache_alloc_notrace(mc, flags);
+
+    if (ret_val != NULL)
+        klc_add_alloc(ret_val, (size_t)kmem_cache_size(mc), stack_depth);
+    
+    return ret_val;
+}
+#endif
+
+static void
+repl_kmem_cache_free(struct kmem_cache *mc, void *p)
+{
+    if (p != NULL && !klc_find_and_remove_alloc(p)) 
+        klc_add_bad_free(p, stack_depth);
+
+    kmem_cache_free(mc, p);
+    return;
+}
+
+static unsigned long
+repl___get_free_pages(gfp_t flags, unsigned int order)
+{
+    unsigned long ret_val;
+    ret_val = __get_free_pages(flags, order);
+
+    if ((void *)ret_val != NULL) {
+        klc_add_alloc((const void *)ret_val, 
+            (size_t)(PAGE_SIZE << order), stack_depth);
+    }
+
+    return ret_val;        
+}
+
+static void
+repl_free_pages(unsigned long addr, unsigned int order)
+{
+    void *p = (void *)addr;
+    if (p != NULL && !klc_find_and_remove_alloc(p)) 
+        klc_add_bad_free(p, stack_depth);
+    
+    free_pages(addr, order);
+    return;
+}
+
+/*********************************************************************
+ * "duplicators" group
+ *********************************************************************/
+static char *
+repl_kstrdup(const char *s, gfp_t gfp)
+{
+    char *ret_val;
+    ret_val = kstrdup(s, gfp);
+    
+    if (ret_val != NULL)
+        klc_add_alloc((void *)ret_val, strlen(s) + 1, stack_depth);
+    
+    return ret_val;
+}
+
+static char *
+repl_kstrndup(const char *s, size_t max, gfp_t gfp)
+{
+    char *ret_val;
+    ret_val = kstrndup(s, max, gfp);
+    
+    if (ret_val != NULL)
+        klc_add_alloc((void *)ret_val, strnlen(s, max) + 1, stack_depth);
+    
+    return ret_val;
+}
+
+static void *
+repl_kmemdup(const void *src, size_t len, gfp_t gfp)
+{
+    void *ret_val;
+    ret_val = kmemdup(src, len, gfp);
+    
+    if (ret_val != NULL)
+        klc_add_alloc(ret_val, len, stack_depth);
+
+    return ret_val;
+}
+
+static char *
+repl_strndup_user(const char __user *s, long n)
+{
+    char *ret_val;
+    ret_val = strndup_user(s, n);
+    
+    if (!IS_ERR(ret_val))
+        klc_add_alloc((void *)ret_val, strnlen_user(s, n), stack_depth);
+    
+    return ret_val;
+}
+
+static void *
+repl_memdup_user(const void __user *src, size_t len)
+{
+    void *ret_val;
+    ret_val = memdup_user(src, len);
+    
+    if (!IS_ERR(ret_val))
+        klc_add_alloc(ret_val, len, stack_depth);
+    
+    return ret_val;
+}
+
+/*********************************************************************
+ * "vmalloc" group
+ *********************************************************************/
+static void *
+repl_vmalloc(unsigned long size)
+{
+    void *ret_val;
+    ret_val = vmalloc(size);
+    
+    if (ret_val != NULL)
+        klc_add_alloc(ret_val, size, stack_depth);
+
+    return ret_val;
+}
+
+static void *
+repl___vmalloc(unsigned long size, gfp_t gfp_mask, pgprot_t prot)
+{
+    void *ret_val;
+    ret_val = __vmalloc(size, gfp_mask, prot);
+
+    if (ret_val != NULL)
+        klc_add_alloc(ret_val, size, stack_depth);
+
+    return ret_val;
+}
+
+static void *
+repl_vmalloc_user(unsigned long size)
+{
+    void *ret_val;
+    ret_val = vmalloc_user(size);
+
+    if (ret_val != NULL)
+        klc_add_alloc(ret_val, size, stack_depth);
+
+    return ret_val;
+}
+
+static void *
+repl_vmalloc_node(unsigned long size, int node)
+{
+    void *ret_val;
+    ret_val = vmalloc_node(size, node);
+
+    if (ret_val != NULL)
+        klc_add_alloc(ret_val, size, stack_depth);
+
+    return ret_val;
+}
+
+static void *
+repl_vmalloc_32(unsigned long size)
+{
+    void *ret_val;
+    ret_val = vmalloc_32(size);
+
+    if (ret_val != NULL)
+        klc_add_alloc(ret_val, size, stack_depth);
+
+    return ret_val;
+}
+
+static void *
+repl_vmalloc_32_user(unsigned long size)
+{
+    void *ret_val;
+    ret_val = vmalloc_32_user(size);
+
+    if (ret_val != NULL)
+        klc_add_alloc(ret_val, size, stack_depth);
+
+    return ret_val;
+}
+
+static void
+repl_vfree(const void *addr)
+{
+    if (addr != NULL && !klc_find_and_remove_alloc(addr)) 
+        klc_add_bad_free(addr, stack_depth);
+
+    vfree(addr);
+    return;    
+}
 
 /*********************************************************************/
-
 /* Names and addresses of the functions of interest */
-static void* orig_addrs[] = {
-    (void*)&__kmalloc,
+static void *orig_addrs[] = {
+    /* "kmalloc" group */
+    (void *)&__kmalloc,
+    (void *)&krealloc,
+    (void *)&__krealloc,
+    (void *)&kfree,
+    (void *)&kzfree,
+
+    (void *)&kmem_cache_alloc,
+#ifdef KEDR_HAVE_KMCA_NOTRACE 
+    (void *)&kmem_cache_alloc_notrace,
+#endif
+    (void *)&kmem_cache_free,
+
+    (void *)&__get_free_pages,
+    (void *)&free_pages,
+
+    /* "duplicators" group */
+    (void *)&kstrdup,
+    (void *)&kstrndup,
+    (void *)&kmemdup,
+    (void *)&strndup_user,
+    (void *)&memdup_user,
+    
+    /* "vmalloc" group */
+    (void *)&vmalloc,
+    (void *)&__vmalloc,
+    (void *)&vmalloc_user,
+    (void *)&vmalloc_node,
+    (void *)&vmalloc_32,
+    (void *)&vmalloc_32_user,
+    (void *)&vfree,
 };
 
 /* Addresses of the replacement functions */
-static void* repl_addrs[] = {
-    (void*)&repl___kmalloc,
-};
+static void *repl_addrs[] = {
+    /* "kmalloc" group */
+    (void *)&repl___kmalloc,
+    (void *)&repl_krealloc,
+    (void *)&repl___krealloc,
+    (void *)&repl_kfree,
+    (void *)&repl_kzfree,
 
+    (void *)&repl_kmem_cache_alloc,
+#ifdef KEDR_HAVE_KMCA_NOTRACE 
+    (void *)&repl_kmem_cache_alloc_notrace,
+#endif
+    (void *)&repl_kmem_cache_free,
+
+    (void *)&repl___get_free_pages,
+    (void *)&repl_free_pages,
+
+    /* "duplicators" group */
+    (void *)&repl_kstrdup,
+    (void *)&repl_kstrndup,
+    (void *)&repl_kmemdup,
+    (void *)&repl_strndup_user,
+    (void *)&repl_memdup_user,
+    
+    /* "vmalloc" group */
+    (void *)&repl_vmalloc,
+    (void *)&repl___vmalloc,
+    (void *)&repl_vmalloc_user,
+    (void *)&repl_vmalloc_node,
+    (void *)&repl_vmalloc_32,
+    (void *)&repl_vmalloc_32_user,
+    (void *)&repl_vfree,
+};
 
 static struct kedr_payload payload = {
     .mod                    = THIS_MODULE,
@@ -160,9 +513,7 @@ payload_init_module(void)
     ret = kedr_payload_register(&payload);
     if (ret != 0) 
         goto fail_reg;
-    
-// TODO: initialize storage and output subsystems if necessary
-   
+  
     return 0;
 
 fail_reg:

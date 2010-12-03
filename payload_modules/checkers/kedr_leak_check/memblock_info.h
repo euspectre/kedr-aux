@@ -28,7 +28,7 @@ struct klc_memblock_info
     /* Pointer to the memory block and the size of that block.
      * 'size' is (size_t)(-1) if the block was freed rather than allocated
      */
-    void *block;
+    const void *block;
     size_t size;
     
     /* Call stack */
@@ -72,10 +72,10 @@ struct klc_memblock_info
  * for memory allocation and deallocation events.
  */
 #define klc_alloc_info_create(block_, size_, max_stack_depth_) \
-    klc_memblock_info_create(block_, size_, max_stack_depth_)
+    klc_memblock_info_create((block_), (size_), (max_stack_depth_))
     
 #define klc_dealloc_info_create(block_, max_stack_depth_) \
-    klc_memblock_info_create(block_, (size_t)(-1), max_stack_depth_)
+    klc_memblock_info_create((block_), (size_t)(-1), (max_stack_depth_))
 
 /* Destroys klc_memblock_info structure pointed to by 'ptr'.
  * No-op if 'ptr' is NULL.

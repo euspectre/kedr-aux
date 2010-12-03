@@ -55,7 +55,7 @@ klc_add_alloc_impl(struct klc_memblock_info *alloc_info)
 }
 
 void
-klc_add_dealloc_impl(struct klc_memblock_info *dealloc_info)
+klc_add_bad_free_impl(struct klc_memblock_info *dealloc_info)
 {
     unsigned long irq_flags;
     BUG_ON(dealloc_info == NULL);
@@ -67,14 +67,14 @@ klc_add_dealloc_impl(struct klc_memblock_info *dealloc_info)
 }
 
 int
-klc_find_and_remove_alloc(void *block)
+klc_find_and_remove_alloc(const void *block)
 {
     unsigned long irq_flags;
     int ret = 0;
     struct klc_memblock_info *mbi = NULL;
     struct klc_memblock_info *tmp = NULL;
     
-    BUG_ON(block == NULL);
+    WARN_ON(block == NULL);
     
     spin_lock_irqsave(&spinlock_mbi_storage, irq_flags);
     list_for_each_entry_safe(mbi, tmp, &alloc_list, list) {

@@ -23,11 +23,11 @@ klc_add_alloc_impl(struct klc_memblock_info *alloc_info);
 /* Adds the structure pointed to by 'dealloc_info' to the list of 
  * "suspicious deallocation events".
  *
- * Use klc_add_dealloc() macro rather than this function in the replacement
+ * Use klc_add_bad_free() macro rather than this function in the replacement
  * functions.
  */
 void
-klc_add_dealloc_impl(struct klc_memblock_info *dealloc_info);
+klc_add_bad_free_impl(struct klc_memblock_info *dealloc_info);
 
 /* Helpers to create klc_memblock_info structures and add them to 
  * the storage in one step.
@@ -37,7 +37,8 @@ klc_add_dealloc_impl(struct klc_memblock_info *dealloc_info);
 #define klc_add_alloc(block_, size_, max_stack_depth_)              \
 {                                                                   \
     struct klc_memblock_info *mbi;                                  \
-    mbi = klc_alloc_info_create(block_, size_, max_stack_depth_);   \
+    mbi = klc_alloc_info_create((block_), (size_),                  \
+        (max_stack_depth_));                                        \
     if (mbi == NULL) {                                              \
         printk(KERN_ERR "[kedr_leak_check] klc_add_alloc: "         \
         "not enough memory to create 'struct klc_memblock_info'\n");\
@@ -46,15 +47,15 @@ klc_add_dealloc_impl(struct klc_memblock_info *dealloc_info);
     }                                                               \
 }
 
-#define klc_add_dealloc(block_, max_stack_depth_)                   \
+#define klc_add_bad_free(block_, max_stack_depth_)                  \
 {                                                                   \
     struct klc_memblock_info *mbi;                                  \
-    mbi = klc_dealloc_info_create(block_, max_stack_depth_);        \
+    mbi = klc_dealloc_info_create((block_), (max_stack_depth_));    \
     if (mbi == NULL) {                                              \
-        printk(KERN_ERR "[kedr_leak_check] klc_add_dealloc: "       \
+        printk(KERN_ERR "[kedr_leak_check] klc_add_bad_free: "      \
         "not enough memory to create 'struct klc_memblock_info'\n");\
     } else {                                                        \
-        klc_add_dealloc_impl(mbi);                                  \
+        klc_add_bad_free_impl(mbi);                                 \
     }                                                               \
 }
 
@@ -69,7 +70,7 @@ klc_add_dealloc_impl(struct klc_memblock_info *dealloc_info);
  * 'block' must not be NULL.
  */
 int
-klc_find_and_remove_alloc(void *block);
+klc_find_and_remove_alloc(const void *block);
 
 /* Outputs the information about the allocation events currently present 
  * in the storage, detetes the corresponding entries from the storage and
