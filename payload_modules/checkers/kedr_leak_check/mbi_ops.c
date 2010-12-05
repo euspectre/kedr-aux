@@ -42,6 +42,14 @@ LIST_HEAD(alloc_list);
  */
 LIST_HEAD(bad_free_list);
 
+/* Statistics: total number of memory allocations, possible leaks and
+ * unallocated frees.
+ */
+u64 total_allocs = 0;
+u64 total_leaks = 0;
+u64 total_bad_frees = 0;
+/* ================================================================ */
+
 void
 klc_add_alloc_impl(struct klc_memblock_info *alloc_info)
 {
@@ -50,6 +58,8 @@ klc_add_alloc_impl(struct klc_memblock_info *alloc_info)
 
     spin_lock_irqsave(&spinlock_mbi_storage, irq_flags);
     list_add(&alloc_info->list, &alloc_list);
+    ++total_allocs;
+    ++total_leaks;
     spin_unlock_irqrestore(&spinlock_mbi_storage, irq_flags);
     return;    
 }
@@ -62,6 +72,7 @@ klc_add_bad_free_impl(struct klc_memblock_info *dealloc_info)
 
     spin_lock_irqsave(&spinlock_mbi_storage, irq_flags);
     list_add(&dealloc_info->list, &bad_free_list);
+    ++total_bad_frees;
     spin_unlock_irqrestore(&spinlock_mbi_storage, irq_flags);
     return;    
 }
@@ -82,6 +93,7 @@ klc_find_and_remove_alloc(const void *block)
             ret = 1;
             list_del(&mbi->list);
             klc_memblock_info_destroy(mbi);
+            --total_leaks;
         }
     }
     spin_unlock_irqrestore(&spinlock_mbi_storage, irq_flags);
@@ -113,6 +125,21 @@ klc_flush_deallocs(void)
         list_del(&mbi->list);
         klc_memblock_info_destroy(mbi);
     }
+    return;
+}
+
+void
+klc_flush_stats(void)
+{
+    klc_print_totals(total_allocs, total_leaks, total_bad_frees);
+
+    /* No need to protect these counters here as this function is called
+     * from on_target_unload handler when no replacement function can
+     * interfere.
+     */
+    total_allocs = 0;
+    total_leaks = 0;
+    total_bad_frees = 0;
     return;
 }
 /* ================================================================ */

@@ -89,4 +89,13 @@ klc_print_alloc_info(struct klc_memblock_info *alloc_info);
 void 
 klc_print_dealloc_info(struct klc_memblock_info *dealloc_info);
 
+/* Output statistics about the analysis session of the target module:
+ * total number of memory allocations, potential memory leaks and 
+ * spurious ("unallocated") frees.
+ * 
+ * Should be called from on_target_unload() handler.
+ */
+void
+klc_print_totals(u64 total_allocs, u64 total_leaks, u64 total_bad_frees);
+
 #endif /* KLC_OUTPUT_H_1810_INCLUDED */

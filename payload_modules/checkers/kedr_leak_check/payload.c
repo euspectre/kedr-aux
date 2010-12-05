@@ -70,6 +70,7 @@ target_unload_callback(struct module *target_module)
     
     klc_flush_allocs();
     klc_flush_deallocs();
+    klc_flush_stats();
     return;
 }
 

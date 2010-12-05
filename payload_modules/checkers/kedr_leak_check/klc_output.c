@@ -168,6 +168,45 @@ klc_print_dealloc_info(struct klc_memblock_info *dealloc_info)
     return;
 }
 
+/* A helper function to print an unsigned 64-bit value using the specified
+ * format. The format must contain "%llu", "%llx" or the like.
+ */
+static void 
+klc_print_u64(enum klc_output_type output_type, u64 data, const char *fmt)
+{
+    char one_char[1];
+    char *buf = NULL;
+    int len;
+    
+    BUG_ON(fmt == NULL);
+    
+    len = snprintf(&one_char[0], 1, fmt, data);
+    buf = (char*)kmalloc(len + 1, GFP_KERNEL);
+    if (buf == NULL) {
+        printk(KERN_ERR "[kedr_leak_check] klc_print_u64: "
+            "not enough memory to prepare a message of size %d\n",
+            len);
+    }
+    snprintf(buf, len + 1, fmt, data);
+    klc_print_string(output_type, buf);
+    kfree(buf);
+    
+    return;    
+}
+
+void
+klc_print_totals(u64 total_allocs, u64 total_leaks, u64 total_bad_frees)
+{
+    klc_print_u64(KLC_OTHER, total_allocs, 
+        "Memory allocations: %llu");
+    klc_print_u64(KLC_OTHER, total_leaks,
+        "Possible leaks: %llu");
+    klc_print_u64(KLC_OTHER, total_bad_frees,
+        "Unallocated frees: %llu");
+    return;
+}
+/* ================================================================ */
+
 int 
 klc_output_init(void)
 {

@@ -96,4 +96,12 @@ klc_flush_allocs(void);
 void
 klc_flush_deallocs(void);
 
+/* Outputs and then resets allocation statistics collected so far: 
+ * total number of allocations, possible leaks, etc. 
+ * 
+ * Should be called from on_target_unload() handler.
+ */
+void
+klc_flush_stats(void);
+
 #endif /* MBI_OPS_H_1723_INCLUDED */
