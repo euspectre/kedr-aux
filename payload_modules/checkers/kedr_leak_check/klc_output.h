@@ -13,6 +13,11 @@
 
 #include "memblock_info.h"
 
+/* The caller must ensure that no output via klc_print_* functions takes
+ * place when klc_output_init(), klc_output_clear() or klc_output_fini()
+ * are running.
+ */
+
 /* Initializes output subsystem (creates files in debugfs if necessary,
  * etc.) 
  * Returns 0 on success, negative error code on failure.
@@ -58,6 +63,8 @@ enum klc_output_type {
  * data structures.
  *
  * A newline will be added at the end automatically.
+ *
+ * This function cannot be used in atomic context.
  */
 void
 klc_print_string(enum klc_output_type output_type, const char *s);

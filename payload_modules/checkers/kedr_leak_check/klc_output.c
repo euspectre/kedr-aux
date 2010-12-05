@@ -19,16 +19,171 @@
  ======================================================================== */
 
 #include <linux/kernel.h>
+#include <linux/string.h>
+#include <linux/errno.h>
 #include <linux/slab.h>
+#include <linux/mutex.h>
 #include <linux/debugfs.h>
 
 #include "klc_output.h"
 
+/* ================================================================ */
+/* Output buffer that accumulates strings sent to it by klc_print_string().
+ * The buffer grows automatically when necessary.
+ * The operations with each such buffer (klc_output_buffer_*(), etc.) 
+ * should be performed with the corresponding mutex locked (see 'lock' 
+ * field in the structure). 
+ *
+ * The caller must also ensure that no other operations with a buffer can
+ * occur during the creation and descruction of the buffer.
+ */
+struct klc_output_buffer
+{
+    char *buf; /* the buffer itself */
+    size_t size; /* the size of the buffer */
+    size_t data_len; /* length of the data currently stored */
+    struct mutex *lock; /* the mutex to guard access to the buffer */
+};
+
+/* Default size of the buffer. */
+/* TODO: increase to 500-1000 */
+#define KLC_OUTPUT_BUFFER_SIZE 125
+
+/* The mutexes to guard access to the buffers. */
+DEFINE_MUTEX(ob_leaks_mutex);
+DEFINE_MUTEX(ob_bad_frees_mutex);
+DEFINE_MUTEX(ob_other_mutex);
+
+/* Output buffers for each type of output resource. */
+struct klc_output_buffer ob_leaks = {
+    .buf = NULL,
+    .size = 0,
+    .data_len = 0,
+    .lock = &ob_leaks_mutex
+};
+
+struct klc_output_buffer ob_bad_frees = {
+    .buf = NULL,
+    .size = 0,
+    .data_len = 0,
+    .lock = &ob_bad_frees_mutex
+};
+
+struct klc_output_buffer ob_other = {
+    .buf = NULL,
+    .size = 0,
+    .data_len = 0,
+    .lock = &ob_other_mutex
+};
+
+/* Initializes the buffer: allocates memory, etc.
+ * Returns 0 on success, a negative error code on failure.
+ */
+static int
+klc_output_buffer_init(struct klc_output_buffer *ob)
+{
+    BUG_ON(ob == NULL);
+
+    ob->buf = (char *)kmalloc(KLC_OUTPUT_BUFFER_SIZE, GFP_KERNEL);
+    if (ob->buf == NULL)
+        return -ENOMEM;
+    
+    ob->size = KLC_OUTPUT_BUFFER_SIZE;
+    
+    return 0;
+}
+
+/* Destroys the buffer: releases the memory pointed to by 'ob->buf', etc.
+ */
+static void
+klc_output_buffer_destroy(struct klc_output_buffer *ob)
+{
+    BUG_ON(ob == NULL);
+    
+    ob->data_len = 0;
+    ob->size = 0;
+    kfree(ob->buf);
+    return;
+}
+
+/* Enlarges the buffer to make it at least 'new_size' bytes in size.
+ * If 'new_size' is less than or equal to 'ob->size', the function does 
+ * nothing.
+ * If there is not enough memory, the function outputs an error to 
+ * the system log, leaves the buffer intact and returns -ENOMEM.
+ * 0 is returned in case of success.
+ */
+static int
+klc_output_buffer_resize(struct klc_output_buffer *ob, size_t new_size)
+{
+    size_t size;
+    void *p;
+    BUG_ON(ob == NULL);
+    
+    if (ob->size >= new_size)
+        return 0;
+    
+    size = ob->size;
+    do {
+         size *= 2;
+    } while (size < new_size);
+    
+    p = krealloc(ob->buf, size, GFP_KERNEL);
+    if (p == NULL) {
+    /* [NB] If krealloc fails to allocate memory, it does not free the 
+     * original memory, so the buffer should not be corrupted.
+     */
+        printk(KERN_ERR "[kedr_leak_check] klc_output_buffer_resize: "
+            "not enough memory to resize the output buffer to %zu bytes\n",
+            size);
+        return -ENOMEM;
+    }
+    
+    ob->buf = p;
+    ob->size = size;
+    
+    //<> TODO: remove
+    printk(KERN_INFO "[DBG] klc_output_buffer_resize: "
+            "resized the output buffer to %zu bytes\n",
+            size);
+    //<> 
+    return 0;
+}
+
+/* Appends the specified string to the buffer, enlarging the latter if 
+ * necessary with klc_output_buffer_resize().
+ */
+static void
+klc_output_buffer_append(struct klc_output_buffer *ob, const char *s)
+{
+    size_t len;
+    int ret;
+    
+    BUG_ON(ob == NULL);
+    BUG_ON(s == NULL);
+    
+    len = strlen(s);
+    if (len == 0)   /* nothing to do */
+        return;
+    
+    /* make sure the buffer is large enough */
+    ret = klc_output_buffer_resize(ob, ob->data_len + len + 1);
+    if (ret != 0)
+        return; /* the error has already been reported */
+    
+    strncpy(&(ob->buf[ob->data_len]), s, len + 1);
+    ob->data_len += len;
+    return;
+}
+
+/* ================================================================ */
 void
 klc_print_string(enum klc_output_type output_type, const char *s)
 {
     BUG_ON(s == NULL);
-    // TODO: BUG_ON(output resources are not initialized)
+// TODO: choose the buffer, BUG_ON(output resource is not initialized), 
+// TODO: lock appropriate mutex (killable) append the string to the buffer, 
+// TODO: then append "\n", unlock mutex
 
     switch (output_type) {
     case KLC_UNALLOCATED_FREE: 
@@ -39,7 +194,7 @@ klc_print_string(enum klc_output_type output_type, const char *s)
     default:
         printk(KERN_WARNING "[kedr_leak_check] unknown output type: %d\n", 
             (int)output_type);
-        break;
+        return;
     }
     return;
 }
@@ -210,21 +365,59 @@ klc_print_totals(u64 total_allocs, u64 total_leaks, u64 total_bad_frees)
 int 
 klc_output_init(void)
 {
-    // TODO
+    int ret = 0;
+    
+    ret = klc_output_buffer_init(&ob_leaks);
+    if (ret != 0)
+        goto fail_ob;
+    
+    ret = klc_output_buffer_init(&ob_bad_frees);
+    if (ret != 0)
+        goto fail_ob;
+    
+    ret = klc_output_buffer_init(&ob_other);
+    if (ret != 0)
+        goto fail_ob;
+    
+    // TODO: files
+    
+    // -ENOMEM
     return 0;
+
+// TODO: 'fail_files' here, above 'fail_ob' to allow falling through
+fail_ob:
+    klc_output_buffer_destroy(&ob_leaks);
+    klc_output_buffer_destroy(&ob_bad_frees);
+    klc_output_buffer_destroy(&ob_other);
+    return ret;
 }
 
 void
 klc_output_clear(void)
 {
-    // TODO
+    /* "Clear" the data without actually releasing memory. 
+     * No need for locking as the caller ensures that no output may 
+     * interfere.
+     */
+    ob_leaks.data_len = 0;
+    ob_leaks.buf[0] = 0;
+    
+    ob_bad_frees.data_len = 0;
+    ob_bad_frees.buf[0] = 0;
+    
+    ob_other.data_len = 0;
+    ob_other.buf[0] = 0;
     return;
 }
 
 void
 klc_output_fini(void)
 {
-    // TODO
+    // TODO: files
+    
+    klc_output_buffer_destroy(&ob_leaks);
+    klc_output_buffer_destroy(&ob_bad_frees);
+    klc_output_buffer_destroy(&ob_other);
     return;
 }
 /* ================================================================ */
