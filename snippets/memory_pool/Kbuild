@@ -1,0 +1,5 @@
+module_name=payload_memory_pool
+
+ccflags-y :=  -DDEBUG -I$(src) -I/home/andrew/cmake-install-dir/include
+obj-m := $(module_name).o
+$(module_name)-y := payload.o memory_pool.o

@@ -1,0 +1,76 @@
+Linux kernel memory management - отдельные моменты:
+
+1. Ќа всех платформах €дро Linux работает со страничной организацией пам€ти.
+ѕри этом, обобщенно, поддерживаетс€ работа с 3х уровневой системой таблиц страниц пам€ти(http://www.kernel.org/doc/gorman/html/understand/understand006.html):
+
+pgt_t - Page Global Table
+pud_t
+pmd_t - Page Middle Table
+pte_t - Page Table Entry
+
+ѕоследний элемент, pte_t, содержит адрес физической страницы пам€ти, котора€ соответсвует виртуальному адресу страницы, и различные флаги:
+
+Read/Write
+User Space/Kernel Space
+Present
+...
+
+ѕрограммный способ определени€ дескриптора страницы по виртуальному адресу:
+
+        pgd_t *pgd;
+        pmd_t *pmd;
+        pud_t *pud;
+        pte_t *ptep, pte;
+
+        pgd = pgd_offset(current->mm, address);
+        if (pgd_none(*pgd) || pgd_bad(*pgd))
+                goto out;
+        pud = pud_offset(pgd, address);
+        if (pud_none(*pud) || pud_bad(*pud))
+                goto out;
+        pmd = pmd_offset(pud, address);
+        if (pmd_none(*pmd) || pmd_bad(*pmd))
+                goto out;
+ 
+        ptep = pte_offset_kernel(pmd, address);
+        if (!ptep)
+                goto out;
+
+        pte = *ptep;
+
+ онкретно данный способ на данный момент не работает на 
+
+-Ubuntu 10.04 (x86) - почему-то выходит, что pgd==pud==pmd, и pmd_bad(pmd).
+-Fedora 13(x86, PAE) - pgd==pud!=pmd, но тем не менее, pmd_bad(pmd).
+
+‘лаги страницы возвращаютс€ функцией pte_flags(pte_t pte).
+ онстанты дл€ конкретных флагов описаны в <asm/pagetable_types.h>
+”становка флагов дл€ страницы - set_pte, pte_set_flags (<asm/pagetable.h>).
+
+
+—труктура 'page'.
+
+ƒл€ того, чтобы узнать некоторые свойства страницы, не заморачива€сь разбором таблиц страниц, можно воспользоватс€ структурой 'struct page'.
+
+struct page* page = addr_to_page(void* addr);
+
+—труктура 'vm_area_struct'.
+
+ƒл€ того, чтобы узнать более глубокие свойства страницы, можно воспользоватс€ структурой 'struct vm_area_struct':
+
+struct vm_area_struct* vma = find_vma(void addr, size_t size);
+
+Ёта структура описывает свойства непрерывного диапазона страниц. ћожно изменить свойства, но это коснетс€ всего диапазона. ≈сть возможность разбивать диапазон, в том числе, выдел€ть конкретную страницу, но техника его использовани€ не до конца пон€тна.
+
+do_brk() - должен добавл€ть описатель одной страницы, do_munmap() - "отцепл€ть" страницу из диапазона.
+
+Ћитература:
+
+x86, описание флагов - http://www.linux-tutorial.info/modules.php?name=MContent&pageid=261,
+http://www.jamesmolloy.co.uk/tutorial_html/6.-Paging.html
+
+ѕереход с 2х модели таблиц на 3х уровневую:
+http://lwn.net/Articles/106177
+
+ѕример определени€ дескриптора страницы по мотивам dump_pagetable:
+http://mail.nl.linux.org/kernelnewbies/2008-05/msg00376.html
