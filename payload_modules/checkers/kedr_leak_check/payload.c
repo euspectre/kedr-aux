@@ -1,7 +1,26 @@
 /*********************************************************************
- * Module: kedr_leak_checker
- * TODO: <description>
+ * Module: kedr_leak_check
+ *
+ * This payload module checks the target for memory leaks.
+ * kedr_leak_check does not use trace events or the like, it performs
+ * analysis itself and simply outputs the results to the files in 
+ * debugfs - see the contents of 'kedr_leak_check' directory there.
+ *
+ * For each possible memory leak (and for each free-like call without 
+ * matching allocation call) the system stores the address of the memory
+ * block and a portion of the call stack for the allocation / deallocation
+ * call.
+ *
+ * Module parameters:
+ *  stack_depth - (unsigned integer, not greater than 16) - maximum number
+ *  of stack frames to store and output. Default: 7.
+ *
+ * Notes:
+ * kedr_leak_check can be more convenient to look for memory leaks than 
+ * plain call monitoring with analysis of the trace. The trace may become
+ * huge if the target module actively allocates and frees memory.
  *********************************************************************/
+ 
 /* ========================================================================
  * Copyright (C) 2010, Institute for System Programming 
  *                     of the Russian Academy of Sciences (ISPRAS)
@@ -40,7 +59,7 @@ MODULE_LICENSE("GPL");
  * Parameters of the module
  *********************************************************************/
 /* Default number of stack frames to output (at most) */
-#define KEDR_STACK_DEPTH_DEFAULT 6
+#define KEDR_STACK_DEPTH_DEFAULT 7
 
 /* At most 'max_stack_entries' stack entries will be output for each 
  * suspicious allocation or deallocation. 

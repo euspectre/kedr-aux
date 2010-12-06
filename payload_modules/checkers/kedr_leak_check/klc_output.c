@@ -24,8 +24,18 @@
 #include <linux/slab.h>
 #include <linux/mutex.h>
 #include <linux/debugfs.h>
+#include <asm/uaccess.h>
 
 #include "klc_output.h"
+
+/* ================================================================ */
+/* A directory for output files in debugfs. */
+struct dentry *dir_klc = NULL;
+
+/* The files in debugfs where the output will go. */
+struct dentry *file_leaks = NULL;
+struct dentry *file_bad_frees = NULL;
+struct dentry *file_stats = NULL;
 
 /* ================================================================ */
 /* Output buffer that accumulates strings sent to it by klc_print_string().
@@ -39,15 +49,21 @@
  */
 struct klc_output_buffer
 {
-    char *buf; /* the buffer itself */
-    size_t size; /* the size of the buffer */
-    size_t data_len; /* length of the data currently stored */
-    struct mutex *lock; /* the mutex to guard access to the buffer */
+    /* the buffer itself */
+    char *buf; 
+    
+    /* the size of the buffer */
+    size_t size; 
+    
+    /* length of the data stored (excluding the terminating '\0')*/
+    size_t data_len; 
+    
+    /* the mutex to guard access to the buffer */
+    struct mutex *lock; 
 };
 
 /* Default size of the buffer. */
-/* TODO: increase to 500-1000 */
-#define KLC_OUTPUT_BUFFER_SIZE 125
+#define KLC_OUTPUT_BUFFER_SIZE 1000
 
 /* The mutexes to guard access to the buffers. */
 DEFINE_MUTEX(ob_leaks_mutex);
@@ -76,6 +92,7 @@ struct klc_output_buffer ob_other = {
     .lock = &ob_other_mutex
 };
 
+/* ================================================================ */
 /* Initializes the buffer: allocates memory, etc.
  * Returns 0 on success, a negative error code on failure.
  */
@@ -88,7 +105,9 @@ klc_output_buffer_init(struct klc_output_buffer *ob)
     if (ob->buf == NULL)
         return -ENOMEM;
     
+    ob->buf[0] = 0;
     ob->size = KLC_OUTPUT_BUFFER_SIZE;
+    ob->data_len = 0;
     
     return 0;
 }
@@ -130,8 +149,8 @@ klc_output_buffer_resize(struct klc_output_buffer *ob, size_t new_size)
     
     p = krealloc(ob->buf, size, GFP_KERNEL);
     if (p == NULL) {
-    /* [NB] If krealloc fails to allocate memory, it does not free the 
-     * original memory, so the buffer should not be corrupted.
+    /* [NB] If krealloc fails to allocate memory, it should leave the buffer
+     * intact, so its previous contents could still be used.
      */
         printk(KERN_ERR "[kedr_leak_check] klc_output_buffer_resize: "
             "not enough memory to resize the output buffer to %zu bytes\n",
@@ -142,11 +161,6 @@ klc_output_buffer_resize(struct klc_output_buffer *ob, size_t new_size)
     ob->buf = p;
     ob->size = size;
     
-    //<> TODO: remove
-    printk(KERN_INFO "[DBG] klc_output_buffer_resize: "
-            "resized the output buffer to %zu bytes\n",
-            size);
-    //<> 
     return 0;
 }
 
@@ -160,6 +174,7 @@ klc_output_buffer_append(struct klc_output_buffer *ob, const char *s)
     int ret;
     
     BUG_ON(ob == NULL);
+    BUG_ON(ob->buf[ob->data_len] != 0);
     BUG_ON(s == NULL);
     
     len = strlen(s);
@@ -175,27 +190,173 @@ klc_output_buffer_append(struct klc_output_buffer *ob, const char *s)
     ob->data_len += len;
     return;
 }
+/* ================================================================ */
+
+/* A convenience macro to define variable of type struct file_operations
+ * for a read only file in debugfs associated with the specified output
+ * buffer.
+ * 
+ * __fops - the name of the variable
+ * __ob - pointer to the output buffer (struct klc_output_buffer *)
+ */
+#define KLC_DEFINE_FOPS_RO(__fops, __ob)                                \
+static int __fops ## _open(struct inode *inode, struct file *filp)      \
+{                                                                       \
+    BUILD_BUG_ON(sizeof(*(__ob)) != sizeof(struct klc_output_buffer));  \
+    filp->private_data = (void *)(__ob);                                \
+    return nonseekable_open(inode, filp);                               \
+}                                                                       \
+static const struct file_operations __fops = {                          \
+    .owner      = THIS_MODULE,                                          \
+    .open       = __fops ## _open,                                      \
+    .release    = klc_release_common,                                   \
+    .read       = klc_read_common,                                      \
+};
+
+/* Helpers for file operations common to all read-only files in this 
+ * example. */
+static int 
+klc_release_common(struct inode *inode, struct file *filp)
+{
+    filp->private_data = NULL;
+    /* nothing more to do: open() did not allocate any resources */
+    return 0;
+}
+
+static ssize_t 
+klc_read_common(struct file *filp, char __user *buf, size_t count,
+    loff_t *f_pos)
+{
+    ssize_t ret = 0;
+    size_t data_len;
+    loff_t pos = *f_pos;
+    struct klc_output_buffer *ob = 
+        (struct klc_output_buffer *)filp->private_data;
+        
+    if (ob == NULL) 
+        return -EINVAL;
+    
+    if (mutex_lock_killable(ob->lock) != 0)
+	{
+        printk(KERN_WARNING "[kedr_leak_check] klc_read_common: "
+            "got a signal while trying to acquire a mutex.\n");
+		return -EINTR;
+	}
+    
+    data_len = ob->data_len;
+    
+    /* Reading outside of the data buffer is not allowed */
+    if ((pos < 0) || (pos > data_len)) {
+        ret = -EINVAL;
+        goto out;
+    }
+    
+    /* EOF reached or 0 bytes requested */
+    if ((count == 0) || (pos == data_len)) {
+        ret = 0; 
+        goto out;
+    }
+    
+    if (pos + count > data_len) 
+        count = data_len - pos;
+    if (copy_to_user(buf, &(ob->buf[pos]), count) != 0) {
+        ret = -EFAULT;
+        goto out;
+    }
+
+    mutex_unlock(ob->lock);
+    
+    *f_pos += count;
+    return count;
+    
+out:
+    mutex_unlock(ob->lock);
+    return ret;
+}
+
+/* Definitions of file_operations structures for the files in debugfs.
+ */
+KLC_DEFINE_FOPS_RO(fops_leaks_ro, &ob_leaks);
+KLC_DEFINE_FOPS_RO(fops_bad_frees_ro, &ob_bad_frees);
+KLC_DEFINE_FOPS_RO(fops_stats_ro, &ob_other);
+/* ================================================================ */
+
+static void
+klc_remove_debugfs_files(void)
+{
+    if (file_leaks      != NULL) debugfs_remove(file_leaks);
+    if (file_bad_frees  != NULL) debugfs_remove(file_bad_frees);
+    if (file_stats      != NULL) debugfs_remove(file_stats);
+    return;
+}
+    
+static int
+klc_create_debugfs_files(void)
+{
+/* [NB] We do not check here if debugfs is supported because this is done 
+ * when creating the directory for these files ('dir_klc').
+ */
+    file_leaks = debugfs_create_file("possible_leaks", S_IRUGO,
+        dir_klc, NULL, &fops_leaks_ro);
+    if (file_leaks == NULL) 
+        goto fail;
+    
+    file_bad_frees = debugfs_create_file("unallocated_frees", S_IRUGO,
+        dir_klc, NULL, &fops_bad_frees_ro);
+    if (file_bad_frees == NULL) 
+        goto fail;
+    
+    file_stats = debugfs_create_file("info", S_IRUGO,
+        dir_klc, NULL, &fops_stats_ro);
+    if (file_stats == NULL) 
+        goto fail;
+
+    return 0;
+
+fail:
+    printk(KERN_ERR "[kedr_leak_check] "
+        "failed to create output files in debugfs\n"
+    );
+    klc_remove_debugfs_files();
+    return -EINVAL;    
+}
 
 /* ================================================================ */
 void
 klc_print_string(enum klc_output_type output_type, const char *s)
 {
+    struct klc_output_buffer *ob = NULL;
+    
     BUG_ON(s == NULL);
-// TODO: choose the buffer, BUG_ON(output resource is not initialized), 
-// TODO: lock appropriate mutex (killable) append the string to the buffer, 
-// TODO: then append "\n", unlock mutex
 
     switch (output_type) {
-    case KLC_UNALLOCATED_FREE: 
     case KLC_UNFREED_ALLOC:
+        ob = &ob_leaks;
+        break;
+    case KLC_UNALLOCATED_FREE: 
+        ob = &ob_bad_frees;
+        break;
     case KLC_OTHER:
-        printk(KERN_INFO "[kedr_leak_check] %s\n", s);
+        ob = &ob_other;
         break;
     default:
         printk(KERN_WARNING "[kedr_leak_check] unknown output type: %d\n", 
             (int)output_type);
         return;
     }
+    BUG_ON(ob->buf == NULL); 
+    
+    if (mutex_lock_killable(ob->lock) != 0)
+	{
+        printk(KERN_WARNING "[kedr_leak_check] klc_print_string: "
+            "got a signal while trying to acquire a mutex.\n");
+		return;
+	}
+    
+    klc_output_buffer_append(ob, s);
+    klc_output_buffer_append(ob, "\n");
+
+    mutex_unlock(ob->lock);
     return;
 }
 
@@ -292,6 +453,9 @@ klc_print_alloc_info(struct klc_memblock_info *alloc_info)
     
     klc_print_stack_trace(KLC_UNFREED_ALLOC, 
         &(alloc_info->stack_entries[0]), alloc_info->num_entries);
+    
+    klc_print_string(KLC_UNFREED_ALLOC, 
+        "----------------------------------------"); /* separator */
     return;
 }
 
@@ -320,6 +484,8 @@ klc_print_dealloc_info(struct klc_memblock_info *dealloc_info)
     
     klc_print_stack_trace(KLC_UNALLOCATED_FREE, 
         &(dealloc_info->stack_entries[0]), dealloc_info->num_entries);
+    
+    klc_print_string(KLC_UNALLOCATED_FREE, "\n");
     return;
 }
 
@@ -367,6 +533,7 @@ klc_output_init(void)
 {
     int ret = 0;
     
+    /* Create output buffers */
     ret = klc_output_buffer_init(&ob_leaks);
     if (ret != 0)
         goto fail_ob;
@@ -379,12 +546,33 @@ klc_output_init(void)
     if (ret != 0)
         goto fail_ob;
     
-    // TODO: files
+    /* Create a directory in debugfs */
+    dir_klc = debugfs_create_dir("kedr_leak_check", NULL);
+    if (IS_ERR(dir_klc)) {
+        printk(KERN_ERR "[kedr_leak_check] debugfs is not supported\n");
+        dir_klc = NULL;
+        ret = -ENODEV;
+        goto fail_ob;
+    }
     
-    // -ENOMEM
+    if (dir_klc == NULL) {
+        printk(KERN_ERR "[kedr_leak_check] "
+            "failed to create a directory in debugfs\n");
+        ret = -EINVAL;
+        goto fail_ob;
+    }
+    
+    /* Create output files */
+    ret = klc_create_debugfs_files();
+    if (ret != 0)
+        goto fail_files;
+
     return 0;
 
-// TODO: 'fail_files' here, above 'fail_ob' to allow falling through
+fail_files:
+    klc_remove_debugfs_files();
+    debugfs_remove(dir_klc);
+    
 fail_ob:
     klc_output_buffer_destroy(&ob_leaks);
     klc_output_buffer_destroy(&ob_bad_frees);
@@ -413,7 +601,9 @@ klc_output_clear(void)
 void
 klc_output_fini(void)
 {
-    // TODO: files
+    klc_remove_debugfs_files();
+    if (dir_klc != NULL) 
+        debugfs_remove(dir_klc);
     
     klc_output_buffer_destroy(&ob_leaks);
     klc_output_buffer_destroy(&ob_bad_frees);

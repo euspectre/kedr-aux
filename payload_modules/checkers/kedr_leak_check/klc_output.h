@@ -50,9 +50,14 @@ klc_output_fini(void);
  * places or distinguished in some other way.
  */
 enum klc_output_type {
-    KLC_UNALLOCATED_FREE,
+    /* possible leaks */
     KLC_UNFREED_ALLOC,
-    KLC_OTHER /* parameters of the target: name, code areas, etc. */
+    
+    /* bad frees */
+    KLC_UNALLOCATED_FREE,
+    
+    /* other info: parameters of the target module, totals, ... */
+    KLC_OTHER
 };
 
 /* Outputs a string pointed to by 's' taking type of this information into.
