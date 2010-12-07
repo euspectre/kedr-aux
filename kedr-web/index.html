@@ -35,6 +35,10 @@
             <li><a href="http://kedr.berlios.de/relnotes/ReleaseNotes.txt">Release Notes</a></li>
             <li><a href="http://kedr.berlios.de/kedr-doc/index.html">Online Documentation</a></li>
         </ul>
+        <p class="sb_head">Tools</p>
+        <ul>
+        	<li><a href="http://prdownload.berlios.de/kedr/kedr_leak_check-0.1.1.tar.bz2">kedr_leak_check 0.1.1</a></li>
+        </ul>
         <p class="sb_head">Quick Links</p>
         <ul>
             <li><a href="http://openfacts2.berlios.de/wikien/index.php/BerliosProject:KEDR">Wiki</a></li>
@@ -64,12 +68,28 @@ Detailed information about KEDR can be found in the <a href="http://kedr.berlios
 To begin with KEDR, you can take a look at <a href="http://kedr.berlios.de/kedr-doc/getting_started.html"><i>Getting Started</i></a> section in the manual. It describes how to install the framework and use it for call monitoring and fault simulation, step by step.
     </p>
     
+    <h2>Checking Kernel Modules for Memory Leaks</h2>
+    <p>
+One of the important applications of KEDR framework is checking kernel modules for memory leaks. Such errors in the modules can be really nasty and very hard to find. 
+	</p>
+	<p>
+There is a special tool based on KEDR framework to reveal memory leaks, <strong>&quot;kedr_leak_check&quot;</strong>, that usually incurs no significant overhead in memory and performance. &quot;kedr_leak_check&quot; is easy to use, it does not require complex installation or configuration procedure. It just works out-of-the-box. Simply install KEDR and build &quot;kedr_leak_check&quot;. Choose which kernel module you would like to analyze and then load the KEDR core and the tool and let them do the job. See <i>Readme.txt</i> included in the archive with &quot;kedr_leak_check&quot; for details.
+    </p>
+    
+    <p>
+<strong>&quot;kedr_leak_check&quot;</strong> is likely to be included into KEDR framework in the future releases. For now, it is distributed separately (see &quot;Downloads&quot; section below).
+    </p>
+    
     <h2>Downloads</h2>
     <p>
 KEDR framework is distributed in the source form. The current stable version is <strong>0.1</strong> (<a href="http://prdownload.berlios.de/kedr/kedr-0.1.tar.bz2">download</a>). 
     </p>
     <p>
 The source archive also includes the documentation (in DocBook and HTML formats) and the examples.
+    </p>
+    
+    <p>
+<strong>kedr_leak_check</strong> tool is also distributed in the source form, you can get the tarball <a href="http://prdownload.berlios.de/kedr/kedr_leak_check-0.1.1.tar.bz2">here</a>.
     </p>
 
     <h2>Mercurial Repository</h2>
