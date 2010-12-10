@@ -127,9 +127,9 @@ repl_krealloc(const void *p, size_t size, gfp_t flags)
 {
     void *ret_val;
     
-    if (size == 0 || p != NULL) {
+    if (size == 0 || !ZERO_OR_NULL_PTR(p)) {
         /* kfree */
-        if (p != NULL && !klc_find_and_remove_alloc(p)) 
+        if (!ZERO_OR_NULL_PTR(p) && !klc_find_and_remove_alloc(p)) 
             klc_add_bad_free(p, stack_depth);
 /* [NB] If size != 0 and p != NULL and later the allocation fails, we will
  * need to add a fake allocation event for 'p' to the storage because 'p'
@@ -189,7 +189,7 @@ repl_kfree(void *p)
      * add it to the storage before klc_find_and_remove_alloc() is called
      * below, which would make a mess.
      */
-    if (p != NULL && !klc_find_and_remove_alloc(p)) 
+    if (!ZERO_OR_NULL_PTR(p) && !klc_find_and_remove_alloc(p)) 
         klc_add_bad_free(p, stack_depth);
     
     kfree(p);
@@ -199,7 +199,7 @@ repl_kfree(void *p)
 static void
 repl_kzfree(void *p)
 {
-    if (p != NULL && !klc_find_and_remove_alloc(p)) 
+    if (!ZERO_OR_NULL_PTR(p) && !klc_find_and_remove_alloc(p)) 
         klc_add_bad_free(p, stack_depth);
     
     kzfree(p);
@@ -235,7 +235,7 @@ repl_kmem_cache_alloc_notrace(struct kmem_cache *mc, gfp_t flags)
 static void
 repl_kmem_cache_free(struct kmem_cache *mc, void *p)
 {
-    if (p != NULL && !klc_find_and_remove_alloc(p)) 
+    if (!ZERO_OR_NULL_PTR(p) && !klc_find_and_remove_alloc(p)) 
         klc_add_bad_free(p, stack_depth);
 
     kmem_cache_free(mc, p);
@@ -260,7 +260,7 @@ static void
 repl_free_pages(unsigned long addr, unsigned int order)
 {
     void *p = (void *)addr;
-    if (p != NULL && !klc_find_and_remove_alloc(p)) 
+    if (!ZERO_OR_NULL_PTR(p) && !klc_find_and_remove_alloc(p)) 
         klc_add_bad_free(p, stack_depth);
     
     free_pages(addr, order);
@@ -408,7 +408,7 @@ repl_vmalloc_32_user(unsigned long size)
 static void
 repl_vfree(const void *addr)
 {
-    if (addr != NULL && !klc_find_and_remove_alloc(addr)) 
+    if (!ZERO_OR_NULL_PTR(addr) && !klc_find_and_remove_alloc(addr)) 
         klc_add_bad_free(addr, stack_depth);
 
     vfree(addr);
