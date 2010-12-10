@@ -485,7 +485,8 @@ klc_print_dealloc_info(struct klc_memblock_info *dealloc_info)
     klc_print_stack_trace(KLC_UNALLOCATED_FREE, 
         &(dealloc_info->stack_entries[0]), dealloc_info->num_entries);
     
-    klc_print_string(KLC_UNALLOCATED_FREE, "\n");
+    klc_print_string(KLC_UNALLOCATED_FREE, 
+        "----------------------------------------"); /* separator */
     return;
 }
 
