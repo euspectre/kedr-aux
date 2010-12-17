@@ -66,4 +66,31 @@ trace_buffer_read_message(struct trace_buffer* trace_buffer,
 unsigned long
 trace_buffer_lost_messages(struct trace_buffer* trace_buffer);
 
+/*
+ * Reset trace in the buffer.
+ * 
+ * Return 0 on success, negative error code otherwise.
+ */
+int
+trace_buffer_reset(struct trace_buffer* trace_buffer);
+
+/*
+ * Return size of buffer in bytes.
+ */
+unsigned long
+trace_buffer_size(struct trace_buffer* trace_buffer);
+
+/*
+ * Change size of the buffer, without resetting it.
+ *
+ * (But messages may be lost due to buffer overflow,
+ * or due to writting during resizing).
+ * 
+ * Return new size on success, negative error code otherwise.
+ */
+
+int
+trace_buffer_resize(struct trace_buffer* trace_buffer,
+    unsigned long size);
+
 #endif

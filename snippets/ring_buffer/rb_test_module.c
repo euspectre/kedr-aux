@@ -9,6 +9,13 @@
 
 #include <linux/uaccess.h>
 
+#include <linux/moduleparam.h>
+
+#define BUFFER_SIZE_DEFAULT 1000
+
+unsigned long buffer_size = BUFFER_SIZE_DEFAULT;
+module_param(buffer_size, ulong, S_IRUGO);
+
 static struct trace_buffer* trace_buffer;
 
 //wrapper for trace_buffer_write_message()
@@ -76,6 +83,16 @@ static const char* control_file_name = "control";
 static struct dentry* trace_file;
 static const char* trace_file_name = "trace";
 
+static struct dentry* reset_file;
+static const char* reset_file_name = "reset";
+
+static struct dentry* buffer_size_file;
+static const char* buffer_size_file_name = "buffer_size";
+
+static struct dentry* lost_messages_file;
+static const char* lost_messages_file_name = "lost_messages";
+
+
 //Add "Write" message to the trace_buffer
 static ssize_t control_file_write(struct file *filp,
     const char __user *buf, size_t count, loff_t * f_pos);
@@ -106,17 +123,87 @@ static struct file_operations trace_file_ops =
     .read = trace_file_read,
 };
 
+// Reset buffer file operations
+static ssize_t reset_file_write(struct file *filp,
+    const char __user *buf, size_t count, loff_t * f_pos);
+
+static int reset_file_open(struct inode *inode, struct file *filp);
+
+static struct file_operations reset_file_ops = 
+{
+    .owner = THIS_MODULE,
+    .open = reset_file_open,
+    .write = reset_file_write,
+};
+
+// Buffer size file operations
+static int
+buffer_size_file_open(struct inode *inode, struct file *filp);
+static int
+buffer_size_file_release(struct inode *inode, struct file *filp);
+static ssize_t
+buffer_size_file_write(struct file *filp,
+    const char __user *buf, size_t count, loff_t * f_pos);
+static ssize_t
+buffer_size_file_read(struct file *filp,
+    char __user* buf, size_t count, loff_t *f_pos);
+
+static struct file_operations buffer_size_file_ops = 
+{
+    .owner = THIS_MODULE,
+    .open = buffer_size_file_open,
+    .release = buffer_size_file_release,
+    .read = buffer_size_file_read,
+    .write = buffer_size_file_write,
+};
+
+// Lost messages file operations
+static int
+lost_messages_file_open(struct inode *inode, struct file *filp);
+static int
+lost_messages_file_release(struct inode *inode, struct file *filp);
+static ssize_t
+lost_messages_file_read(struct file *filp,
+    char __user* buf, size_t count, loff_t *f_pos);
+
+
+static struct file_operations lost_messages_file_ops = 
+{
+    .owner = THIS_MODULE,
+    .open = lost_messages_file_open,
+    .release = lost_messages_file_release,
+    .read = lost_messages_file_read,
+};
+
+//Need for do not worry about correct destroying things
+// in case, when something wrong in 'init'.
+static void destroy_all(void)
+{
+#define REMOVE_FILE(entry) if(entry) debugfs_remove(entry)
+    REMOVE_FILE(lost_messages_file);
+    REMOVE_FILE(buffer_size_file);
+    REMOVE_FILE(reset_file);
+    REMOVE_FILE(trace_file);
+    REMOVE_FILE(control_file);
+    REMOVE_FILE(work_dir);
+    
+#undef REMOVE_FILE
+    if(trace_buffer) trace_buffer_destroy(trace_buffer);
+}
+
 static int __init
 rb_test_init(void)
 {
-    trace_buffer = trace_buffer_alloc(1000, 1);
+    trace_buffer = trace_buffer_alloc(buffer_size, 1);
     if(trace_buffer == NULL) return -ENOMEM;
     
+    buffer_size = trace_buffer_size(trace_buffer);
+
     work_dir = debugfs_create_dir(work_dir_name, NULL);
     if(work_dir == NULL)
     {
         pr_err("Cannot create work directory in debugfs.");
-        trace_buffer_destroy(trace_buffer);
+        destroy_all();
         return -EINVAL;
     }
 
@@ -128,8 +215,7 @@ rb_test_init(void)
     if(control_file == NULL)
     {
         pr_err("Cannot create control file.");
-        debugfs_remove(work_dir);
-        trace_buffer_destroy(trace_buffer);
+        destroy_all();
         return -EINVAL;
     }
 
@@ -141,9 +227,43 @@ rb_test_init(void)
     if(trace_file == NULL)
     {
         pr_err("Cannot create trace file.");
-        debugfs_remove(control_file);
-        debugfs_remove(work_dir);
-        trace_buffer_destroy(trace_buffer);
+        destroy_all();
+        return -EINVAL;
+    }
+    
+    reset_file = debugfs_create_file(reset_file_name,
+        S_IWUSR | S_IWGRP,
+        work_dir,
+        NULL,
+        &reset_file_ops);
+    if(reset_file == NULL)
+    {
+        pr_err("Cannot create reset file.");
+        destroy_all();
+        return -EINVAL;
+    }
+
+    buffer_size_file = debugfs_create_file(buffer_size_file_name,
+        S_IRUGO | S_IWUSR | S_IWGRP,
+        work_dir,
+        NULL,
+        &buffer_size_file_ops);
+    if(buffer_size_file == NULL)
+    {
+        pr_err("Cannot create file for control size of buffer.");
+        destroy_all();
+        return -EINVAL;
+    }
+    
+    lost_messages_file = debugfs_create_file(lost_messages_file_name,
+        S_IRUGO,
+        work_dir,
+        NULL,
+        &lost_messages_file_ops);
+    if(lost_messages_file == NULL)
+    {
+        pr_err("Cannot create file for control number of messages lost.");
+        destroy_all();
         return -EINVAL;
     }
 
@@ -153,10 +273,7 @@ rb_test_init(void)
 void __exit
 rb_test_exit(void)
 {
-    debugfs_remove(trace_file);
-    debugfs_remove(control_file);
-    debugfs_remove(work_dir);
-    trace_buffer_destroy(trace_buffer);
+    destroy_all();
 }
 
 module_init(rb_test_init);
@@ -194,22 +311,28 @@ read_buffer_read(struct read_buffer *read_buffer,
 
 // Callback for trace_buffer_read_message.
 static int read_buffer_update_process_data(const void* msg,
-    size_t size, u64 ms, void* user_data)
+    size_t size, u64 ts, void* user_data)
 {
+    //snprintf-like function, which print message into string,
+    //which then will be read from the trace.
+#define print_msg(buffer, size) snprintf(buffer, size, "%lu: %s\n", \
+    (unsigned long)(ts >> 27), (const char*)msg)
+
     struct read_buffer *read_buffer = (struct read_buffer*)user_data;
-    //real format of message data
-    const char* str = (const char*)msg;
-    //format for output message data
-#define format_string "%s\n"
     size_t read_size;
    
-    read_size = snprintf(NULL, 0, format_string, str) + 1;//include terminating '\0'
+    read_size = print_msg(NULL, 0);//determine size of the message
+    //Need to allocate buffer for message + '\0' byte, because
+    //snprintf appends '\0' in any case, even if it does not need.
     read_buffer->start = krealloc(read_buffer->start, read_size,
         GFP_KERNEL);
     if(read_buffer->start)
     {
-        snprintf(read_buffer->start, read_size,
-            format_string, str);
+        // Real printing
+        // read_size + 1 means size of message + '\0' byte
+        print_msg(read_buffer->start, read_size + 1);
+        // We don't want to read '\0' byte, so silently ignore it
+        // (read_size without "+1")
         read_buffer->end = read_buffer->start + read_size;
         read_buffer->current_pos = read_buffer->start;
         return read_size;
@@ -220,6 +343,7 @@ static int read_buffer_update_process_data(const void* msg,
         read_buffer->current_pos = NULL;
         return -ENOMEM;
     }
+#undef print_msg
 }
 
 /*
@@ -267,23 +391,6 @@ ssize_t control_file_read(struct file *filp,
     return 0;//eof
 }
 
-// For prevent opening trace file,
-// when it is already opened by another reader.
-static atomic_t trace_file_opened = ATOMIC_INIT(0);
-static int lock_buffer(void)
-{
-    if(atomic_cmpxchg(&trace_file_opened, 0, 1) != 0)
-    {
-        pr_err("Trace file cannot be opened twice at the same moment.");
-        return -EINVAL;
-    }
-    return 0;
-}
-static void unlock_buffer(void)
-{
-    smp_wmb();
-    atomic_set(&trace_file_opened, 0);
-}
 //Implementation of trace file operations
 static int trace_file_open(struct inode *inode, struct file *filp)
 {
@@ -291,14 +398,10 @@ static int trace_file_open(struct inode *inode, struct file *filp)
     
     struct read_buffer* read_buffer;
 
-    result = lock_buffer();
-    if(result) return result;
-
     read_buffer = kmalloc(sizeof(*read_buffer), GFP_KERNEL);
     if(read_buffer == NULL)
     {
         pr_err("trace_file_open: cannot create trace buffer.");
-        unlock_buffer();
         return -ENOMEM;
     }
     read_buffer_init(read_buffer);
@@ -308,7 +411,6 @@ static int trace_file_open(struct inode *inode, struct file *filp)
     {
         read_buffer_destroy(read_buffer);
         kfree(read_buffer);
-        unlock_buffer();
     }
     return result;
 }
@@ -317,7 +419,6 @@ static int trace_file_release(struct inode *inode, struct file *filp)
     struct read_buffer* read_buffer = filp->private_data;
     read_buffer_destroy(read_buffer);
     kfree(read_buffer);
-    unlock_buffer();
     return 0;
 }
 
@@ -338,7 +439,7 @@ ssize_t trace_file_read(struct file *filp,
     {
         //update buffer and re-read it
         ssize_t error = read_buffer_update(read_buffer,
-            filp->f_flags & O_NONBLOCK);
+            /*filp->f_flags & O_NONBLOCK*/1);
         if(error < 0) return error;
         //now should read some chars
         result = read_buffer_read(read_buffer, count, &str);
@@ -355,5 +456,150 @@ ssize_t trace_file_read(struct file *filp,
     if(copy_to_user(buf, str, count) != 0)
         return -EFAULT;
 
+    return count;
+}
+
+// Reset buffer file operations implementation
+ssize_t reset_file_write(struct file *filp,
+    const char __user *buf, size_t count, loff_t * f_pos)
+{
+    // Do nothing, resetting already performed while opening file
+    return count;
+}
+
+int reset_file_open(struct inode *inode, struct file *filp)
+{
+    trace_buffer_reset(trace_buffer);
+    return nonseekable_open(inode, filp);
+}
+
+// Buffer size file operations implementation
+int
+buffer_size_file_open(struct inode *inode, struct file *filp)
+{
+    int result;
+    unsigned long size = trace_buffer_size(trace_buffer);
+    size_t size_len;
+    char* size_str;
+    size_len = snprintf(NULL, 0, "%lu\n", size);
+    size_str = kmalloc(size_len + 1, GFP_KERNEL);
+    if(size_str == NULL)
+    {
+        pr_err("buffer_size_file_open: Cannot allocate string.");
+        return -ENOMEM;
+    }
+    snprintf(size_str, size_len + 1, "%lu\n", size);
+    filp->private_data = size_str;
+    result = nonseekable_open(inode, filp);
+    if(result)
+    {
+        kfree(size_str);
+    }
+    return result;
+}
+int
+buffer_size_file_release(struct inode *inode, struct file *filp)
+{
+    char* size_str = filp->private_data;
+    kfree(size_str);
+    return 0;
+}
+ssize_t buffer_size_file_write(struct file *filp,
+    const char __user *buf, size_t count, loff_t * f_pos)
+{
+    int error = 0;
+    char* str;
+    unsigned long size;
+    
+    if(count == 0) return -EINVAL;
+    str = kmalloc(count, GFP_KERNEL);
+    if(str == NULL)
+    {
+        error = -ENOMEM;
+        goto out;
+    }
+    if(copy_from_user(str, buf, count))
+    {
+        error = -EFAULT;
+        goto out;
+    }
+    error = strict_strtoul(str, 0, &size);
+    if(error) goto out;
+    error = trace_buffer_resize(trace_buffer, size);
+    if(error >= 0)
+    {
+        buffer_size = size;
+        error = 0;
+    }
+out:
+    kfree(str);
+    return error ? error : count;
+}
+ssize_t buffer_size_file_read(struct file *filp,
+    char __user* buf, size_t count, loff_t *f_pos)
+{
+    const char* size_str = filp->private_data;
+    size_t size_len = strlen(size_str);
+    
+    if(count == 0) return 0;
+    if(*f_pos > size_len) return -EINVAL;
+    if(size_len < count + *f_pos)
+        count = size_len - *f_pos;
+    
+    if(copy_to_user(buf, size_str + *f_pos, count))
+        return -EFAULT;
+    
+    *f_pos += count;
+    return count;
+}
+
+// Lost messages file operations implementation
+int
+lost_messages_file_open(struct inode *inode, struct file *filp)
+{
+    int result;
+    unsigned long lost_messages =
+        trace_buffer_lost_messages(trace_buffer);
+    size_t len;
+    char* str;
+    len = snprintf(NULL, 0, "%lu\n", lost_messages);
+    str = kmalloc(len + 1, GFP_KERNEL);
+    if(str == NULL)
+    {
+        pr_err("lost_messages_file_open: Cannot allocate string.");
+        return -ENOMEM;
+    }
+    snprintf(str, len + 1, "%lu\n", lost_messages);
+    filp->private_data = str;
+    result = nonseekable_open(inode, filp);
+    if(result)
+    {
+        kfree(str);
+    }
+    return result;
+}
+int
+lost_messages_file_release(struct inode *inode, struct file *filp)
+{
+    char* str = filp->private_data;
+    kfree(str);
+    return 0;
+}
+ssize_t
+lost_messages_file_read(struct file *filp,
+    char __user* buf, size_t count, loff_t *f_pos)
+{
+    const char* str = filp->private_data;
+    size_t len = strlen(str);
+    
+    if(count == 0) return 0;
+    if(*f_pos > len) return -EINVAL;
+    if(len < count + *f_pos)
+        count = len - *f_pos;
+    
+    if(copy_to_user(buf, str + *f_pos, count))
+        return -EFAULT;
+    
+    *f_pos += count;
     return count;
 }
