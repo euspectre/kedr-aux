@@ -334,6 +334,126 @@ checkScenarioGlobal()
     fi
     printSeparator
 }
+
+########################################################################
+# Scenario: building and installing KEDR with 'make -j N', N > 1
+########################################################################
+checkParallelBuild()
+{
+    printMessage "\n"
+    printMessage "Checking scenario: parallel build\n" 
+    printMessage "\n"
+
+    cd "${WORK_DIR}" || exitFailure
+    rm -rf "${ARCHIVE_DIR}" "${BUILD_DIR}" "${INSTALL_DIR}" 
+    rm -rf "${EXAMPLES_DIR}" "${TEMP_DIR}"
+
+    # CMAKE_INSTALL_PREFIX defaults to "/usr/local" on Linux
+    INSTALL_DIR="/usr/local"    
+    
+    # make will use the following number of "jobs" to perform the build, etc.
+    KEDR_NJOBS=4
+    MAKE_CMD="make -j ${KEDR_NJOBS}"
+
+    ####################################################################
+    {
+        mkdir -p "${BUILD_DIR}" && \
+        mkdir -p "${EXAMPLES_DIR}" && \
+        mkdir -p "${TEMP_DIR}"
+    } >> "${LOG_FILE}" 2>&1
+
+    # Unpack the archive
+    tar xfj "${ARCHIVE_FILE}" 
+    if test $? -ne 0; then
+        printMessage "Failed to unpack ${ARCHIVE_FILE}\n"
+        exitFailure
+    fi
+    printSeparator
+
+    ####################################################################
+    # Configure, build and install the system
+    cd "${BUILD_DIR}" >> "${LOG_FILE}" 2>&1
+    if test $? -ne 0; then
+        printMessage "Failed to change directory to ${BUILD_DIR}\n"
+        exitFailure
+    fi
+
+    # Configure the build
+    printMessage "===== Configuring the system =====\n"
+    cmake \
+        "${WORK_DIR}/${ARCHIVE_DIR}" >> "${LOG_FILE}" 2>&1
+    if test $? -ne 0; then
+        printMessage "Failed to configure the system\n"
+        exitFailure
+    fi
+
+    # Build the system
+    printMessage "===== Building the system =====\n"
+    ${MAKE_CMD} >> "${LOG_FILE}" 2>&1
+    if test $? -ne 0; then
+        printMessage "Failed to build the system\n"
+        exitFailure
+    fi
+    printSeparator
+    
+    # Install the system
+    printMessage "===== Installing the system =====\n"
+    ${MAKE_CMD} install >> "${LOG_FILE}" 2>&1
+    if test $? -ne 0; then
+        printMessage "Failed to install the system to ${INSTALL_DIR}\n"
+        exitFailure
+    fi
+    printSeparator
+
+    # Move the build tree to a temporary location to hide it from the 
+    # installed examples.
+    cd "${WORK_DIR}" || exitFailure
+    mv "${BUILD_DIR}" "${TEMP_DIR}" || exitFailure
+
+    # Copy the installed examples to another directory (the default one 
+    # will probably be read only) and try to build each one of them.
+    cp -r "${INSTALL_DIR}/share/kedr/examples" "${EXAMPLES_DIR}" >> "${LOG_FILE}" 2>&1
+    if test $? -ne 0; then
+        printMessage "Failed to copy the examples from ${INSTALL_DIR}/share/kedr/examples to ${EXAMPLES_DIR}\n"
+        exitFailure
+    fi
+
+    # just in case
+    export PATH=$PATH:${INSTALL_DIR}/bin
+    
+    # Build each example (but there is no need test them here as 
+    # checkScenarioLocal() does this)
+    for dd in ${EXAMPLES_DIR}/examples/*; do
+        if test -d "${dd}"; then
+            printf "Building example in ${dd}\n" >> "${LOG_FILE}"
+            ${MAKE_CMD} -C "${dd}" >> "${LOG_FILE}" 2>&1
+            if test $? -ne 0; then
+                printMessage "Failed to build the example in ${dd}\n"
+                exitFailure
+            else
+                printf "Successfully built the example in ${dd}\n" >> "${LOG_FILE}"
+            fi
+        fi
+    done
+    
+    ####################################################################
+    cd "${WORK_DIR}" || exitFailure
+
+    # Restore the build tree
+    mv "${TEMP_DIR}/build" . || exitFailure
+    printSeparator
+
+    ####################################################################
+    # Uninstall
+    printMessage "===== Uninstalling the system =====\n"
+    cd "${BUILD_DIR}" || exitFailure
+    ${MAKE_CMD} uninstall >> "${LOG_FILE}" 2>&1
+    if test $? -ne 0; then
+        printMessage "Failed to uninstall the system\n"
+        exitFailure
+    fi
+    printSeparator
+}
 ########################################################################
 # main()
 ########################################################################
@@ -381,6 +501,9 @@ checkScenarioLocal
 # Check "global" installation. Also check if the installed examples
 # can be built without the binary tree of KEDR available.
 checkScenarioGlobal
+
+# Check building and installing KEDR with 'make -j N' where N > 1.
+checkParallelBuild
 
 # NOTE: 
 # If you would like to add more scenarios to check if the system operates
