@@ -1,0 +1,5 @@
+module_name=rb_test
+
+ccflags-y :=  -I$(src)
+obj-m := ${module_name}.o
+${module_name}-y := rb_test_module.o trace_buffer.o
