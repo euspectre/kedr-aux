@@ -12,15 +12,19 @@ KEDR_CORE_SYMVERS := $(KEDR_INSTALL_DIR)/lib/modules/$(shell uname -r)/symvers/k
 # KEDR core as 'Module.symvers' too.
 KEDR_SYMVERS_NAME := Module.symvers
 
-# It seems that not each variant of the kernel provides 
-# kmem_cache_alloc_notrace() function. 
-# KEDR itself has a nice configuration system  to handle such situations 
-# but let us resort to a simpler approach for now.
-KMCA_NOTRACE := $(shell (grep -q '\bkmem_cache_alloc_notrace' /proc/kallsyms; echo $$?))
-ifeq ($(KMCA_NOTRACE),0)
-EXTRA_DEFINES := -DKEDR_HAVE_KMCA_NOTRACE
-else
 EXTRA_DEFINES := 
+# It seems that not each variant of the kernel provides 
+# kmem_cache_alloc_notrace() and alloc_pages_current() functions. 
+# KEDR itself has a nice configuration system to handle such situations 
+# but let us resort to a simpler approach for now.
+TMP_RES := $(shell (grep -q 'T[ \t]*kmem_cache_alloc_notrace' /proc/kallsyms; echo $$?))
+ifeq ($(TMP_RES),0)
+EXTRA_DEFINES += -DKEDR_HAVE_KMCA_NOTRACE
+endif
+
+TMP_RES := $(shell (grep -q 'T[ \t]*alloc_pages_current' /proc/kallsyms; echo $$?))
+ifeq ($(TMP_RES),0)
+EXTRA_DEFINES += -DKEDR_HAVE_ALLOC_PAGES_CURRENT
 endif
 
 ifeq ($(KERNELRELEASE),)

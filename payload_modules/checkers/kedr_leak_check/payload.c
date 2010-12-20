@@ -118,7 +118,7 @@ repl___kmalloc(size_t size, gfp_t flags)
     void *ret_val;
     ret_val = __kmalloc(size, flags);
     
-    if (ret_val != NULL)
+    if (!ZERO_OR_NULL_PTR(ret_val))
         klc_add_alloc(ret_val, size, stack_depth);
 
     return ret_val;
@@ -255,7 +255,21 @@ repl___get_free_pages(gfp_t flags, unsigned int order)
             (size_t)(PAGE_SIZE << order), stack_depth);
     }
 
-    return ret_val;        
+    return ret_val;
+}
+
+static unsigned long 
+repl_get_zeroed_page(gfp_t gfp_mask)
+{
+    unsigned long ret_val;
+    ret_val = get_zeroed_page(gfp_mask);
+    
+    if ((void *)ret_val != NULL) {
+        klc_add_alloc((const void *)ret_val, 
+            (size_t)PAGE_SIZE, stack_depth);
+    }
+
+    return ret_val;
 }
 
 static void
@@ -266,6 +280,19 @@ repl_free_pages(unsigned long addr, unsigned int order)
         klc_add_bad_free(p, stack_depth);
     
     free_pages(addr, order);
+    return;
+}
+
+static void
+repl___free_pages(struct page *page, unsigned int order)
+{
+    if (page != NULL) {
+        const void *p = (const void *)page_address(page);
+        if (!klc_find_and_remove_alloc(p)) 
+            klc_add_bad_free(p, stack_depth);
+    }
+    
+    __free_pages(page, order);
     return;
 }
 
@@ -282,6 +309,44 @@ repl___alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
     }
     
     return page;
+}
+
+#ifdef KEDR_HAVE_ALLOC_PAGES_CURRENT
+static struct page *
+repl_alloc_pages_current(gfp_t gfp, unsigned order)
+{
+    struct page *page;
+    page = alloc_pages_current(gfp, order);
+    
+    if (page != NULL) {
+        klc_add_alloc((const void *)page_address(page), 
+            (size_t)(PAGE_SIZE << order), stack_depth);
+    }
+    
+    return page;
+}
+#endif
+
+static void *
+repl_alloc_pages_exact(size_t size, gfp_t gfp_mask)
+{
+    void *ret_val;
+    ret_val = alloc_pages_exact(size, gfp_mask);
+    
+    if (!ZERO_OR_NULL_PTR(ret_val))
+        klc_add_alloc(ret_val, size, stack_depth);
+
+    return ret_val;
+}
+
+static void 
+repl_free_pages_exact(void *virt, size_t size)
+{
+    if (!ZERO_OR_NULL_PTR(virt) && !klc_find_and_remove_alloc(virt)) 
+        klc_add_bad_free(virt, stack_depth);
+    
+    free_pages_exact(virt, size);
+    return;
 }
 
 /*********************************************************************
@@ -449,9 +514,16 @@ static void *orig_addrs[] = {
     (void *)&kmem_cache_free,
 
     (void *)&__get_free_pages,
+    (void *)&get_zeroed_page,
     (void *)&free_pages,
+    (void *)&__free_pages,
     (void *)&__alloc_pages_nodemask,
-
+#ifdef KEDR_HAVE_ALLOC_PAGES_CURRENT
+    (void *)&alloc_pages_current,
+#endif
+    (void *)&alloc_pages_exact,
+    (void *)&free_pages_exact,
+    
     /* "duplicators" group */
     (void *)&kstrdup,
     (void *)&kstrndup,
@@ -485,8 +557,15 @@ static void *repl_addrs[] = {
     (void *)&repl_kmem_cache_free,
 
     (void *)&repl___get_free_pages,
+    (void *)&repl_get_zeroed_page,
     (void *)&repl_free_pages,
+    (void *)&repl___free_pages,
     (void *)&repl___alloc_pages_nodemask,
+#ifdef KEDR_HAVE_ALLOC_PAGES_CURRENT
+    (void *)&repl_alloc_pages_current,
+#endif
+    (void *)&repl_alloc_pages_exact,
+    (void *)&repl_free_pages_exact,
 
     /* "duplicators" group */
     (void *)&repl_kstrdup,
