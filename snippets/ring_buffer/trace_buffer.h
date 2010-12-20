@@ -7,7 +7,7 @@
  * Struct, represented buffer which support two main operations:
  *
  * 1.Writting message into buffer
- * 2.Extract oldest message from the buffer.
+ * 2.Extract the oldest message from the buffer.
  *   If buffer is empty, may wait.
  */
 
@@ -56,7 +56,7 @@ void trace_buffer_write_message(struct trace_buffer* trace_buffer,
  */
 int
 trace_buffer_read_message(struct trace_buffer* trace_buffer,
-    int (*process_data)(const void* msg, size_t size, u64 ts, void* user_data),
+    int (*process_data)(const void* msg, size_t size, int cpu, u64 ts, void* user_data),
     int should_wait,
     void* user_data);
 
@@ -81,11 +81,11 @@ unsigned long
 trace_buffer_size(struct trace_buffer* trace_buffer);
 
 /*
- * Change size of the buffer, without resetting it.
+ * Change size of the buffer.
  *
- * (But messages may be lost due to buffer overflow,
- * or due to writting during resizing).
- * 
+ * Current messages in the buffer may be silently lost.
+ * (in current implementation buffer is forcibly reseted).
+ *
  * Return new size on success, negative error code otherwise.
  */
 

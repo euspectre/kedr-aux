@@ -11,6 +11,8 @@
 
 #include <linux/moduleparam.h>
 
+#include <linux/slab.h> /*kmalloc and others*/
+
 #define BUFFER_SIZE_DEFAULT 1000
 
 unsigned long buffer_size = BUFFER_SIZE_DEFAULT;
@@ -311,16 +313,21 @@ read_buffer_read(struct read_buffer *read_buffer,
 
 // Callback for trace_buffer_read_message.
 static int read_buffer_update_process_data(const void* msg,
-    size_t size, u64 ts, void* user_data)
+    size_t size, int cpu, u64 ts, void* user_data)
 {
+    // ts is time in nanoseconds since system starts
+    u32 sec, ms;
     //snprintf-like function, which print message into string,
     //which then will be read from the trace.
-#define print_msg(buffer, size) snprintf(buffer, size, "%lu: %s\n", \
-    (unsigned long)(ts >> 27), (const char*)msg)
+#define print_msg(buffer, size) snprintf(buffer, size, "[%.03d]\t%.6lu.%.06u:\t%s\n", \
+    cpu, (unsigned long)sec, (unsigned)ms, (const char*)msg)
 
     struct read_buffer *read_buffer = (struct read_buffer*)user_data;
     size_t read_size;
    
+    sec = div_u64_rem(ts, 1000000000, &ms);
+    ms /= 1000;
+
     read_size = print_msg(NULL, 0);//determine size of the message
     //Need to allocate buffer for message + '\0' byte, because
     //snprintf appends '\0' in any case, even if it does not need.
