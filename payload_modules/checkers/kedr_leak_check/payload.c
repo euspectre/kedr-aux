@@ -39,6 +39,8 @@
 
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/gfp.h>
+#include <linux/mm.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/err.h>
@@ -267,6 +269,21 @@ repl_free_pages(unsigned long addr, unsigned int order)
     return;
 }
 
+static struct page *
+repl___alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
+    struct zonelist *zonelist, nodemask_t *nodemask)
+{
+    struct page *page;
+    page = __alloc_pages_nodemask(gfp_mask, order, zonelist, nodemask);
+    
+    if (page != NULL) {
+        klc_add_alloc((const void *)page_address(page), 
+            (size_t)(PAGE_SIZE << order), stack_depth);
+    }
+    
+    return page;
+}
+
 /*********************************************************************
  * "duplicators" group
  *********************************************************************/
@@ -433,6 +450,7 @@ static void *orig_addrs[] = {
 
     (void *)&__get_free_pages,
     (void *)&free_pages,
+    (void *)&__alloc_pages_nodemask,
 
     /* "duplicators" group */
     (void *)&kstrdup,
@@ -468,6 +486,7 @@ static void *repl_addrs[] = {
 
     (void *)&repl___get_free_pages,
     (void *)&repl_free_pages,
+    (void *)&repl___alloc_pages_nodemask,
 
     /* "duplicators" group */
     (void *)&repl_kstrdup,
