@@ -3,6 +3,7 @@
 
 #include <linux/types.h>
 
+#include <linux/wait.h>
 /*
  * Struct, represented buffer which support two main operations:
  *
@@ -59,6 +60,20 @@ trace_buffer_read_message(struct trace_buffer* trace_buffer,
     int (*process_data)(const void* msg, size_t size, int cpu, u64 ts, void* user_data),
     int should_wait,
     void* user_data);
+
+
+/*
+ * Polling read status of trace_buffer.
+ *
+ * wait_function should have semantic similar to poll_wait().
+ *
+ * Return 1 if buffer can currently be read without lock, 0 otherwise.
+ */
+int
+trace_buffer_poll_read(struct trace_buffer* trace_buffer,
+    void (*wait_function)(wait_queue_head_t* wq, void* data),
+    void* data);
+
 
 /*
  * Return number of messages lost due to the buffer overflow.

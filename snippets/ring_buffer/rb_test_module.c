@@ -13,6 +13,8 @@
 
 #include <linux/slab.h> /*kmalloc and others*/
 
+#include <linux/poll.h>
+
 #define BUFFER_SIZE_DEFAULT 1000
 
 unsigned long buffer_size = BUFFER_SIZE_DEFAULT;
@@ -46,6 +48,11 @@ read_buffer_destroy(struct read_buffer *read_buffer)
     kfree(read_buffer->start);
 }
 
+static bool
+read_buffer_is_empty(struct read_buffer* read_buffer)
+{
+    return read_buffer->current_pos == read_buffer->end;
+}
 /*
  *  Set pointer 'p' to the first unread symbol.
  * Advance current_pos pointer up to the 'count' symbols.
@@ -117,12 +124,15 @@ static ssize_t trace_file_read(struct file *filp,
 static int trace_file_open(struct inode *inode, struct file *filp);
 static int trace_file_release(struct inode *inode, struct file *filp);
 
+static unsigned int trace_file_poll(struct file *filp, poll_table *wait);
+
 static struct file_operations trace_file_ops = 
 {
     .owner = THIS_MODULE,
     .open = trace_file_open,
     .release = trace_file_release,
     .read = trace_file_read,
+    .poll = trace_file_poll,
 };
 
 // Reset buffer file operations
@@ -311,6 +321,8 @@ read_buffer_read(struct read_buffer *read_buffer,
     return count;
 }
 
+
+
 // Callback for trace_buffer_read_message.
 static int read_buffer_update_process_data(const void* msg,
     size_t size, int cpu, u64 ts, void* user_data)
@@ -446,7 +458,7 @@ ssize_t trace_file_read(struct file *filp,
     {
         //update buffer and re-read it
         ssize_t error = read_buffer_update(read_buffer,
-            /*filp->f_flags & O_NONBLOCK*/1);
+            (filp->f_flags & O_NONBLOCK) == 0);
         if(error < 0) return error;
         //now should read some chars
         result = read_buffer_read(read_buffer, count, &str);
@@ -464,6 +476,37 @@ ssize_t trace_file_read(struct file *filp,
         return -EFAULT;
 
     return count;
+}
+
+struct trace_file_poll_table
+{
+    struct file *filp;
+    poll_table *wait;
+};
+
+static void trace_file_wait_function(wait_queue_head_t *q, void* data)
+{
+    struct trace_file_poll_table* table = (struct trace_file_poll_table*)data;
+    poll_wait(table->filp, q, table->wait);
+}
+
+static unsigned int trace_file_poll(struct file *filp, poll_table *wait)
+{
+    int can_read = 0;
+    struct read_buffer* read_buffer = filp->private_data;
+    if(!read_buffer_is_empty(read_buffer))
+    {
+        can_read = 1;
+    }
+    else
+    {
+        struct trace_file_poll_table table;
+        table.filp = filp;
+        table.wait = wait;
+        can_read = trace_buffer_poll_read(trace_buffer, trace_file_wait_function,
+            &table);
+    }
+    return (can_read < 0) ? POLLERR : (can_read ? (POLLIN | POLLRDNORM) : 0);
 }
 
 // Reset buffer file operations implementation
