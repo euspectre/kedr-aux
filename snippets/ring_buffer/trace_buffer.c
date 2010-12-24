@@ -1,6 +1,7 @@
 /*
  * Implementation of the 'trace_buffer' API.
  */
+#include "trace_buffer.h"
 
 #include <linux/ring_buffer.h> /* ring buffer functions*/
 #include <linux/delay.h> /* msleep_interruptible definition */
@@ -11,6 +12,10 @@
 #include <linux/mutex.h> /* mutexes */
 
 #include <linux/slab.h> /* kmalloc and others*/
+
+#include <linux/wait.h> /*wait queue definitions*/
+
+#include <linux/sched.h> /* TASK_NORMAL, TASK_INTERRUPTIBLE*/
 /*
  * Configurable parameters for internal implementation of the buffer.
  */
@@ -165,10 +170,52 @@ struct trace_buffer
      * Other losts are account in ring_buffer_overruns().
      */
     unsigned long messages_lost_internal;
-    // Caches for empty and non-empty per-cpu buffers
-    //cpumask_t subbuffers_empty;
-    //cpumask_t subbuffers_nonempty;
+    // Wait queue for reading and polling
+    wait_queue_head_t rq;
+    // Work in which reader will wake up.
+    // This work shedule only on demand.
+    struct delayed_work work_wakeup_reader;
 };
+
+static void wake_up_reader(struct work_struct *work)
+{
+    struct trace_buffer* trace_buffer = container_of(to_delayed_work(work), struct trace_buffer, work_wakeup_reader);
+    //pr_info("Wake up all.");
+    wake_up_all(&trace_buffer->rq);//unconditionally wakeup
+}
+
+/*
+ * Clear all messages in the buffer.
+ *
+ * Should be executed with lock taken.
+ */
+
+static void trace_buffer_clear_internal(struct trace_buffer* trace_buffer)
+{
+    int cpu;
+    //Clear last messages
+    INIT_LIST_HEAD(&trace_buffer->last_messages_ordered);
+    trace_buffer->non_empty_buffers = 0;
+
+    for_each_possible_cpu(cpu)
+    {
+        struct list_head* insert_point;
+        struct last_message* last_message =
+            &trace_buffer->last_messages[cpu];
+        u64 ts = ring_buffer_time_stamp(trace_buffer->buffer, cpu);
+        last_message_clear(last_message);
+        last_message_set_timestamp(last_message, ts);
+        //look for position for insert entry into the list
+        list_for_each_prev(insert_point, &trace_buffer->last_messages_ordered)
+        {
+            if(list_entry(insert_point, struct last_message, list)->ts <= ts) break;
+        }
+        list_add(&last_message->list, insert_point);
+    }
+
+    trace_buffer->messages_lost_internal = 0;
+    ring_buffer_reset(trace_buffer->buffer);
+}
 
 /*
  * Allocate buffer.
@@ -226,9 +273,10 @@ struct trace_buffer* trace_buffer_alloc(
     
     trace_buffer->messages_lost_internal = 0;
     
-    //cpumask_setall(&trace_buffer->subbuffers_empty);
-    //cpumask_clear(&trace_buffer->subbuffers_nonempty);
-
+    init_waitqueue_head(&trace_buffer->rq);
+    
+    INIT_DELAYED_WORK(&trace_buffer->work_wakeup_reader, wake_up_reader);
+    
     return trace_buffer;
 }
 /*
@@ -237,6 +285,8 @@ struct trace_buffer* trace_buffer_alloc(
 void trace_buffer_destroy(struct trace_buffer* trace_buffer)
 {
     int cpu;
+    
+    cancel_delayed_work_sync(&trace_buffer->work_wakeup_reader);
     
     mutex_destroy(&trace_buffer->read_mutex);
     //May be cpu-s, for which bit in subbuffers_empty is set,
@@ -266,6 +316,146 @@ void trace_buffer_write_message(struct trace_buffer* trace_buffer,
 }
 
 /*
+ * Non-blocking read only current oldest message(without reading of the per-cpu buffers).
+ *
+ * Should be executed under lock.
+ */
+
+static int trace_buffer_read_internal(struct trace_buffer* trace_buffer,
+    int (*process_data)(const void* msg, size_t size, int cpu, u64 ts, void* user_data),
+    void* user_data)
+{
+    int result;
+    // Determine oldest message
+    struct last_message* oldest_message = 
+        list_first_entry(&trace_buffer->last_messages_ordered, struct last_message, list);
+    if(!oldest_message->is_exist)
+    {
+        return -EAGAIN;
+    }
+
+    result = process_data(oldest_message->msg,
+        oldest_message->size,
+        oldest_message->cpu,
+        oldest_message->ts,
+        user_data);
+    //Remove oldest message
+    last_message_clear(oldest_message);
+    trace_buffer->non_empty_buffers--;
+
+    return result;
+}
+
+/*
+ * Update oldest message if needed and possible.
+ * May read every cpu-buffer, but not more then once.
+ *
+ * Should be executed under lock.
+ *
+ * Return 0 on success.
+ * If cannot update oldest message, because need read some cpu-buffer more then once, return -EAGAIN.
+ * Otherwise return negative error code.
+ *
+ * If 'wait_function' is not NULL, call it for waitqueue, which is woken up when new messages in the buffer
+ * are available.
+ */
+
+static int trace_buffer_update_internal(struct trace_buffer* trace_buffer,
+    void (*wait_function)(wait_queue_head_t* wq, void* data),
+    void* data)
+{
+    struct last_message* oldest_message;
+    cpumask_t subbuffers_updated;
+
+    if(wait_function)
+        wait_function(&trace_buffer->rq, data);
+    
+    cpumask_clear(&subbuffers_updated);
+    // Try to determine oldest message in the buffer(from all cpu's)
+    for(oldest_message = list_first_entry(&trace_buffer->last_messages_ordered, struct last_message, list);
+        !oldest_message->is_exist;
+        oldest_message = list_first_entry(&trace_buffer->last_messages_ordered, struct last_message, list))
+    {
+        // Cannot determine latest message - need to update timestamp
+        int cpu = oldest_message->cpu;
+        u64 ts;
+        struct ring_buffer_event* event;
+        struct list_head* insert_point;
+        
+        if(cpumask_test_cpu(cpu, &subbuffers_updated))
+        {
+            //This cpu-buffer has already been tested. Buffer is cannot read now.
+            if(wait_function)
+                schedule_delayed_work(&trace_buffer->work_wakeup_reader,
+                    (trace_buffer->non_empty_buffers ? TIME_WAIT_SUBBUFFER : TIME_WAIT_BUFFER)
+                    * HZ / 1000/*jiffies in ms*/);
+            
+            return -EAGAIN;
+        }
+        ts = ring_buffer_time_stamp(trace_buffer->buffer, cpu);
+        event = ring_buffer_consume(trace_buffer->buffer, cpu, &ts);
+        last_message_set_timestamp(oldest_message, ts);
+        //rearrange 'oldest_message'
+        list_del(&oldest_message->list);
+        list_for_each_prev(insert_point, &trace_buffer->last_messages_ordered)
+        {
+            if(list_entry(insert_point, struct last_message, list)->ts <= ts) break;
+        }
+        list_add(&oldest_message->list, insert_point);
+        //mark cpu as 'updated'
+        cpumask_set_cpu(cpu, &subbuffers_updated);
+        
+        if(event)
+        {
+            if(last_message_set(oldest_message, event))
+            {
+                pr_err("Cannot allocate new message.");
+                trace_buffer->messages_lost_internal++;
+                return -ENOMEM;
+            }
+            trace_buffer->non_empty_buffers++;
+        }
+    }
+   
+    return 0;
+}
+
+//callback function for update_internal() for perform blocking read.
+//For simplisity, it containt only one entry for record wait_queue_head_t and wait_queue_t pair.
+struct read_wait_table
+{
+    wait_queue_t wait;
+    wait_queue_head_t* q;
+};
+
+static void
+read_wait_init(struct read_wait_table* table)
+{
+    table->q = NULL;
+    init_wait(&table->wait);
+}
+
+static void
+read_wait_finish(struct read_wait_table* table)
+{
+    if(table->q)
+    {
+        finish_wait(table->q, &table->wait);
+        table->q = NULL;
+    }
+    else set_current_state(TASK_RUNNING);
+}
+
+static void
+read_wait_function(wait_queue_head_t* q, void* data)
+{
+    struct read_wait_table* table = (struct read_wait_table*)data;
+    BUG_ON(table->q != NULL);
+    table->q = q;
+    add_wait_queue(q, &table->wait);
+}
+
+/*
  * Read the oldest message from the buffer, and consume it.
  * 
  * For message consumed call 'process_data':
@@ -284,111 +474,87 @@ void trace_buffer_write_message(struct trace_buffer* trace_buffer,
  * 
  * Shouldn't be called in atomic context.
  */
+
 int
 trace_buffer_read_message(struct trace_buffer* trace_buffer,
     int (*process_data)(const void* msg, size_t size, int cpu, u64 ts, void* user_data),
     int should_wait,
     void* user_data)
 {
-    int result = 0;
-    
-    /*
-     * Flags for cpu's, on which cpu-buffer was already updated.
-     *
-     * If we need to update cpu-buffer for cpu, for which its flag was set, we need wait.
-     *
-     * These flags should be cleared after every mutex_unlock.
-     */
-    cpumask_t subbuffers_updated;
-    
-    struct last_message* oldest_message;
-    
+    int result;
     if(mutex_lock_killable(&trace_buffer->read_mutex))
         return -ERESTARTSYS;
-    cpumask_clear(&subbuffers_updated);
-    // Try to determine oldest message in the buffer(from all cpu's)
-    for(oldest_message = list_first_entry(&trace_buffer->last_messages_ordered, struct last_message, list);
-        !oldest_message->is_exist;
-        oldest_message = list_first_entry(&trace_buffer->last_messages_ordered, struct last_message, list))
-    {
-        // Cannot determine latest message - need to update timestamp
-        int cpu = oldest_message->cpu;
-        u64 ts;
-        struct ring_buffer_event* event;
-        struct list_head* insert_point;
-        
-        if(cpumask_test_cpu(cpu, &subbuffers_updated))
-        {
-            //field 'non_empty_buffers' should be tested under the lock
-            bool non_empty_buffers = trace_buffer->non_empty_buffers;
-            //need to wait
-            if(!should_wait)
-            {
-                result = -EAGAIN;
-                goto out;
-            }
-            cpumask_clear(&subbuffers_updated);
-            mutex_unlock(&trace_buffer->read_mutex);
-            
-            if(non_empty_buffers == 0)
-            {
-                if(msleep_interruptible(TIME_WAIT_BUFFER))
-                {
-                    //mutex already dropped, so simply return
-                    return -ERESTARTSYS;//was interrupted
-                }
-            }
-            else
-            {
-                if(msleep_interruptible(TIME_WAIT_SUBBUFFER))
-                {
-                    //mutex already dropped, so simply return
-                    return -ERESTARTSYS;//was interrupted
-                }
-            }
-            if(mutex_lock_killable(&trace_buffer->read_mutex))
-                return -ERESTARTSYS;
-            //mutex was dropped, so need to extract the oldest message again
-            continue;
-        }
 
-        ts = ring_buffer_time_stamp(trace_buffer->buffer, cpu);
-        event = ring_buffer_consume(trace_buffer->buffer, cpu, &ts);
-        last_message_set_timestamp(oldest_message, ts);
-        //rearrange 'oldest_message'
-        list_del(&oldest_message->list);
-        list_for_each_prev(insert_point, &trace_buffer->last_messages_ordered)
+    
+    //pr_info("Updating buffers");
+    while(((result = trace_buffer_update_internal(trace_buffer, NULL, NULL)) == -EAGAIN)
+        && should_wait)
+    {
+        //perform wait_event_killable()
+        struct read_wait_table table;
+        read_wait_init(&table);
+        //pr_info("Waiting trace...");
+        while(1)
         {
-            if(list_entry(insert_point, struct last_message, list)->ts <= ts) break;
-        }
-        list_add(&oldest_message->list, insert_point);
-        //mark cpu as 'updated'
-        cpumask_set_cpu(cpu, &subbuffers_updated);
-        
-        if(event)
-        {
-            result = last_message_set(oldest_message, event);
-            if(result)
+            set_current_state(TASK_KILLABLE);
+            //verify condition again, but with registering reader on waitqueue.
+            result = trace_buffer_update_internal(trace_buffer, read_wait_function, &table);
+            if(result != -EAGAIN) break;
+            //verify signal
+            if(fatal_signal_pending(current))
             {
-                trace_buffer->messages_lost_internal++;
-                goto out;
+                result = -ERESTARTSYS;
+                break;
             }
-            trace_buffer->non_empty_buffers++;
+            mutex_unlock(&trace_buffer->read_mutex);
+            //drop lock before scheduling...
+            schedule();
+            //and reaquire it
+            if(mutex_lock_killable(&trace_buffer->read_mutex))
+            {
+                result = -ERESTARTSYS;
+                break;
+            }
+            read_wait_finish(&table);
         }
+        read_wait_finish(&table);
+        if(result != -EAGAIN) break;
     }
-    // Determine oldest message
-    result = process_data(oldest_message->msg,
-        oldest_message->size,
-        oldest_message->cpu,
-        oldest_message->ts,
-        user_data);
-    //Remove oldest message
-    last_message_clear(oldest_message);
-    trace_buffer->non_empty_buffers--;
+    if(result)
+        goto out;
+    //pr_info("Reading message");
+    result = trace_buffer_read_internal(trace_buffer, process_data, user_data);
 out:
     mutex_unlock(&trace_buffer->read_mutex);
     return result;
 }
+
+/*
+ * Polling read status of trace_buffer.
+ *
+ * wait_function should have semantic similar to poll_wait().
+ *
+ * Return 1 if buffer can currently be read without lock, 0 otherwise.
+ */
+int
+trace_buffer_poll_read(struct trace_buffer* trace_buffer,
+    void (*wait_function)(wait_queue_head_t* wq, void* data),
+    void* data)
+{
+    int result;
+
+    if(mutex_lock_killable(&trace_buffer->read_mutex))
+        return -ERESTARTSYS;
+    result = trace_buffer_update_internal(trace_buffer, wait_function, data);
+    mutex_unlock(&trace_buffer->read_mutex);
+    if(result == 0)
+        return 1;//buffer may currently be read without lock
+    else if(result == -EAGAIN)
+        return 0;//buffer may not currently be read without lock
+    else
+        return result;//error
+}
+
 
 /*
  * Return number of messages lost due to the buffer overflow.
@@ -409,33 +575,11 @@ trace_buffer_lost_messages(struct trace_buffer* trace_buffer)
 int
 trace_buffer_reset(struct trace_buffer* trace_buffer)
 {
-    int cpu;
     if(mutex_lock_interruptible(&trace_buffer->read_mutex))
     {
         return -ERESTARTSYS;
     }
-    ring_buffer_reset(trace_buffer->buffer);
-    //Clear last messages
-    INIT_LIST_HEAD(&trace_buffer->last_messages_ordered);
-    trace_buffer->non_empty_buffers = 0;
-
-    for_each_possible_cpu(cpu)
-    {
-        struct list_head* insert_point;
-        struct last_message* last_message =
-            &trace_buffer->last_messages[cpu];
-        u64 ts = ring_buffer_time_stamp(trace_buffer->buffer, cpu);
-        last_message_clear(last_message);
-        last_message_set_timestamp(last_message, ts);
-        //look for position for insert entry into the list
-        list_for_each_prev(insert_point, &trace_buffer->last_messages_ordered)
-        {
-            if(list_entry(insert_point, struct last_message, list)->ts <= ts) break;
-        }
-        list_add(&last_message->list, insert_point);
-    }
-
-    trace_buffer->messages_lost_internal = 0;
+    trace_buffer_clear_internal(trace_buffer);
     mutex_unlock(&trace_buffer->read_mutex);
     return 0;
 }
@@ -462,35 +606,13 @@ int trace_buffer_resize(struct trace_buffer* trace_buffer,
     unsigned long size)
 {
     int result;
-    int cpu;
     if(mutex_lock_interruptible(&trace_buffer->read_mutex))
     {
         return -ERESTARTSYS;
     }
     result = ring_buffer_resize(trace_buffer->buffer, size);
-    ring_buffer_reset(trace_buffer->buffer);
-    //Clear last messages
-    INIT_LIST_HEAD(&trace_buffer->last_messages_ordered);
-    trace_buffer->non_empty_buffers = 0;
-
-    for_each_possible_cpu(cpu)
-    {
-        struct list_head* insert_point;
-        struct last_message* last_message =
-            &trace_buffer->last_messages[cpu];
-        u64 ts = ring_buffer_time_stamp(trace_buffer->buffer, cpu);
-        last_message_clear(last_message);
-        last_message_set_timestamp(last_message, ts);
-        //look for position for insert entry into the list
-        list_for_each_prev(insert_point, &trace_buffer->last_messages_ordered)
-        {
-            if(list_entry(insert_point, struct last_message, list)->ts <= ts) break;
-        }
-        list_add(&last_message->list, insert_point);
-    }
-
-    trace_buffer->messages_lost_internal = 0;
-
+    trace_buffer_clear_internal(trace_buffer);
+    
     mutex_unlock(&trace_buffer->read_mutex);
     return result;
 }
