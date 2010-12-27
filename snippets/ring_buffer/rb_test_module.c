@@ -399,7 +399,7 @@ read_buffer_update(struct read_buffer *read_buffer, int should_wait)
 ssize_t control_file_write(struct file *filp,
     const char __user *buf, size_t count, loff_t * f_pos)
 {
-    rb_test_buffer_write("Write");
+    rb_test_buffer_write(count <= 10 ? "Write" : "Write large");
     return count;
 }
 
