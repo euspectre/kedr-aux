@@ -322,9 +322,11 @@ void trace_buffer_write_message(struct trace_buffer* trace_buffer,
  */
 
 static int trace_buffer_read_internal(struct trace_buffer* trace_buffer,
-    int (*process_data)(const void* msg, size_t size, int cpu, u64 ts, void* user_data),
+    int (*process_data)(const void* msg, size_t size, int cpu,
+        u64 ts, bool *consume, void* user_data),
     void* user_data)
 {
+    bool consume = 0;//do not consume message by default
     int result;
     // Determine oldest message
     struct last_message* oldest_message = 
@@ -338,10 +340,14 @@ static int trace_buffer_read_internal(struct trace_buffer* trace_buffer,
         oldest_message->size,
         oldest_message->cpu,
         oldest_message->ts,
+        &consume,
         user_data);
-    //Remove oldest message
-    last_message_clear(oldest_message);
-    trace_buffer->non_empty_buffers--;
+    //Remove oldest message if it is consumed
+    if(consume)
+    {
+        last_message_clear(oldest_message);
+        trace_buffer->non_empty_buffers--;
+    }
 
     return result;
 }
@@ -477,7 +483,8 @@ read_wait_function(wait_queue_head_t* q, void* data)
 
 int
 trace_buffer_read_message(struct trace_buffer* trace_buffer,
-    int (*process_data)(const void* msg, size_t size, int cpu, u64 ts, void* user_data),
+    int (*process_data)(const void* msg, size_t size, int cpu,
+        u64 ts, bool *consume, void* user_data),
     int should_wait,
     void* user_data)
 {

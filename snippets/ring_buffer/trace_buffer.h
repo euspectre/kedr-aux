@@ -38,15 +38,19 @@ void trace_buffer_write_message(struct trace_buffer* trace_buffer,
     const void* msg, size_t size);
 
 /*
- * Read the oldest message from the buffer, and consume it.
+ * Read the oldest message from the buffer.
  * 
- * For message consumed call 'process_data':
+ * For message read call 'process_data':
  * 'msg' is set to the pointer to the message data.
  * 'size' is set to the size of the message,
  * 'ts' is set to the timestamp of the message,
  * 'user_data' is set to the 'user_data' parameter of the function.
  * 
  * Return value, which is returned by 'process_data'.
+ *
+ * If 'process_data' set 'consume' parameter to not 0,
+ * message is treated consumed, and next reading return next message from buffer.
+ * Otherwise, next reading return the same message.
  * 
  * If buffer is empty, and should_wait is 0,
  * return 0; otherwise wait until message will be available
@@ -57,7 +61,8 @@ void trace_buffer_write_message(struct trace_buffer* trace_buffer,
  */
 int
 trace_buffer_read_message(struct trace_buffer* trace_buffer,
-    int (*process_data)(const void* msg, size_t size, int cpu, u64 ts, void* user_data),
+    int (*process_data)(const void* msg, size_t size, int cpu,
+        u64 ts, bool *consume, void* user_data),
     int should_wait,
     void* user_data);
 
