@@ -83,7 +83,8 @@ checkScenarioLocal()
 {
     printMessage "\n"
     printMessage "Checking scenario: \"local\" installation\n" 
-    printMessage "CHECK_KEDR_SELFTEST is \"${CHECK_KEDR_SELFTEST}\"\n\n"
+    printMessage "CHECK_KEDR_SELFTEST is \"${CHECK_KEDR_SELFTEST}\"\n"
+    printMessage "ENABLE_STD_PAYLOADS is \"${ENABLE_STD_PAYLOADS}\"\n\n"
 
     cd "${WORK_DIR}" || exitFailure
     rm -rf "${ARCHIVE_DIR}" "${BUILD_DIR}" "${INSTALL_DIR}" 
@@ -111,15 +112,31 @@ checkScenarioLocal()
         exitFailure
     fi
 
+    add_cmake_options=
+    if test "t${ENABLE_STD_PAYLOADS}" = "tno"; then
+        add_cmake_options="-DKEDR_STANDARD_CALLM_PAYLOADS=OFF -DKEDR_STANDARD_FSIM_PAYLOADS=OFF"
+    fi
+
     # Configure the build
     printMessage "===== Configuring the system =====\n"
-    cmake \
+    cmake ${add_cmake_options} \
         -DCMAKE_VERBOSE_MAKEFILE="ON" \
         -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
         "${WORK_DIR}/${ARCHIVE_DIR}" >> "${LOG_FILE}" 2>&1
     if test $? -ne 0; then
         printMessage "Failed to configure the system\n"
         exitFailure
+    fi
+
+    if test "t${ENABLE_STD_PAYLOADS}" = "tno"; then
+        if test -d "${BUILD_DIR}/payloads_callm"; then
+            printMessage "Standard payloads (callm) are enabled but they should not be.\n"
+            exitFailure
+        fi
+        if test -d "${BUILD_DIR}/payloads_fsim"; then
+            printMessage "Standard payloads (fsim) are enabled but they should not be.\n"
+            exitFailure
+        fi
     fi
 
     # Build the system
@@ -488,6 +505,10 @@ if test ! -f "${ARCHIVE_FILE}"; then
     exitFailure
 fi
 
+# Standard payload modules for call monitoring and fault simulation
+# should be built and tested if ENABLE_STD_PAYLOADS is set to 'yes'
+ENABLE_STD_PAYLOADS=yes
+
 # First check everything and run tests too.
 CHECK_KEDR_SELFTEST=yes
 checkScenarioLocal
@@ -504,6 +525,11 @@ checkScenarioGlobal
 
 # Check building and installing KEDR with 'make -j N' where N > 1.
 checkParallelBuild
+
+# Check local installation without standard payload modules.
+CHECK_KEDR_SELFTEST=yes
+ENABLE_STD_PAYLOADS=no
+checkScenarioLocal
 
 # NOTE: 
 # If you would like to add more scenarios to check if the system operates
