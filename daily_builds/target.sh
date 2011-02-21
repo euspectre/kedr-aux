@@ -121,7 +121,7 @@ checkScenarioLocal()
     # Configure the build
     printMessage "===== Configuring the system =====\n"
     cmake ${add_cmake_options} \
-        -DCMAKE_VERBOSE_MAKEFILE="ON" \
+        -DCMAKE_VERBOSE_MAKEFILE="OFF" \
         -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
         -DKEDR_ENABLE_CALLER_ADDRESS="${ENABLE_CALLER_ADDRESS}" \
         "${WORK_DIR}/${ARCHIVE_DIR}" >> "${LOG_FILE}" 2>&1
