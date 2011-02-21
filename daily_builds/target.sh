@@ -84,6 +84,7 @@ checkScenarioLocal()
     printMessage "\n"
     printMessage "Checking scenario: \"local\" installation\n" 
     printMessage "CHECK_KEDR_SELFTEST is \"${CHECK_KEDR_SELFTEST}\"\n"
+    printMessage "ENABLE_CALLER_ADDRESS is \"${ENABLE_CALLER_ADDRESS}\"\n"
     printMessage "ENABLE_STD_PAYLOADS is \"${ENABLE_STD_PAYLOADS}\"\n\n"
 
     cd "${WORK_DIR}" || exitFailure
@@ -122,6 +123,7 @@ checkScenarioLocal()
     cmake ${add_cmake_options} \
         -DCMAKE_VERBOSE_MAKEFILE="ON" \
         -DCMAKE_INSTALL_PREFIX="${INSTALL_DIR}" \
+        -DKEDR_ENABLE_CALLER_ADDRESS="${ENABLE_CALLER_ADDRESS}" \
         "${WORK_DIR}/${ARCHIVE_DIR}" >> "${LOG_FILE}" 2>&1
     if test $? -ne 0; then
         printMessage "Failed to configure the system\n"
@@ -508,8 +510,9 @@ fi
 # Standard payload modules for call monitoring and fault simulation
 # should be built and tested if ENABLE_STD_PAYLOADS is set to 'yes'
 ENABLE_STD_PAYLOADS=yes
+ENABLE_CALLER_ADDRESS=ON
 
-# First check everything and run tests too.
+# Check everything and run tests too.
 CHECK_KEDR_SELFTEST=yes
 checkScenarioLocal
 
@@ -529,6 +532,12 @@ checkParallelBuild
 # Check local installation without standard payload modules.
 CHECK_KEDR_SELFTEST=yes
 ENABLE_STD_PAYLOADS=no
+checkScenarioLocal
+
+# Check local installation with standard payload modules.
+ENABLE_CALLER_ADDRESS=OFF
+CHECK_KEDR_SELFTEST=yes
+ENABLE_STD_PAYLOADS=yes
 checkScenarioLocal
 
 # NOTE: 
