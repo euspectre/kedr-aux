@@ -21,8 +21,8 @@ LOG_FILE="${WORK_DIR}/build.log"
 # The directory to build the system in (out-of-tree build is to be done).
 BUILD_DIR="${WORK_DIR}/build"
 
-# The directory to install the system into ("local" install scenario).
-INSTALL_DIR="${WORK_DIR}/install"
+# The directory to install the system into.
+INSTALL_DIR=""
 
 # The directory to copy the installed examples into (for building).
 EXAMPLES_DIR="${WORK_DIR}/examples"
@@ -87,6 +87,8 @@ checkScenarioLocal()
     printMessage "ENABLE_CALLER_ADDRESS is \"${ENABLE_CALLER_ADDRESS}\"\n"
     printMessage "ENABLE_STD_PAYLOADS is \"${ENABLE_STD_PAYLOADS}\"\n\n"
 
+    INSTALL_DIR="${WORK_DIR}/install"
+
     cd "${WORK_DIR}" || exitFailure
     rm -rf "${ARCHIVE_DIR}" "${BUILD_DIR}" "${INSTALL_DIR}" 
     rm -rf "${EXAMPLES_DIR}" "${TEMP_DIR}"
@@ -115,7 +117,7 @@ checkScenarioLocal()
 
     add_cmake_options=
     if test "t${ENABLE_STD_PAYLOADS}" = "tno"; then
-        add_cmake_options="-DKEDR_STANDARD_CALLM_PAYLOADS=OFF -DKEDR_STANDARD_FSIM_PAYLOADS=OFF"
+        add_cmake_options="-DKEDR_STANDARD_CALLM_PAYLOADS=OFF -DKEDR_STANDARD_FSIM_PAYLOADS=OFF -DKEDR_LEAK_CHECK=OFF"
     fi
 
     # Configure the build
@@ -364,7 +366,7 @@ checkParallelBuild()
     printMessage "\n"
 
     cd "${WORK_DIR}" || exitFailure
-    rm -rf "${ARCHIVE_DIR}" "${BUILD_DIR}" "${INSTALL_DIR}" 
+    rm -rf "${ARCHIVE_DIR}" "${BUILD_DIR}" 
     rm -rf "${EXAMPLES_DIR}" "${TEMP_DIR}"
 
     # CMAKE_INSTALL_PREFIX defaults to "/usr/local" on Linux
@@ -484,6 +486,8 @@ fi
 
 ARCHIVE_DIR="$1"
 ARCHIVE_FILE="${ARCHIVE_DIR}.tar.bz2"
+
+INSTALL_DIR="${WORK_DIR}/install"
 
 rm -rf "${LOG_FILE}" 
 rm -rf "${ARCHIVE_DIR}" "${BUILD_DIR}" "${INSTALL_DIR}" 
