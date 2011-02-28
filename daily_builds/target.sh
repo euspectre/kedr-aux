@@ -249,12 +249,12 @@ checkScenarioGlobal()
     printMessage "Checking scenario: \"global\" installation\n" 
     printMessage "\n"
 
-    cd "${WORK_DIR}" || exitFailure
-    rm -rf "${ARCHIVE_DIR}" "${BUILD_DIR}" "${INSTALL_DIR}" 
-    rm -rf "${EXAMPLES_DIR}" "${TEMP_DIR}"
-
     # CMAKE_INSTALL_PREFIX defaults to "/usr/local" on Linux
-    INSTALL_DIR="/usr/local"    
+    INSTALL_DIR="/usr/local" 
+
+    cd "${WORK_DIR}" || exitFailure
+    rm -rf "${ARCHIVE_DIR}" "${BUILD_DIR}"
+    rm -rf "${EXAMPLES_DIR}" "${TEMP_DIR}"
 
     ####################################################################
     {
@@ -365,13 +365,13 @@ checkParallelBuild()
     printMessage "Checking scenario: parallel build\n" 
     printMessage "\n"
 
+    # CMAKE_INSTALL_PREFIX defaults to "/usr/local" on Linux
+    INSTALL_DIR="/usr/local"    
+
     cd "${WORK_DIR}" || exitFailure
     rm -rf "${ARCHIVE_DIR}" "${BUILD_DIR}" 
     rm -rf "${EXAMPLES_DIR}" "${TEMP_DIR}"
 
-    # CMAKE_INSTALL_PREFIX defaults to "/usr/local" on Linux
-    INSTALL_DIR="/usr/local"    
-    
     # make will use the following number of "jobs" to perform the build, etc.
     KEDR_NJOBS=4
     MAKE_CMD="make -j ${KEDR_NJOBS}"
