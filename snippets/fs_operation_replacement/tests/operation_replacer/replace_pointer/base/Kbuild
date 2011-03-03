@@ -1,0 +1,6 @@
+module_name=delegate_base
+
+ccflags-y :=  -I$(src)/.. -I$(src)/../delegate_operation_replacer/ -I$(src)/../../../..
+
+obj-m := $(module_name).o
+$(module_name)-y := base_module.o

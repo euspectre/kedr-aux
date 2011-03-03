@@ -1,0 +1,5 @@
+module_name=char_counter
+
+ccflags-y :=  -I$(src)/.. -I$(src)/../process_user_string/
+
+obj-m := $(module_name).o

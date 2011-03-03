@@ -1,0 +1,2 @@
+/home/andrew/test/fs_operation_replacement/tests/callback_replacer/process_user_string/process_user_string.ko
+/home/andrew/test/fs_operation_replacement/tests/callback_replacer/process_user_string/process_user_string_module.o

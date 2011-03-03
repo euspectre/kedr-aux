@@ -1,0 +1,5 @@
+module_name=test_module
+
+ccflags-y :=  -I$(src)/../../..
+obj-m := $(module_name).o
+$(module_name)-y = module.o data_map.o

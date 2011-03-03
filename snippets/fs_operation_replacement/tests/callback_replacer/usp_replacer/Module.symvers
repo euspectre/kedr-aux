@@ -1,0 +1,7 @@
+0x4a0a3165	usp_replace	/home/andrew/test/fs_operation_replacement/tests/callback_replacer/usp_replacer/usp_replacer	EXPORT_SYMBOL
+0x77299a68	usp_target_load_callback	/home/andrew/test/fs_operation_replacement/tests/callback_replacer/usp_replacer/usp_replacer	EXPORT_SYMBOL
+0x6fae8ec2	usp_get_orig	/home/andrew/test/fs_operation_replacement/tests/callback_replacer/usp_replacer/usp_replacer	EXPORT_SYMBOL
+0x24c07fda	usp_payload_unregister	/home/andrew/test/fs_operation_replacement/tests/callback_replacer/usp_replacer/usp_replacer	EXPORT_SYMBOL
+0xf765cf71	usp_target_unload_callback	/home/andrew/test/fs_operation_replacement/tests/callback_replacer/usp_replacer/usp_replacer	EXPORT_SYMBOL
+0x70ceab5a	usp_replacement_clean	/home/andrew/test/fs_operation_replacement/tests/callback_replacer/usp_replacer/usp_replacer	EXPORT_SYMBOL
+0xe121cc93	usp_payload_register	/home/andrew/test/fs_operation_replacement/tests/callback_replacer/usp_replacer/usp_replacer	EXPORT_SYMBOL

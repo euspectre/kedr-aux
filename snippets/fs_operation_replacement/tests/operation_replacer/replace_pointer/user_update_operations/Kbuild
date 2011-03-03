@@ -1,0 +1,6 @@
+module_name=delegate_impl_update_operations
+
+ccflags-y :=  -DUPDATE_OPERATIONS -I$(src)/.. -I$(src)/../base/
+
+obj-m := $(module_name).o
+$(module_name)-y := delegate_impl.o

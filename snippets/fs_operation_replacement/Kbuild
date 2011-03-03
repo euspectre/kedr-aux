@@ -1,0 +1,8 @@
+module_name=fs_replacer
+
+objects := data_map.o operation_replacer.o callback_replacer.o fs_operation_replacement.o payload.o
+
+ccflags-y := -g -I$(src) -I/home/andrew/kedr-builds/common/install/include
+obj-m := ${module_name}.o
+${module_name}-y := ${objects}
+

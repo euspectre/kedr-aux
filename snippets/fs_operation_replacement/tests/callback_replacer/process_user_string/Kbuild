@@ -1,0 +1,6 @@
+module_name=process_user_string
+
+ccflags-y :=  -I$(src)/.. -I$(src)/../usp_replacer/ -I$(src)/../../..
+
+obj-m := $(module_name).o
+$(module_name)-y := process_user_string_module.o

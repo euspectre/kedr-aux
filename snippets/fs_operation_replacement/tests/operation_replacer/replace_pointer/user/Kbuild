@@ -1,0 +1,5 @@
+module_name=delegate_impl
+
+ccflags-y :=  -I$(src)/.. -I$(src)/../base/
+
+obj-m := $(module_name).o
