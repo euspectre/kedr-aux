@@ -15,7 +15,7 @@
         
         <td style="width: 100%; vertical-align: middle">
         <h1 id="heading-title">
-            <span id="kedr">KEDR - Runtime Analysis of Linux Kernel Modules</span>
+            <span id="kedr">KEDR - Dynamic Analysis of Linux Kernel Modules</span>
         </h1>
         </td>
     </tr></tbody>
@@ -54,6 +54,11 @@
     <p>
 <strong>KEDR framework</strong> is an extensible system for dynamic analysis of kernel modules (device drivers, file system modules, etc.) in Linux. KEDR tools operate on the modules chosen by the user and can detect memory leaks, perform fault simulation and more. The framework is intended for the developers of kernel modules and, in particular, it may be useful for building automated driver verification systems.
 	</p>
+
+	<p>
+KEDR framework is free software and is distributed under the terms of <a href="http://www.gnu.org/licenses/old-licenses/gpl-2.0.html">GNU General Public License Version 2</a>.
+	</p>
+	
     <h2>Features</h2>
     <p>
 Like the dynamic analysis frameworks, such as <a href="http://valgrind.org/">Valgrind</a>, oriented towards user-space applications and libraries, KEDR uses plugin-based architecture. Each analysis system based on KEDR relies at least on the following components: 
