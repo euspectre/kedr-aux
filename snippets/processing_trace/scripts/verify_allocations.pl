@@ -63,6 +63,7 @@ my %alloc_functions = (
 	"kmem_cache_alloc" => '{ /result:\\s*(\\(null\\)|\\w+)/; $_="$1"; }',
 	"kmem_cache_alloc_notrace" => '{ /result:\\s*(\\(null\\)|\\w+)/; $_="$1"; }',
     "__get_free_pages" => '{ /result:\\s*(\\(null\\)|\\w+)/; $_="$1"; }',
+    "kstrdup" => '{ /result:\\s*(\\(null\\)|\\w+)/; $_="$1"; }',
 );
 
 my %free_functions = (
