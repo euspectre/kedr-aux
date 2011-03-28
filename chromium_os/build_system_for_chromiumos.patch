@@ -1,0 +1,763 @@
+diff --git a/sources/CMakeLists.txt b/sources/CMakeLists.txt
+--- a/sources/CMakeLists.txt
++++ b/sources/CMakeLists.txt
+@@ -3,6 +3,19 @@
+ enable_language(C)
+ enable_language(CXX)
+ 
++#<>
++if (NOT KEDR_ARCH)
++	set (KEDR_ARCH "x86")
++endif (NOT KEDR_ARCH)
++
++message (STATUS 
++	"ARCH is '${KEDR_ARCH}', CROSS_COMPILE is '${KEDR_CROSS_COMPILE}'"
++)
++
++set (ENV{KEDR_ARCH} "${KEDR_ARCH}")
++set (ENV{KEDR_CROSS_COMPILE} "${KEDR_CROSS_COMPILE}")
++#<>
++
+ #######################################################################
+ # Prohibit a common type of an in-source build.
+ # Note that building in a subdirectory in the source tree is still allowed 
+@@ -19,7 +32,7 @@
+ set(KEDR_PACKAGE_NAME "kedr")
+ set(KEDR_VERSION_MAJOR 0)
+ set(KEDR_VERSION_MINOR 2)
+-set(KEDR_VERSION_MICRO 0)
++set(KEDR_VERSION_MICRO "0-chromium")
+ 
+ #######################################################################
+ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
+@@ -118,10 +131,12 @@
+ #######################################################################
+ # Supported types of analysis (and, consequently, the sets of payload 
+ # modules).
++
+ option(KEDR_STANDARD_CALLM_PAYLOADS 
+ 	"Enable support for call monitoring" 
+ 	ON
+ )
++
+ option(KEDR_STANDARD_FSIM_PAYLOADS 
+ 	"Enable support for fault simulation" 
+ 	ON
+@@ -148,137 +163,159 @@
+ 	)
+ 	set(KEDR_ENABLE_CALLER_ADDRESS OFF)
+ endif ()
++
++
+ #######################################################################
+ 
+-# kedr_gen is built here explicitly and installed to a temporary location.
+-# This is only necessary to build KEDR itself.
+-# This should be done before the first add_subdirectory() command.
++if (KEDR_GEN)
++	#<>
++	# If cross-compiling for a different architecture, kedr_gen tool 
++	# will probably not build here, so it should be built separately 
++	# in advance in this case. The path to kedr_gen should be passed here 
++	# in KEDR_GEN variable.
++	#<>
++	
++	# ${KEDR_GEN_TOOL} is the path to "kedr_gen". The path can be used to call
++	# "kedr_gen" tool during the build of payload modules, etc.
++	set (KEDR_GEN_TOOL ${KEDR_GEN})
++	
++	# TODO: check if the tool exists at the path specified.
++	
++	message (STATUS "\"kedr_gen\" tool: ${KEDR_GEN}")
++else ()
+ 
+-# The temporary install directory must be persistent and it must not be 
+-# KEDR_INSTALL_PREFIX_TEMP because it has nothing to do with the installation 
+-# of KEDR: it is used when KEDR is being built only.
++	# kedr_gen is built here explicitly and installed to a temporary location.
++	# This is only necessary to build KEDR itself.
++	# This should be done before the first add_subdirectory() command.
+ 
+-message (STATUS "Creating \"kedr_gen\"")
+-set (KEDR_GEN_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/kedr_gen.install")
+-set (KEDR_GEN_TEMP_BUILD "${CMAKE_CURRENT_BINARY_DIR}/kedr_gen.build")
++	# The temporary install directory must be persistent and it must not be 
++	# KEDR_INSTALL_PREFIX_TEMP because it has nothing to do with the installation 
++	# of KEDR: it is used when KEDR is being built only.
+ 
+-# The temporary build directory should be removed during 'make clean'
+-# Note that the temporary install directory containing 'kedr_gen' must 
+-# survive as kedr_gen will be necessary if the user wants to rebuild KEDR 
+-# after 'make clean' without reconfiguring.
+-set_property (DIRECTORY APPEND PROPERTY 
+-    ADDITIONAL_MAKE_CLEAN_FILES kedr_gen.build
+-)
++	message (STATUS "Creating \"kedr_gen\"")
++	set (KEDR_GEN_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/kedr_gen.install")
++	set (KEDR_GEN_TEMP_BUILD "${CMAKE_CURRENT_BINARY_DIR}/kedr_gen.build")
+ 
+-# Remove the old temporary build and install directories first and 
+-# (re)create them.
++	# The temporary build directory should be removed during 'make clean'
++	# Note that the temporary install directory containing 'kedr_gen' must 
++	# survive as kedr_gen will be necessary if the user wants to rebuild KEDR 
++	# after 'make clean' without reconfiguring.
++	set_property (DIRECTORY APPEND PROPERTY 
++		ADDITIONAL_MAKE_CLEAN_FILES kedr_gen.build
++	)
+ 
+-# [NB] Note that if several commands are specified in execute_process() 
+-# call, it is equivalent to executing a pipeline in the shell:
+-#   command1 | command2 | ...
+-# Generally, there are no restrictions on the order in which the commands 
+-# will be executed and on whether some of the commands will execute 
+-# concurrently. Therefore, here is the rule of thumb:
+-# [!!!] Specify 2 or more commands in a single execute_process() statement
+-# if and only if the pipeline of the commands is what you want or if it is 
+-# not important whether they will actually run simultaneously. 
+-# Otherwise, you should use separate execute_process() statements.
+-#
+-# For example, using execute_process() like this is definitely looking 
+-# for trouble:
+-#   execute_process (
+-#       COMMAND rm -rf "some_dir" 
+-#       COMMAND mkdir -p "some_dir" 
+-#   )
+-# The order in which these commands will do their work is unspecified. 
+-# It may happen that 'mkdir' will finish before 'rm' will begin removing
+-# "some_dir". This is probably not what you expect here.
++	# Remove the old temporary build and install directories first and 
++	# (re)create them.
+ 
+-#Do not destroy previously installed generator
+-#execute_process (
+-#    COMMAND rm -rf "${KEDR_GEN_TEMP_BUILD}" 
+-#    COMMAND rm -rf "${KEDR_GEN_INSTALL_PREFIX}" 
+-#)
++	# [NB] Note that if several commands are specified in execute_process() 
++	# call, it is equivalent to executing a pipeline in the shell:
++	#   command1 | command2 | ...
++	# Generally, there are no restrictions on the order in which the commands 
++	# will be executed and on whether some of the commands will execute 
++	# concurrently. Therefore, here is the rule of thumb:
++	# [!!!] Specify 2 or more commands in a single execute_process() statement
++	# if and only if the pipeline of the commands is what you want or if it is 
++	# not important whether they will actually run simultaneously. 
++	# Otherwise, you should use separate execute_process() statements.
++	#
++	# For example, using execute_process() like this is definitely looking 
++	# for trouble:
++	#   execute_process (
++	#       COMMAND rm -rf "some_dir" 
++	#       COMMAND mkdir -p "some_dir" 
++	#   )
++	# The order in which these commands will do their work is unspecified. 
++	# It may happen that 'mkdir' will finish before 'rm' will begin removing
++	# "some_dir". This is probably not what you expect here.
+ 
+-# [NB] After the command is executed, the variable specified 
+-# in RESULT_VARIABLE may contain either numeric return code or a string 
+-# describing the error.
+-execute_process (
+-    COMMAND mkdir -p "${KEDR_GEN_TEMP_BUILD}" 
+-    RESULT_VARIABLE kedr_gen_result
+-)
+-if (NOT kedr_gen_result EQUAL 0)
+-    message (FATAL_ERROR 
+-"Failed to create directory ${KEDR_GEN_TEMP_BUILD}"
+-    )
+-endif ()
++	#Do not destroy previously installed generator
++	#execute_process (
++	#    COMMAND rm -rf "${KEDR_GEN_TEMP_BUILD}" 
++	#    COMMAND rm -rf "${KEDR_GEN_INSTALL_PREFIX}" 
++	#)
+ 
+-execute_process (
+-    COMMAND mkdir -p "${KEDR_GEN_INSTALL_PREFIX}" 
+-    RESULT_VARIABLE kedr_gen_result
+-)
+-if (NOT kedr_gen_result EQUAL 0)
+-    message (FATAL_ERROR 
+-"Failed to create directory ${KEDR_GEN_TEMP_BUILD}"
+-    )
+-endif ()
++	# [NB] After the command is executed, the variable specified 
++	# in RESULT_VARIABLE may contain either numeric return code or a string 
++	# describing the error.
++	execute_process (
++		COMMAND mkdir -p "${KEDR_GEN_TEMP_BUILD}" 
++		RESULT_VARIABLE kedr_gen_result
++	)
++	if (NOT kedr_gen_result EQUAL 0)
++		message (FATAL_ERROR 
++	"Failed to create directory ${KEDR_GEN_TEMP_BUILD}"
++		)
++	endif ()
+ 
+-# Configure kedr_gen
+-execute_process (
+-    COMMAND ${CMAKE_COMMAND} 
+-        -DCMAKE_INSTALL_PREFIX=${KEDR_GEN_INSTALL_PREFIX}
+-        -DCMAKE_BUILD_TYPE=Release
+-        -DKEDR_GEN_INSTALL_PREFIX=${KEDR_GEN_INSTALL_PREFIX}
+-        "${CMAKE_CURRENT_SOURCE_DIR}/tools/kedr_gen/src"
+-    WORKING_DIRECTORY ${KEDR_GEN_TEMP_BUILD}
+-    RESULT_VARIABLE kedr_gen_result
+-    OUTPUT_VARIABLE kedr_gen_output
+-    ERROR_VARIABLE  kedr_gen_output
+-)
+-if (NOT kedr_gen_result EQUAL 0)
+-    message ("Failed to configure \"kedr_gen\".")
+-    message ("CMake output:\n${kedr_gen_output}\n")
+-    message ("CMake result:\n${kedr_gen_result}\n")
+-    message (FATAL_ERROR "Unable to build \"kedr_gen\", aborting.")
+-endif ()
++	execute_process (
++		COMMAND mkdir -p "${KEDR_GEN_INSTALL_PREFIX}" 
++		RESULT_VARIABLE kedr_gen_result
++	)
++	if (NOT kedr_gen_result EQUAL 0)
++		message (FATAL_ERROR 
++	"Failed to create directory ${KEDR_GEN_TEMP_BUILD}"
++		)
++	endif ()
+ 
+-# Build kedr_gen
+-execute_process (
+-    COMMAND make
+-    WORKING_DIRECTORY ${KEDR_GEN_TEMP_BUILD}
+-    RESULT_VARIABLE kedr_gen_result
+-    OUTPUT_VARIABLE kedr_gen_output
+-    ERROR_VARIABLE  kedr_gen_output
+-)
+-if (NOT kedr_gen_result EQUAL 0)
+-    message ("Failed to build \"kedr_gen\".")
+-    message ("Make output:\n${kedr_gen_output}\n")
+-    message ("Make result:\n${kedr_gen_result}\n")
+-    message (FATAL_ERROR "Unable to build \"kedr_gen\", aborting.")
+-endif ()
++	# Configure kedr_gen
++	execute_process (
++		COMMAND ${CMAKE_COMMAND} 
++			-DCMAKE_SYSTEM_NAME=${CMAKE_HOST_SYSTEM_NAME}
++			-DCMAKE_INSTALL_PREFIX=${KEDR_GEN_INSTALL_PREFIX}
++			-DCMAKE_BUILD_TYPE=Release
++			-DKEDR_GEN_INSTALL_PREFIX=${KEDR_GEN_INSTALL_PREFIX}
++			"${CMAKE_CURRENT_SOURCE_DIR}/tools/kedr_gen/src"
++		WORKING_DIRECTORY ${KEDR_GEN_TEMP_BUILD}
++		RESULT_VARIABLE kedr_gen_result
++		OUTPUT_VARIABLE kedr_gen_output
++		ERROR_VARIABLE  kedr_gen_output
++	)
++	if (NOT kedr_gen_result EQUAL 0)
++		message ("Failed to configure \"kedr_gen\".")
++		message ("CMake output:\n${kedr_gen_output}\n")
++		message ("CMake result:\n${kedr_gen_result}\n")
++		message (FATAL_ERROR "Unable to build \"kedr_gen\", aborting.")
++	endif ()
+ 
+-# Install kedr_gen
+-execute_process (
+-    COMMAND make install
+-    WORKING_DIRECTORY ${KEDR_GEN_TEMP_BUILD}
+-    RESULT_VARIABLE kedr_gen_result
+-    OUTPUT_VARIABLE kedr_gen_output
+-    ERROR_VARIABLE  kedr_gen_output
+-)
+-if (NOT kedr_gen_result EQUAL 0)
+-    message ("Failed to install \"kedr_gen\" to ${KEDR_GEN_INSTALL_PREFIX}.")
+-    message ("Make output:\n${kedr_gen_output}\n")
+-    message ("Make result:\n${kedr_gen_result}\n")
+-    message (FATAL_ERROR "Unable to install \"kedr_gen\", aborting.")
+-endif ()
++	# Build kedr_gen
++	execute_process (
++		COMMAND make
++		WORKING_DIRECTORY ${KEDR_GEN_TEMP_BUILD}
++		RESULT_VARIABLE kedr_gen_result
++		OUTPUT_VARIABLE kedr_gen_output
++		ERROR_VARIABLE  kedr_gen_output
++	)
++	if (NOT kedr_gen_result EQUAL 0)
++		message ("Failed to build \"kedr_gen\".")
++		message ("Make output:\n${kedr_gen_output}\n")
++		message ("Make result:\n${kedr_gen_result}\n")
++		message (FATAL_ERROR "Unable to build \"kedr_gen\", aborting.")
++	endif ()
+ 
+-# ${KEDR_GEN_TOOL} is the path to "kedr_gen". The path can be used to call
+-# "kedr_gen" tool during the build of payload modules, etc.
+-set (KEDR_GEN_TOOL ${KEDR_GEN_INSTALL_PREFIX}/kedr_gen)
+-message (STATUS "Creating \"kedr_gen\" - done")
++	# Install kedr_gen
++	execute_process (
++		COMMAND make install
++		WORKING_DIRECTORY ${KEDR_GEN_TEMP_BUILD}
++		RESULT_VARIABLE kedr_gen_result
++		OUTPUT_VARIABLE kedr_gen_output
++		ERROR_VARIABLE  kedr_gen_output
++	)
++	if (NOT kedr_gen_result EQUAL 0)
++		message ("Failed to install \"kedr_gen\" to ${KEDR_GEN_INSTALL_PREFIX}.")
++		message ("Make output:\n${kedr_gen_output}\n")
++		message ("Make result:\n${kedr_gen_result}\n")
++		message (FATAL_ERROR "Unable to install \"kedr_gen\", aborting.")
++	endif ()
++
++	# ${KEDR_GEN_TOOL} is the path to "kedr_gen". The path can be used to call
++	# "kedr_gen" tool during the build of payload modules, etc.
++	set (KEDR_GEN_TOOL ${KEDR_GEN_INSTALL_PREFIX}/kedr_gen)
++	message (STATUS "Creating \"kedr_gen\" - done")
++endif()
+ #######################################################################
+ 
+ prepare_function_lookup()
++
+ #######################################################################
+ 
+ add_subdirectory(base)
+@@ -332,13 +369,22 @@
+ 
+ add_subdirectory(tools)
+ 
+-add_subdirectory(examples)
++#<>
++#add_subdirectory(examples)
+ 
++#<>
+ # Documentation
+-add_subdirectory(doc)
++#add_subdirectory(doc)
+ 
++#<>
+ # "Global" tests
+-add_subdirectory(tests)
++#add_subdirectory(tests)
+ #######################################################################
+ configure_file("${CMAKE_SOURCE_DIR}/config.h.in" "${CMAKE_BINARY_DIR}/config.h")
+ message(STATUS "Creating config.h - done")
++
++#######################################################################
++#<>
++#message (FATAL_ERROR "[DBG] Forced stop.")
++#<>
++
+diff --git a/sources/cmake/modules/FindKbuild.cmake b/sources/cmake/modules/FindKbuild.cmake
+--- a/sources/cmake/modules/FindKbuild.cmake
++++ b/sources/cmake/modules/FindKbuild.cmake
+@@ -5,9 +5,22 @@
+ # KBUILD_INCLUDE_DIR - /usr/src/linux-headers-${KBUILD_VERSION_STRING}/include
+ # KBUILD_FOUND - TRUE if all correct, FALSE otherwise
+ 
+-set(KBUILD_VERSION_STRING ${CMAKE_SYSTEM_VERSION} CACHE STRING "Kernel version for which KEDR is built.")
+-set(KBUILD_BUILD_DIR "/lib/modules/${KBUILD_VERSION_STRING}/build")
+-set(KBUILD_INCLUDE_DIRS "/usr/src/linux-headers-${KBUILD_VERSION_STRING}/include")
++if (NOT KBUILD_VERSION_STRING)
++	set(KBUILD_VERSION_STRING ${CMAKE_SYSTEM_VERSION} CACHE STRING 
++		"Kernel version for which KEDR is built."
++	)
++endif (NOT KBUILD_VERSION_STRING)
++
++if (NOT KBUILD_BUILD_DIR)
++	set(KBUILD_BUILD_DIR "/lib/modules/${KBUILD_VERSION_STRING}/build")
++endif (NOT KBUILD_BUILD_DIR)
++
++#set(KBUILD_BUILD_DIR "/lib/modules/${KBUILD_VERSION_STRING}/build")
++#set(KBUILD_INCLUDE_DIRS "/usr/src/linux-headers-${KBUILD_VERSION_STRING}/include")
++
++#<>
++set(KBUILD_INCLUDE_DIRS "NOT USED")
++#<>
+ 
+ # Note: only KBUILD_BUILD_DIR variable is really used in the project.
+ # Others variables defined only for FindModule architecture of CMake.
+diff --git a/sources/cmake/modules/kbuild_system.cmake b/sources/cmake/modules/kbuild_system.cmake
+--- a/sources/cmake/modules/kbuild_system.cmake
++++ b/sources/cmake/modules/kbuild_system.cmake
+@@ -1,5 +1,9 @@
+ include(cmake_useful)
+ 
++#<>
++set (ENV{KERNELDIR} "${KBUILD_BUILD_DIR}")
++#<>
++
+ # Where this CMake module is located
+ set(kbuild_this_module_dir "${CMAKE_SOURCE_DIR}/cmake/modules")
+ 
+@@ -170,12 +174,14 @@
+ 	if(kbuild_symbol_files)
+     	add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${name}.ko ${symvers_file}
+ 				COMMAND cat ${kbuild_symbol_files} >> ${symvers_file}
+-    			COMMAND $(MAKE) -C ${KBUILD_BUILD_DIR} M=${CMAKE_CURRENT_BINARY_DIR} modules
++    			COMMAND $(MAKE) ARCH=${KEDR_ARCH} CROSS_COMPILE=${KEDR_CROSS_COMPILE} 
++					-C ${KBUILD_BUILD_DIR} M=${CMAKE_CURRENT_BINARY_DIR} modules
+     			DEPENDS ${depend_files} ${kbuild_symbol_files}
+                 )
+ 	else(kbuild_symbol_files)
+     	add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${name}.ko ${symvers_file}
+-    			COMMAND $(MAKE) -C ${KBUILD_BUILD_DIR} M=${CMAKE_CURRENT_BINARY_DIR} modules
++    			COMMAND $(MAKE) ARCH=${KEDR_ARCH} CROSS_COMPILE=${KEDR_CROSS_COMPILE}
++					-C ${KBUILD_BUILD_DIR} M=${CMAKE_CURRENT_BINARY_DIR} modules
+     			DEPENDS ${depend_files}
+     			)
+ 	endif(kbuild_symbol_files)
+@@ -227,7 +233,8 @@
+ 	#create rules
+ 	list(APPEND clean_files_list "${CMAKE_CURRENT_BINARY_DIR}/Module.symvers")
+ 	add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${name}.o"
+-			COMMAND $(MAKE) -C ${KBUILD_BUILD_DIR} M=${CMAKE_CURRENT_BINARY_DIR}
++			COMMAND $(MAKE) ARCH=${KEDR_ARCH} CROSS_COMPILE=${KEDR_CROSS_COMPILE}
++				-C ${KBUILD_BUILD_DIR} M=${CMAKE_CURRENT_BINARY_DIR}
+ 			DEPENDS ${depend_files}
+ 			)
+ 
+@@ -297,4 +304,4 @@
+ 		)
+ 		list(APPEND ${clean_files_list} "${_kbuild_dir_part}${created_file}")
+ 	endforeach(created_file "${_kbuild_name}.o" ".${_kbuild_name}.o.cmd")
+-endmacro(_kbuild_add_clean_files_c c_source_noext_abs clean_files_list)
+\ No newline at end of file
++endmacro(_kbuild_add_clean_files_c c_source_noext_abs clean_files_list)
+diff --git a/sources/cmake/modules/kmodule.cmake b/sources/cmake/modules/kmodule.cmake
+--- a/sources/cmake/modules/kmodule.cmake
++++ b/sources/cmake/modules/kmodule.cmake
+@@ -1,6 +1,15 @@
+ set(kmodule_this_module_dir "${CMAKE_SOURCE_DIR}/cmake/modules/")
+ set(kmodule_test_sources_dir "${CMAKE_SOURCE_DIR}/cmake/kmodule_sources")
+ 
++set(kmodule_function_map_file "")
++if (CMAKE_CROSSCOMPILING)
++	set(kmodule_function_map_file "${KEDR_ROOT_DIR}/boot/System.map")
++endif (CMAKE_CROSSCOMPILING)
++
++#<>
++#message ("[DBG] kmodule_function_map_file is \"${kmodule_function_map_file}\"\n")
++#<>
++
+ # kmodule_try_compile(RESULT_VAR bindir srcfile
+ #           [COMPILE_DEFINITIONS flags]
+ #           [OUTPUT_VARIABLE var])
+@@ -29,10 +38,14 @@
+ 			)
+ 		endif(arg STREQUAL "COMPILE_DEFINITIONS")
+ 	endforeach(arg ${ARGN})
+-	set(cmake_params "-DSRC_FILE:path=${src_abs_path}")
++	set(cmake_params "-DSRC_FILE:path=${src_abs_path}" "-DKERNELDIR=${KBUILD_BUILD_DIR}")
+ 	if(DEFINED kmodule_cflags)
+ 		list(APPEND cmake_params "-Dkmodule_flags=${kmodule_cflags}")
+ 	endif(DEFINED kmodule_cflags)
++	
++#<>
++#	message ("[DBG0] Options: ${cmake_params}\n")
++#<>
+ 
+ 	if(DEFINED output_variable)
+ 		try_compile(result_tmp "${bindir}"
+@@ -86,16 +99,27 @@
+     if(DEFINED ${RESULT_VAR})
+         set(kmodule_is_function_exist_message "${kmodule_is_function_exist_message} [cached]")
+     else(DEFINED ${RESULT_VAR})
++
+         execute_process(
+-            COMMAND sh ${kmodule_is_function_exist_script} ${function_name}
++            COMMAND sh ${kmodule_is_function_exist_script} 
++				${function_name} ${kmodule_function_map_file}
+ 			WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+             RESULT_VARIABLE kmodule_is_function_exist_result
+             OUTPUT_QUIET)
++#<>
++#			OUTPUT_VARIABLE kifer_out)
++#			message ("[DBG] Out:\n${kifer_out}")
++#<>
++			
+         if (kmodule_is_function_exist_result EQUAL 0)
+             set(${RESULT_VAR} "TRUE" CACHE INTERNAL "Does ${function_name} exist in the kernel?")
+         elseif(kmodule_is_function_exist_result EQUAL 1)
+             set(${RESULT_VAR} "FALSE" CACHE INTERNAL "Does ${function_name} exist in the kernel?")
+         else(kmodule_is_function_exist_result EQUAL 0)
++            #<>
++            message ("[DBG] Result: ${kmodule_is_function_exist_result}")
++            #<>
++            
+             message(FATAL_ERROR 
+ "Cannot determine whether function '${function_name}' exists in the kernel"
+ 			)
+@@ -230,20 +254,26 @@
+ "${check_module_build_message} [cached] - ${MODULE_BUILD_SUPPORTED}"
+ 		)
+ 	else (DEFINED MODULE_BUILD_SUPPORTED)
+-		kmodule_try_compile(stack_trace_reliable_impl 
++		kmodule_try_compile(module_build_supported_impl 
+ 			"${CMAKE_BINARY_DIR}/check_module_build"
+ 			"${kmodule_test_sources_dir}/check_module_build/module.c"
++#			OUTPUT_VARIABLE module_build_supported_out
+ 		)
+-		if (stack_trace_reliable_impl)
++		
++#<>
++#		message ("[DBG]\n${module_build_supported_out}\n[/DBG]")
++#<>		
++		
++		if (module_build_supported_impl)
+ 			set(MODULE_BUILD_SUPPORTED "yes" CACHE INTERNAL
+ 				"Can kernel modules be built on this system?"
+ 			)
+-		else (stack_trace_reliable_impl)
++		else (module_build_supported_impl)
+ 			set(MODULE_BUILD_SUPPORTED "no")
+ 			message(FATAL_ERROR 
+ 				"Kernel modules cannot be built on this system"
+ 			)
+-		endif (stack_trace_reliable_impl)
++		endif (module_build_supported_impl)
+ 				
+ 		set(check_module_build_message 
+ "${check_module_build_message} - ${MODULE_BUILD_SUPPORTED}"
+@@ -269,7 +299,10 @@
+ 	else (DEFINED KERNEL_VERSION_OK)
+ 		string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" 
+ 			real_kernel_version_string
+-			"${CMAKE_SYSTEM_VERSION}"
++#<>
++#			"${CMAKE_SYSTEM_VERSION}"
++			"${KBUILD_VERSION_STRING}"
++#<>
+ 		)
+ 
+ 		if (real_kernel_version_string VERSION_LESS check_kernel_version_string)
+diff --git a/sources/cmake/modules/kmodule_files/CMakeLists.txt b/sources/cmake/modules/kmodule_files/CMakeLists.txt
+--- a/sources/cmake/modules/kmodule_files/CMakeLists.txt
++++ b/sources/cmake/modules/kmodule_files/CMakeLists.txt
+@@ -1,7 +1,14 @@
+ # Needed for all CMakeLists files, otherwise cmake will warn
+ cmake_minimum_required (VERSION 2.6)
+ 
+-set(KERNELDIR /lib/modules/$\(shell uname -r\)/build)
++if (NOT KERNELDIR)
++	set(KERNELDIR /lib/modules/${CMAKE_SYSTEM_VERSION}/build)
++endif (NOT KERNELDIR)
++
++#<>
++#message ("[DBG] KERNELDIR is ${KERNELDIR}")
++#<>
++
+ set(PWD $\(shell pwd\))
+ 
+ project(hello)
+@@ -21,8 +28,8 @@
+ add_custom_target(kmodule_compile ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/try_compile.ko)
+ # Rule to produce try_compile.ko from try_compile.c
+ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/try_compile.ko"
+-					COMMAND $(MAKE) -C ${KERNELDIR} M=${PWD} modules
+-					DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/try_compile.c")
++	COMMAND $(MAKE) ARCH=${KEDR_ARCH} CROSS_COMPILE=${KEDR_CROSS_COMPILE} -C ${KERNELDIR} M=${PWD} modules
++	DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/try_compile.c")
+ 
+ # Kbuild system cannot work with out-of-source build,
+ # so copy source file into build dir and rename it to try_compile.c.
+diff --git a/sources/cmake/modules/kmodule_files/scripts/lookup_kernel_function.sh b/sources/cmake/modules/kmodule_files/scripts/lookup_kernel_function.sh
+--- a/sources/cmake/modules/kmodule_files/scripts/lookup_kernel_function.sh
++++ b/sources/cmake/modules/kmodule_files/scripts/lookup_kernel_function.sh
+@@ -1,2 +1,14 @@
+ #!/bin/sh
+-grep -E "^[[:xdigit:]]+[[:space:]]+T[[:space:]]+$1$" /proc/kallsyms > /dev/null
+\ No newline at end of file
++# Usage: lookup_kernel_function.sh <function_name> [map_file]
++
++MAP_FILE=/proc/kallsyms
++if test -n "$2"; then
++	MAP_FILE="$2"
++fi
++
++if ! test -f "${MAP_FILE}"; then
++	printf "Symbol map file ${MAP_FILE} does not exist\n" 
++	exit 2
++fi
++
++grep -E "^[[:xdigit:]]+[[:space:]]+T[[:space:]]+$1$" "${MAP_FILE}" > /dev/null
+diff --git a/sources/cmake/modules/kmodule_files/scripts/lookup_kernel_function_hard.sh b/sources/cmake/modules/kmodule_files/scripts/lookup_kernel_function_hard.sh
+--- a/sources/cmake/modules/kmodule_files/scripts/lookup_kernel_function_hard.sh
++++ b/sources/cmake/modules/kmodule_files/scripts/lookup_kernel_function_hard.sh
+@@ -9,7 +9,7 @@
+ # to prepare the source code of the probe modules.
+ ########################################################################
+ 
+-if test $# -ne 1; then
++if test $# -gt 2; then
+     echo "Usage: $0 <function>"
+     exit 2
+ fi
+@@ -25,10 +25,20 @@
+ 	exit 2
+ fi
+ 
++MAP_FILE=/proc/kallsyms
++if test -n "$2"; then
++	MAP_FILE="$2"
++fi
++
++if ! test -f "${MAP_FILE}"; then
++	printf "Symbol map file ${MAP_FILE} does not exist\n" > /dev/stderr
++	exit 2
++fi
++
+ # First look through /proc/kallsyms. If the function is listed there,
+ # this script additionally tries to compile a probe module that calls it
+ # to verify it is usable.
+-grep -E "^[[:xdigit:]]+[[:space:]]+T[[:space:]]+${FUNC_NAME}$" /proc/kallsyms > /dev/null
++grep -E "^[[:xdigit:]]+[[:space:]]+T[[:space:]]+${FUNC_NAME}$" "${MAP_FILE}" > /dev/null
+ RESULT_CODE=$?
+ if test ${RESULT_CODE} -ne 0; then
+ 	# not found or error occured
+@@ -36,12 +46,14 @@
+ fi
+ 
+ if ! test -d "${TOP_PROBES_DIR}/${FUNC_NAME}"; then
+-	printf "Directory ${TOP_PROBES_DIR}/${FUNC_NAME} does not exist\n"
++	printf "Directory ${TOP_PROBES_DIR}/${FUNC_NAME} does not exist\n" > /dev/stderr
+ 	exit 2
+ fi
+ 
+-make -C "${TOP_PROBES_DIR}/${FUNC_NAME}" clean > /dev/null 2>&1
+-make -C "${TOP_PROBES_DIR}/${FUNC_NAME}" > /dev/null 2>&1
++make ARCH=${KEDR_ARCH} CROSS_COMPILE=${KEDR_CROSS_COMPILE} \
++	-C "${TOP_PROBES_DIR}/${FUNC_NAME}" clean > /dev/null 2>&1
++make ARCH=${KEDR_ARCH} CROSS_COMPILE=${KEDR_CROSS_COMPILE} \
++	-C "${TOP_PROBES_DIR}/${FUNC_NAME}" > /dev/null 2>&1
+ if test $? -ne 0; then
+ 	exit 1
+ fi
+diff --git a/sources/cmake/platform/chromium-x86-generic.cmake b/sources/cmake/platform/chromium-x86-generic.cmake
+new file mode 100644
+--- /dev/null
++++ b/sources/cmake/platform/chromium-x86-generic.cmake
+@@ -0,0 +1,9 @@
++# Cross-compile stuff
++set (KEDR_BOARD "x86-generic")
++set (KEDR_ARCH "i386")
++set (KEDR_CROSS_COMPILE "i686-pc-linux-gnu-")
++set (KEDR_ROOT_DIR "/build/${KEDR_BOARD}")
++
++set (CMAKE_SYSTEM_NAME "Linux")
++set (CMAKE_SYSTEM_VERSION "2.6.32.26+drm33.12")
++set (CMAKE_C_COMPILER "${KEDR_CROSS_COMPILE}gcc")
+diff --git a/sources/examples/counters/CMakeLists.txt b/sources/examples/counters/CMakeLists.txt
+--- a/sources/examples/counters/CMakeLists.txt
++++ b/sources/examples/counters/CMakeLists.txt
+@@ -20,7 +20,7 @@
+ )
+ 
+ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.ko"
+-    COMMAND $(MAKE) -f makefile_test
++    COMMAND $(MAKE) ARCH=${KEDR_ARCH} CROSS_COMPILE=${KEDR_CROSS_COMPILE} -f makefile_test
+     DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/counters.c"
+             "${CMAKE_CURRENT_BINARY_DIR}/counters.h"
+             "${CMAKE_CURRENT_BINARY_DIR}/makefile_installed"
+diff --git a/sources/examples/custom_indicator_fsim/CMakeLists.txt b/sources/examples/custom_indicator_fsim/CMakeLists.txt
+--- a/sources/examples/custom_indicator_fsim/CMakeLists.txt
++++ b/sources/examples/custom_indicator_fsim/CMakeLists.txt
+@@ -101,7 +101,7 @@
+ 
+ 
+ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.ko"
+-        COMMAND $(MAKE) -f makefile_test
++        COMMAND $(MAKE) ARCH=${KEDR_ARCH} CROSS_COMPILE=${KEDR_CROSS_COMPILE} -f makefile_test
+         DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/indicator.data"
+ 				${additional_sources_test}
+                 "${CMAKE_CURRENT_BINARY_DIR}/makefile_test"
+diff --git a/sources/examples/custom_payload_callm/CMakeLists.txt b/sources/examples/custom_payload_callm/CMakeLists.txt
+--- a/sources/examples/custom_payload_callm/CMakeLists.txt
++++ b/sources/examples/custom_payload_callm/CMakeLists.txt
+@@ -67,7 +67,7 @@
+ add_dependencies("custom_payload_callm" "custom_payload_callm_templates")
+ 
+ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.ko"
+-        COMMAND $(MAKE) -f makefile_test
++        COMMAND $(MAKE) ARCH=${KEDR_ARCH} CROSS_COMPILE=${KEDR_CROSS_COMPILE} -f makefile_test
+         DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/payload.data"
+                 "${CMAKE_CURRENT_BINARY_DIR}/makefile_test"
+                 "${CMAKE_CURRENT_BINARY_DIR}/Kbuild"
+diff --git a/sources/examples/custom_payload_fsim/CMakeLists.txt b/sources/examples/custom_payload_fsim/CMakeLists.txt
+--- a/sources/examples/custom_payload_fsim/CMakeLists.txt
++++ b/sources/examples/custom_payload_fsim/CMakeLists.txt
+@@ -67,7 +67,7 @@
+ add_dependencies("custom_payload_fsim" "custom_payload_fsim_templates")
+ 
+ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.ko"
+-        COMMAND $(MAKE) -f makefile_test
++        COMMAND $(MAKE) ARCH=${KEDR_ARCH} CROSS_COMPILE=${KEDR_CROSS_COMPILE} -f makefile_test
+         DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/payload.data"
+                 "${CMAKE_CURRENT_BINARY_DIR}/makefile_test"
+                 "${CMAKE_CURRENT_BINARY_DIR}/Kbuild"
+diff --git a/sources/examples/sample_fsim_payload/CMakeLists.txt b/sources/examples/sample_fsim_payload/CMakeLists.txt
+--- a/sources/examples/sample_fsim_payload/CMakeLists.txt
++++ b/sources/examples/sample_fsim_payload/CMakeLists.txt
+@@ -20,7 +20,7 @@
+                 )
+ 
+ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.ko"
+-        COMMAND $(MAKE) -f makefile_test
++        COMMAND $(MAKE) ARCH=${KEDR_ARCH} CROSS_COMPILE=${KEDR_CROSS_COMPILE} -f makefile_test
+         DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/sample_fsim_payload.c"
+                 "${CMAKE_CURRENT_BINARY_DIR}/makefile_test"
+                 "${CMAKE_CURRENT_BINARY_DIR}/Kbuild"
+diff --git a/sources/examples/sample_indicator/CMakeLists.txt b/sources/examples/sample_indicator/CMakeLists.txt
+--- a/sources/examples/sample_indicator/CMakeLists.txt
++++ b/sources/examples/sample_indicator/CMakeLists.txt
+@@ -20,7 +20,7 @@
+                 )
+ 
+ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.ko"
+-        COMMAND $(MAKE) -f makefile_test
++        COMMAND $(MAKE) ARCH=${KEDR_ARCH} CROSS_COMPILE=${KEDR_CROSS_COMPILE} -f makefile_test
+         DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/sample_indicator.c"
+                 "${CMAKE_CURRENT_BINARY_DIR}/makefile_test"
+                 "${CMAKE_CURRENT_BINARY_DIR}/Kbuild"
+diff --git a/sources/examples/sample_target/CMakeLists.txt b/sources/examples/sample_target/CMakeLists.txt
+--- a/sources/examples/sample_target/CMakeLists.txt
++++ b/sources/examples/sample_target/CMakeLists.txt
+@@ -11,7 +11,7 @@
+                 )
+ 
+ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.ko"
+-        COMMAND $(MAKE) -f makefile_installed
++        COMMAND $(MAKE) ARCH=${KEDR_ARCH} CROSS_COMPILE=${KEDR_CROSS_COMPILE} -f makefile_installed
+         DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/cfake.c"
+                 "${CMAKE_CURRENT_BINARY_DIR}/cfake.h"
+                 "${CMAKE_CURRENT_BINARY_DIR}/makefile_installed"
+diff --git a/sources/tools/CMakeLists.txt b/sources/tools/CMakeLists.txt
+--- a/sources/tools/CMakeLists.txt
++++ b/sources/tools/CMakeLists.txt
+@@ -1,7 +1,9 @@
+ add_subdirectory(control)
+ add_subdirectory(capture_trace)
+ 
++#<>
+ # Here "kedr_gen" will be built for standalone usage (rather than to build 
+ # KEDR itself)
+-set (KEDR_GEN_INSTALL_PREFIX ${KEDR_INSTALL_PREFIX_EXEC_AUX})
+-add_subdirectory(kedr_gen)
++#set (KEDR_GEN_INSTALL_PREFIX ${KEDR_INSTALL_PREFIX_EXEC_AUX})
++#add_subdirectory(kedr_gen)
++#<>
+diff --git a/sources/tools/kedr_gen/CMakeLists.txt b/sources/tools/kedr_gen/CMakeLists.txt
+--- a/sources/tools/kedr_gen/CMakeLists.txt
++++ b/sources/tools/kedr_gen/CMakeLists.txt
+@@ -1,1 +1,3 @@
++cmake_minimum_required (VERSION 2.6)
++
+ add_subdirectory(src)
+diff --git a/sources/tools/kedr_gen/src/CMakeLists.txt b/sources/tools/kedr_gen/src/CMakeLists.txt
+--- a/sources/tools/kedr_gen/src/CMakeLists.txt
++++ b/sources/tools/kedr_gen/src/CMakeLists.txt
+@@ -3,6 +3,9 @@
+ #######################################################################
+ # Name of the subproject and of the application
+ project (kedr_gen)
++enable_language (C)
++enable_language(CXX)
++
+ set (KEDR_GEN_APP ${PROJECT_NAME})
+ 
+ #######################################################################
