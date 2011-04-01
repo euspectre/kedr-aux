@@ -1,0 +1,441 @@
+# This module processes the calls to the functions dealing with socket
+# buffers ('skb'). These functions are commonly used in network drivers, 
+# etc.
+
+module.name = kedr_fsim_skb
+module.author = Eugene A. Shatokhin
+module.license = GPL
+
+header =>>
+/* ========================================================================
+ * Copyright (C) 2010-2011, Institute for System Programming 
+ *                          of the Russian Academy of Sciences (ISPRAS)
+ * Authors: 
+ *      Eugene A. Shatokhin <spectre@ispras.ru>
+ *      Andrey V. Tsyvarev  <tsyvarev@ispras.ru>
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published
+ * by the Free Software Foundation.
+ ======================================================================== */
+
+#include <linux/skbuff.h>
+#include <linux/netdevice.h>
+<<
+#######################################################################
+
+[group]
+	# Name and return type of the target function
+	function.name = __alloc_skb
+	returnType = struct sk_buff *
+
+	# Names and types of the arguments of the target function
+	arg.type = unsigned int
+	arg.name = size
+
+    arg.type = gfp_t 
+	arg.name = gfp_mask
+
+    arg.type = int
+	arg.name = fclone
+
+    arg.type = int
+	arg.name = node
+
+	# The parameters to be output to the trace. 
+
+	trace.param.type = unsigned int
+	trace.param.name = size
+
+    trace.param.type = unsigned int
+	trace.param.name = gfp_mask
+
+    trace.param.type = int
+	trace.param.name = fclone
+
+    trace.param.type = int
+	trace.param.name = node
+
+	trace.param.type = void *
+	trace.param.name = returnValue
+
+	# The format string to be used for trace output.
+	trace.formatString = "arguments: (size=%u, gfp_mask=%x, fclone=%d, node=%d), result: %p"
+
+	# Fault Simulation
+	fpoint.fault_code =	returnValue = NULL;
+
+# End of the group of definitions for __alloc_skb().
+#######################################################################
+
+[group]
+	# Name and return type of the target function
+	function.name = __netdev_alloc_skb
+	returnType = struct sk_buff *
+
+	# Names and types of the arguments of the target function
+	arg.type = struct net_device *
+	arg.name = dev
+
+    arg.type = unsigned int
+	arg.name = length
+
+    arg.type = gfp_t 
+	arg.name = gfp_mask
+
+	# The parameters to be output to the trace. 
+	trace.param.type = void *
+	trace.param.name = dev
+
+    trace.param.type = unsigned int
+	trace.param.name = length
+
+    trace.param.type = unsigned int
+	trace.param.name = gfp_mask
+
+	trace.param.type = void *
+	trace.param.name = returnValue
+
+	# The format string to be used for trace output.
+	trace.formatString = "arguments: (dev=%p, length=%u, gfp_mask=%x), result: %p"
+
+	# Fault Simulation
+	fpoint.reuse_point = __alloc_skb
+	fpoint.fault_code =	returnValue = NULL;
+
+# End of the group of definitions for __netdev_alloc_skb().
+#######################################################################
+
+[group]
+	# Name and return type of the target function
+	function.name = dev_alloc_skb
+	returnType = struct sk_buff *
+
+	# Names and types of the arguments of the target function
+	arg.type = unsigned int
+	arg.name = length
+
+    # The parameters to be output to the trace. 
+	trace.param.type = unsigned int
+	trace.param.name = length
+
+	trace.param.type = void *
+	trace.param.name = returnValue
+
+	# The format string to be used for trace output.
+	trace.formatString = "arguments: (length=%u), result: %p"
+
+	# Fault Simulation
+	fpoint.reuse_point = __alloc_skb
+	fpoint.fault_code =	returnValue = NULL;
+
+# End of the group of definitions for dev_alloc_skb().
+#######################################################################
+
+[group]
+	# Name and return type of the target function
+	function.name = skb_clone
+	returnType = struct sk_buff *
+
+	# Names and types of the arguments of the target function
+	arg.type = struct sk_buff *
+	arg.name = skb
+
+    arg.type = gfp_t 
+	arg.name = gfp_mask
+
+	# The parameters to be output to the trace. 
+	trace.param.type = void *
+	trace.param.name = skb
+
+    trace.param.type = unsigned int
+	trace.param.name = gfp_mask
+
+	trace.param.type = void *
+	trace.param.name = returnValue
+
+	# The format string to be used for trace output.
+	trace.formatString = "arguments: (skb=%p, gfp_mask=%x), result: %p"
+
+	# Fault Simulation
+	fpoint.reuse_point = __alloc_skb
+	fpoint.fault_code =	returnValue = NULL;
+
+# End of the group of definitions for skb_clone().
+#######################################################################
+
+[group]
+	# Name and return type of the target function
+	function.name = skb_copy
+	returnType = struct sk_buff *
+
+	# Names and types of the arguments of the target function
+	arg.type = const struct sk_buff *
+	arg.name = skb
+
+    arg.type = gfp_t 
+	arg.name = gfp_mask
+
+	# The parameters to be output to the trace. 
+	trace.param.type = const void *
+	trace.param.name = skb
+
+    trace.param.type = unsigned int
+	trace.param.name = gfp_mask
+
+	trace.param.type = void *
+	trace.param.name = returnValue
+
+	# The format string to be used for trace output.
+	trace.formatString = "arguments: (skb=%p, gfp_mask=%x), result: %p"
+
+	# Fault Simulation
+	fpoint.reuse_point = __alloc_skb
+	fpoint.fault_code =	returnValue = NULL;
+
+# End of the group of definitions for skb_copy().
+#######################################################################
+
+[group]
+	# Name and return type of the target function
+	function.name = kfree_skb
+
+	# Names and types of the arguments of the target function
+	arg.type = struct sk_buff *
+	arg.name = skb
+	
+	# The parameters to be output to the trace. 
+	trace.param.type = void *
+	trace.param.name = skb
+
+	# Happens-before relationship with __alloc_skb() and similar functions
+	trace.happensBefore = yes
+
+	# The format string to be used for trace output.
+	trace.formatString = "arguments: (%p)"
+
+# End of the group of definitions for kfree_skb().
+#######################################################################
+
+[group]
+	# Name and return type of the target function
+	function.name = __kfree_skb
+
+	# Names and types of the arguments of the target function
+	arg.type = struct sk_buff *
+	arg.name = skb
+	
+	# The parameters to be output to the trace. 
+	trace.param.type = void *
+	trace.param.name = skb
+
+	# Happens-before relationship with __alloc_skb() and similar functions
+	trace.happensBefore = yes
+
+	# The format string to be used for trace output.
+	trace.formatString = "arguments: (%p)"
+
+# End of the group of definitions for __kfree_skb().
+#######################################################################
+
+[group]
+	# Name and return type of the target function
+	function.name = consume_skb
+
+	# Names and types of the arguments of the target function
+	arg.type = struct sk_buff *
+	arg.name = skb
+	
+	# The parameters to be output to the trace. 
+	trace.param.type = void *
+	trace.param.name = skb
+
+	# Happens-before relationship with __alloc_skb() and similar functions
+	trace.happensBefore = yes
+
+	# The format string to be used for trace output.
+	trace.formatString = "arguments: (%p)"
+
+# End of the group of definitions for consume_skb().
+#######################################################################
+
+[group]
+	# Name and return type of the target function
+	function.name = dev_kfree_skb_any
+
+	# Names and types of the arguments of the target function
+	arg.type = struct sk_buff *
+	arg.name = skb
+	
+	# The parameters to be output to the trace. 
+	trace.param.type = void *
+	trace.param.name = skb
+
+	# Happens-before relationship with __alloc_skb() and similar functions
+	trace.happensBefore = yes
+
+	# The format string to be used for trace output.
+	trace.formatString = "arguments: (%p)"
+
+# End of the group of definitions for dev_kfree_skb_any().
+#######################################################################
+
+[group]
+	# Name and return type of the target function
+	function.name = dev_kfree_skb_irq
+
+	# Names and types of the arguments of the target function
+	arg.type = struct sk_buff *
+	arg.name = skb
+	
+	# The parameters to be output to the trace. 
+	trace.param.type = void *
+	trace.param.name = skb
+
+	# Happens-before relationship with __alloc_skb() and similar functions
+	trace.happensBefore = yes
+
+	# The format string to be used for trace output.
+	trace.formatString = "arguments: (%p)"
+
+# End of the group of definitions for dev_kfree_skb_irq().
+#######################################################################
+
+[group]
+	# Name and return type of the target function
+	function.name = pskb_expand_head
+	returnType = int
+
+	# Names and types of the arguments of the target function
+	arg.type = struct sk_buff *
+	arg.name = skb
+
+    arg.type = int
+	arg.name = nhead
+
+    arg.type = int
+	arg.name = ntail
+	
+	arg.type = gfp_t 
+	arg.name = gfp_mask
+
+	# The parameters to be output to the trace. 
+	trace.param.type = void *
+	trace.param.name = skb
+
+    trace.param.type = int
+	trace.param.name = nhead
+
+    trace.param.type = int
+	trace.param.name = ntail
+
+    trace.param.type = unsigned int
+	trace.param.name = gfp_mask
+
+	trace.param.type = void *
+	trace.param.name = returnValue
+
+	# The format string to be used for trace output.
+	trace.formatString = "arguments: (skb=%p, nhead=%d, ntail=%d, gfp_mask=%x), result: %p"
+
+	# Fault Simulation
+	fpoint.reuse_point = __alloc_skb
+	fpoint.fault_code =	returnValue = -ENOMEM;
+
+# End of the group of definitions for pskb_expand_head().
+#######################################################################
+
+[group]
+	# Name and return type of the target function
+	function.name = ___pskb_trim
+	returnType = int
+
+	# Names and types of the arguments of the target function
+	arg.type = struct sk_buff *
+	arg.name = skb
+
+    arg.type = unsigned int 
+	arg.name = len
+
+	# The parameters to be output to the trace. 
+	trace.param.type = void *
+	trace.param.name = skb
+
+    trace.param.type = unsigned int
+	trace.param.name = len
+
+	trace.param.type = void *
+	trace.param.name = returnValue
+
+	# The format string to be used for trace output.
+	trace.formatString = "arguments: (skb=%p, len=%u), result: %p"
+
+	# Fault Simulation
+	fpoint.reuse_point = __alloc_skb
+	fpoint.fault_code =	returnValue = -ENOMEM;
+
+# End of the group of definitions for ___pskb_trim().
+#######################################################################
+
+[group]
+	# Name and return type of the target function
+	function.name = __pskb_pull_tail
+	returnType = unsigned char *
+
+	# Names and types of the arguments of the target function
+	arg.type = struct sk_buff *
+	arg.name = skb
+
+    arg.type = int
+	arg.name = delta
+
+	# The parameters to be output to the trace. 
+	trace.param.type = void *
+	trace.param.name = skb
+
+    trace.param.type = int
+	trace.param.name = delta
+
+	trace.param.type = void *
+	trace.param.name = returnValue
+
+	# The format string to be used for trace output.
+	trace.formatString = "arguments: (skb=%p, delta=%d), result: %p"
+
+	# Fault Simulation
+	fpoint.fault_code =	returnValue = NULL;
+
+# End of the group of definitions for __pskb_pull_tail().
+#######################################################################
+
+[group]
+	# Name and return type of the target function
+	function.name = pskb_copy
+	returnType = struct sk_buff *
+
+	# Names and types of the arguments of the target function
+	arg.type = struct sk_buff *
+	arg.name = skb
+
+    arg.type = gfp_t 
+	arg.name = gfp_mask
+
+	# The parameters to be output to the trace. 
+	trace.param.type = void *
+	trace.param.name = skb
+
+    trace.param.type = unsigned int
+	trace.param.name = gfp_mask
+
+	trace.param.type = void *
+	trace.param.name = returnValue
+
+	# The format string to be used for trace output.
+	trace.formatString = "arguments: (skb=%p, gfp_mask=%x), result: %p"
+
+	# Fault Simulation
+	fpoint.reuse_point = __alloc_skb
+	fpoint.fault_code =	returnValue = NULL;
+
+# End of the group of definitions for pskb_copy().
+#######################################################################
