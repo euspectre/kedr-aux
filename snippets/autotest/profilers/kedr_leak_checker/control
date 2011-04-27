@@ -1,0 +1,16 @@
+TIME="SHORT"
+AUTHOR = "Tsyvarev Andrew"
+DOC = """
+Using KEDR leak check as a profiler
+"""
+NAME = 'kedr_leak_checker'
+TEST_CLASS = 'kernel'
+TEST_CATEGORY = 'Functional'
+TEST_TYPE = 'client'
+
+KEDR_INSTALL_DIR='/home/andrew/kedr-builds/work/install'
+job.profilers.add('kedr_leak_checker',
+    target_name = 'kedr_sample_target',
+    kedr_install_dir = KEDR_INSTALL_DIR)
+job.run_test('sample_test', kedr_install_dir = KEDR_INSTALL_DIR)
+job.profilers.delete('kedr_leak_checker')

@@ -1,0 +1,16 @@
+TIME="SHORT"
+AUTHOR = "Tsyvarev Andrew"
+DOC = """
+Using KEDR call monitor as a profiler
+"""
+NAME = 'kedr_call_monitor'
+TEST_CLASS = 'kernel'
+TEST_CATEGORY = 'Functional'
+TEST_TYPE = 'client'
+
+KEDR_INSTALL_DIR='/home/andrew/kedr-builds/work/install'
+job.profilers.add('kedr_call_monitor',
+    target_name = 'kedr_sample_target',
+    kedr_install_dir = KEDR_INSTALL_DIR)
+job.run_test('sample_test', kedr_install_dir = KEDR_INSTALL_DIR)
+job.profilers.delete('kedr_call_monitor')

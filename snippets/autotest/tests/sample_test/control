@@ -1,0 +1,12 @@
+TIME="SHORT"
+AUTHOR = "Tsyvarev Andrew"
+DOC = """
+Sample test
+"""
+NAME = 'sample'
+TEST_CLASS = 'kernel'
+TEST_CATEGORY = 'Functional'
+TEST_TYPE = 'client'
+
+KEDR_INSTALL_DIR = '/home/andrew/kedr-builds/work/install'
+job.run_test('sample_test', kedr_install_dir = KEDR_INSTALL_DIR)

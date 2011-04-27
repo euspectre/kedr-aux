@@ -1,0 +1,26 @@
+Examples of using KEDR with autotest.
+
+'profilers' directory contain two profilers(in sence of autotest terminology): kedr_leack_checker and kedr_call_monitor.
+First of them run KEDR with leak check payload during the test and store resulting leak_check files into 'kedr_leack_checker' subdirectory of profilers.
+Second one run KEDR with call monitor payloads during the test and store resulting trace into 'kedr_call_monitor' subdirectory of profilers.
+
+'tests' directory contain test involving kedr_sample_target module. This test is used for profilers.
+
+INSTALL:
+'profilers' and 'tests' directories should be copied into 'client' subdirectory of autotest.
+Then, KEDR_INSTALL_DIR parameter should be set correctly in all 'control' files (for both profilers and for test).
+
+EXECUTE:
+Change directory to 'client' subdirectory of autotest. All commands should be executed with root privileges.
+
+For run the test without profilers:
+    bin/autotest tests/sample_test/control
+
+For run the test under kedr_leak_checker profiler:
+    bin/autotest profilers/kedr_leak_checker/control
+
+For run the test under kedr_call_monitor profiler:
+    bin/autotest profilers/kedr_call_monitor/control
+
+Note, that, when running under profiler, first iteration of the test will be executed without profiler, and second one - with corresponded profiler.
+So, profiler reports will be stored under 'results/default/sample_test/profiling/iteration.2'.
