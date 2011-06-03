@@ -218,7 +218,7 @@ debug_read_common(struct file *filp, char __user *buf, size_t count,
 
 	if (mutex_lock_killable(ob->lock) != 0)
 	{
-		pr_warn("[sample] debug_read_common: "
+		pr_warning("[sample] debug_read_common: "
 			"got a signal while trying to acquire a mutex.\n");
 		return -EINTR;
 	}
@@ -331,7 +331,7 @@ debug_util_print_string(const char *s)
     
 	if (mutex_lock_killable(output_buffer.lock) != 0)
 	{
-		pr_warn("[sample] debug_util_print_string: "
+		pr_warning("[sample] debug_util_print_string: "
 			"got a signal while trying to acquire a mutex.\n");
 		return;
 	}
@@ -348,7 +348,7 @@ debug_util_print_raw_bytes(const void *bytes, unsigned int count)
     
 	if (mutex_lock_killable(output_buffer.lock) != 0)
 	{
-		pr_warn("[sample] debug_util_print_raw_bytes: "
+		pr_warning("[sample] debug_util_print_raw_bytes: "
 			"got a signal while trying to acquire a mutex.\n");
 		return;
 	}
@@ -397,7 +397,7 @@ debug_util_print_hex_bytes(const void *bytes, unsigned int count)
 	
 	if (mutex_lock_killable(output_buffer.lock) != 0)
 	{
-		pr_warn("[sample] debug_util_print_hex_bytes: "
+		pr_warning("[sample] debug_util_print_hex_bytes: "
 			"got a signal while trying to acquire a mutex.\n");
 		return;
 	}

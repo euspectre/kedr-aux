@@ -3,9 +3,6 @@
  * 
  * Unless specifically stated, the function returning int return 0 on 
  * success and a negative error code on failure. */
- 
-// TODO: delete the elements of func->blocks and func->jump_tables when
-// appropriate.
 
 #include <linux/kernel.h>
 #include <linux/kallsyms.h>
@@ -784,12 +781,12 @@ resolve_jtables_overlaps(struct kedr_jump_table *jtable,
 		 * a pointer to unsigned long. */
 		WARN_ON(jtable->addr + jtable->num != pos->addr + pos->num);
 		//<>
-		if (jtable->addr + jtable->num != pos->addr + pos->num) {
+		/*if (jtable->addr + jtable->num != pos->addr + pos->num) {
 			pr_info("[DBG] jtable at %p with %u elems; "
 				"pos at %p with %u elems\n",
 				jtable->addr, jtable->num,
 				pos->addr, pos->num);
-		}
+		}*/
 		//<>
 		
 		if (jtable->addr == pos->addr) {
@@ -851,7 +848,7 @@ handle_jmp_near_indirect(struct insn *insn,
 	/* Sanity check: jtable_addr should point to some location within
 	 * the module. */
 	if (!in_core && !in_init) {
-		pr_warn("[sample] Spurious jump table (?) at %p "
+		pr_warning("[sample] Spurious jump table (?) at %p "
 			"referred to by jmp at %pS, leaving it as is.\n",
 			(void *)jtable_addr,
 			insn->kaddr);
@@ -1125,13 +1122,13 @@ prepare_blocks(struct kedr_tmod_function *func, struct module *mod)
 	WARN_ON(ddbb.block_offsets[ddbb.num - 1] != (u32)func->size);
 	
 	//<>
-	if (ddbb.block_offsets[ddbb.num - 1] != (u32)func->size) {
+	/*if (ddbb.block_offsets[ddbb.num - 1] != (u32)func->size) {
 		debug_util_print_string("Offsets: \n");
 		for (i = 0; i < ddbb.num; ++i) {
 			debug_util_print_u64((u64)ddbb.block_offsets[i], 
 				"%llx\n");
 		}
-	}
+	}*/
 	//<>
 
 	i = 0;
@@ -1335,16 +1332,3 @@ kedr_process_target(struct module *mod)
 	return 0;
 }
 /* ====================================================================== */
-
-	//<> [DBG]
-	/*if (dest) {
-		debug_util_print_string(ddbb->func->name);
-		debug_util_print_string("+");
-		debug_util_print_u64((u64)((unsigned long)insn->kaddr - 
-				(unsigned long)ddbb->func->addr), 
-			"0x%llx");
-		debug_util_print_string(": to ");
-		debug_util_print_u64((u64)dest, "0x%llx");
-		debug_util_print_string("\n");
-	}*/
-	//<>

@@ -109,7 +109,7 @@ on_module_load(struct module *mod)
 		goto cleanup_func_and_fail;
 	}
 
-	// TODO
+	// TODO: more processing if necessary
 	return;
 	
 cleanup_func_and_fail: 
@@ -135,7 +135,7 @@ on_module_unload(struct module *mod)
 		module_name(mod));
 	
 	if (!module_get_failed) {
-		// TODO
+		// TODO: cleanup what is left (if anything)
 		kedr_cleanup_function_subsystem();
 		module_put(THIS_MODULE);
 	}
@@ -153,7 +153,7 @@ detector_notifier_call(struct notifier_block *nb,
     
 	if (mutex_lock_interruptible(&target_module_mutex) != 0)
 	{
-		pr_warn("[sample] "
+		pr_warning("[sample] "
 		"failed to lock target_module_mutex\n");
 		return 0;
 	}

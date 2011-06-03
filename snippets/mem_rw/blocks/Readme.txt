@@ -37,15 +37,14 @@ For each function "kedr_sample" outputs the maximum size of a block (in bytes) v
 Tested on the following systems (modules: wacom, btrfs, xfs, nfs, e1000, ...):
 - OpenSUSE 11.4 x86-64, kernel 2.6.37
 - Fedora 15 x86, kernel 2.6.38 (PAE)
-
-Currently, it will not build on systems with kernel older than 2.6.35: pr_*() functions are not available there.
+- OpenSUSE 11.3 x86, kernel 2.6.34
 
 TODO:
 Ubuntu 11.04 x86-64, kernel 2.6.38
 Fedora 14 x86-64, kernel 2.6.35
 OpenSUSE 11.3 x86, vanilla kernel 2.6.39-rc4
 Debian 6 x86, kernel 2.6.32
-OpenSUSE 11.3 x86, kernel 2.6.34
+Debian 6 x86-64, kernel 2.6.32
 RHEL6 x86-64, kernel 2.6.32
 RHEL6 x86-64, kernel 2.6.32-debug
 Mandriva 2010 x86, kernel 2.6.31
