@@ -588,6 +588,11 @@ processTargetMachines()
     
     printMessage "Machine list file: $1\n"
     
+    printSeparator
+    cat "$1"
+    cat "$1" >> "${MAIN_LOG}"
+    printSeparator
+    
     OLD_IFS=${IFS}
     IFS="${NEWLINE}"
 
