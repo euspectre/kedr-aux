@@ -385,8 +385,6 @@ execCommandOnTarget()
     printf "Executing: ${exec_command}\n"
     expect  -c "set timeout ${exec_timeout}" \
         -c "spawn ssh ${VM_USER}@${exec_ip} \"${exec_command}\"" \
-        -c "expect -ex \":\"" \
-        -c "send \"${VM_PASS}\n\"" \
         -c "expect eof"
     } >> "${MAIN_LOG}" 2>&1
 }
@@ -418,8 +416,6 @@ uploadToTarget()
     {
     expect  -c "set timeout ${VM_TIMEOUT}" \
         -c "spawn scp \"${upload_what}\" ${VM_USER}@${upload_ip}:${upload_where}" \
-        -c "expect -ex \":\"" \
-        -c "send \"${VM_PASS}\n\"" \
         -c "expect eof"
     } >> "${MAIN_LOG}" 2>&1
 }
@@ -452,8 +448,6 @@ downloadFromTarget()
     {
     expect  -c "set timeout ${VM_TIMEOUT}" \
         -c "spawn scp ${VM_USER}@${download_ip}:${download_what} \"${download_where}\"" \
-        -c "expect -ex \":\"" \
-        -c "send \"${VM_PASS}\n\"" \
         -c "expect eof"
     } >> "${MAIN_LOG}" 2>&1
 }
