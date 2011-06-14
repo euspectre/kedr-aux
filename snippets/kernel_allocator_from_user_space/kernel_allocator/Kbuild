@@ -1,0 +1,3 @@
+obj-m := kernel_allocator.o
+
+kernel_allocator-objs := allocator.o

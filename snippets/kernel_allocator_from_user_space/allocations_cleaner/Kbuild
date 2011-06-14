@@ -1,0 +1,3 @@
+obj-m := allocations_cleaner.o
+
+allocations_cleaner-objs := cleaner.o
