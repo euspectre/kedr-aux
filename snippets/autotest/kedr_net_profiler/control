@@ -1,0 +1,19 @@
+AUTHOR = "Andrey Tsyvarev"
+NAME = "network_test_with_KEDR"
+TIME = "SHORT"
+TEST_CATEGORY = "Functional"
+TEST_CLASS = "General"
+TEST_TYPE = "client"
+
+DOC = """
+Run network test with KEDR LeakCheck running as a profiler.
+"""
+
+# Dependencies between kernel modules and network interfaces.
+module_interface_dependencies = (('forcedeth', 'eth0'),)
+
+job.profilers.add('kedr_net_profiler',
+    module_name = 'forcedeth',
+    module_interface_dependencies = module_interface_dependencies)
+job.run_test('network_Ping')
+job.profilers.delete('kedr_net_profiler')
