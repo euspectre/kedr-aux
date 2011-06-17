@@ -1,0 +1,8 @@
+Allow to call kfree "from user space".
+
+After loading of module, command 
+
+<debugfs>/allocations_cleaner/kfree <addr>
+
+will call free(<addr>), where <addr> is interpreted as hexadecimal integer.
+

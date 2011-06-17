@@ -1,0 +1,4 @@
+Useful modules which allow to call some kernel memory-related functions "from user space".
+
+These modules may be usefull for debugging leak checker and verification of its results.
+

@@ -1,0 +1,9 @@
+Autotest profiler based on KEDR leak checker, which may be used with already written tests.
+
+This profiler allows to check the modules of the following kinds: 
+-modules that can be unloaded using simple rmmod 
+-modules that require to stop a network interface before rmmod 
+-modules that first need to unload other modules using the above mechanisms.
+
+Python file is a profiler code itself, 'control' file is an example of application of profiler to existing test.
+This example shows how to choose module for verification by the KEDR leak checker and how to set dependency between modules and net interfaces.
