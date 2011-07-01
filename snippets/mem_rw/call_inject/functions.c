@@ -848,13 +848,6 @@ debug_print_func_code(struct kedr_tmod_function *func)
  * registers. %eax/%rax should be saved and restored separately by the 
  * caller of the wrapper code. This register is used to pass the argument 
  * to the function to be called and to contain its return value.
- * 
- * KEDR_CHECK_ARG(arg)
- * This macro can be used inside a function called via wrappers to checks if
- * the function was passed the value of its parameter correctly (i.e. in the
- * register we expect it to be). 
- * 'arg' should be the first parameter of the function. If an inconsistency
- * is found, a warning will be output to the system log.
  */
 #ifdef CONFIG_X86_64
 # define KEDR_SAVE_SCRATCH_REGS_BUT_AX \
@@ -878,16 +871,6 @@ debug_print_func_code(struct kedr_tmod_function *func)
 	"popq %rdx\n\t"	\
 	"popq %rcx\n\t"	\
 	"popfq\n\t"
-
-/* "%rdi" is added to the clobber list just in case. */
-# define KEDR_CHECK_ARG(arg) { 			\
-	unsigned long kedr_tmp_arg_;		\
-	asm volatile(	"movq %%rdi, %0\n\t"	\
-			: "=g"(kedr_tmp_arg_)	\
-			: /* no inputs */	\
-			: "memory", "%rdi");	\
-	WARN_ON_ONCE(arg != kedr_tmp_arg_);	\
-}
 	
 #else /* CONFIG_X86_32 */
 # define KEDR_SAVE_SCRATCH_REGS_BUT_AX \
@@ -900,15 +883,6 @@ debug_print_func_code(struct kedr_tmod_function *func)
 	"popl %ecx\n\t"		\
 	"popf\n\t"
 
-/* "%eax" is added to the clobber list just in case. */
-# define KEDR_CHECK_ARG(arg) {			\
-	unsigned long kedr_tmp_arg_;		\
-	asm volatile(	"movl %%eax, %0\n\t"	\
-			: "=g"(kedr_tmp_arg_)	\
-			: /* no inputs */	\
-			: "memory", "%eax");	\
-	WARN_ON_ONCE(arg != kedr_tmp_arg_);	\
-}
 #endif /* #ifdef CONFIG_X86_64 */
 
 /* The "holder-wrapper" technique is inspired by the implementation of 
@@ -956,14 +930,7 @@ kedr_get_primary_storage(unsigned long orig_func_addr)
 {
 	//<>
 	static unsigned int call_no = 0;
-	//<>
-	
-	/* It is better not to do anything heavy before KEDR_CHECK_ARG(),
-	 * this helps avoid clobbering the register where the parameter
-	 * has been passed here. */
-	KEDR_CHECK_ARG(orig_func_addr);
-	
-	//<>
+
 	/* A race condition is possible here between the threads executing
 	 * 'call_no < 256' and '++call_no'. In this case (debug output 
 	 * only), it does not make much harm. */
