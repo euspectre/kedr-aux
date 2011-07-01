@@ -1,0 +1,3 @@
+Code snippets, examples and prototypes for instrumentation of memory operations as well as for processing of the data collected this way are now in "devel" section of the repository of Kernel Strider project:
+
+http://code.google.com/p/kernel-strider/
