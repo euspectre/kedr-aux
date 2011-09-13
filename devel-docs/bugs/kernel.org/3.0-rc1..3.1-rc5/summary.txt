@@ -1,0 +1,65 @@
+﻿Summary for v3.0-rc1..v3.0-rc5 (May 29 - September 4, 2011)
+========================================================================
+
+The data were taken from git log of the Linus's tree.
+
+737 merged branches, 10699 raw commits (incl. merges) => 
+about 10k commits total (9962).
+
+Estimates for fixes (taking possible duplicates into account):
+
+(fixes by keywords in summary,
+grep -E -i '^([ \t]*[A-Za-z0-9_-\/]*[ \t]*:){1,}[ \t]*\w*[ \t]*<keyword>'):
+
+- "fix":        1169 ([2338/2])
+- "avoid":      52 ([105/2])
+- "prevent":    22 ([44/2])
+- "handle":     42 ([85/2])
+- "correct":    57 ([115/2])
+- "eliminate":  8 ([17/2])
+- "always":     13 ([26/2])
+- "do not":     54 ([109/2])
+- "don?t":      5 ([10/2])
+- "ensure":     23 ([46/2])
+- "make sure":  9 ([19/2])
+- "check":      59 ([119/2])
+- "bug":        31 ([62/2])
+
+Raw: 1544 (including build and doc failures).
+
+Build & doc failures ("fix*compil", "fix*build", "fix*include", 
+"fix*header", "fix*doc", "fix*warning") estimated count:
+(105 + 166 + 17 + 44 + 27 + 168) / 2 = ~ 264
+
+That is, there are about 1300 (1280) "runtime" failures for all 
+architectures total. 
+========================================================================
+
+Estimated count of errors in handling of unusual conditions 
+(errors, timeouts, rarely occuring responses from other components): 60
+
+kernel proper (6): ++++++
+modules (54): ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+========================================================================
+
+Estimated count of data races: 95
+
+kernel proper (20): ++++++++++++++++++++
+modules (75): +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+(N.B. races were observed even in ext4, 
+see dccaf33fa37a1bc5d651baeb3bfeb6becb86597b for example, 
+as well as in jbd2, cifs, btrfs, bluetooth, etc.)
+========================================================================
+
+Estimated count of resource leaks (including those that occur in error 
+paths): 90
+
+kernel proper (13): +++++++++++++
+modules (77): +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+(N.B. skb leaks were observed too as well as memory leaks in nouveau, etc.)
+========================================================================
+
+It follows from the above that about 80-90% of these errors are in kernel modules, the rest - in the kernel proper.
+========================================================================
