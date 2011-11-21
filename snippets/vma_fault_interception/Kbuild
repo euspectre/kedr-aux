@@ -1,0 +1,10 @@
+module_name=vma_fault_interception
+
+interceptors_normal = vma_operations
+interceptors_factory = 
+interceptors_creation = vma_operations_clone
+interceptors_standard = file_operations inode_file_operations file_system_type super_operations inode_operations dentry_operations
+
+ccflags-y :=  -DDEBUG -I$(src) -I$(KEDR_INSTALL_PREFIX)/include -I$(KEDR_COI_INSTALL_PREFIX)/include
+obj-m := $(module_name).o
+$(module_name)-y := vma_fault.o $(addsuffix _interceptor.o, $(interceptors_normal) $(interceptors_factory) $(interceptors_creation) $(interceptors_standard)) fs_interception.o functions_support.o

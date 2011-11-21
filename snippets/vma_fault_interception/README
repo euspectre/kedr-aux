@@ -1,0 +1,30 @@
+Intercept 'fault' callback in 'vm_area_struct', created as
+result of mmap() system call.
+
+Such interception may be usefull when create model of memory
+allocation/free:
+Page return from 'fault' handler is automatically added to
+vm_area_struct object and freed when this object is deleted.
+
+mremap() system call is also processed correctly.
+
+Example use KEDR platform and KEDR COI library for intercept
+given handler in kernel module.
+Aside from KEDR COI library, example concerned with file
+system operations interception from KEDR COI is used.
+
+                    Configuration.
+./configure.sh script should be used for configuration.
+Before its call:
+'KEDR_INSTALL_PREFIX' should be set to the installation prefix
+of KEDR,
+'KEDR_COI_INSTALL_PREFIX' should be set to the installation
+prefix of KEDR COI.
+
+                    Building.
+'make' utility should be used for build example.
+
+                    Using.
+'vma_fault_interception.conf' file should be used as
+configuration file for KEDR for load payload with 'fault' handler
+interception functionality.
