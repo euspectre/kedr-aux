@@ -1,3 +1,5 @@
 module_name=wrapper
 
+ccflags-y = -I$(src)/..
+
 obj-m := ${module_name}.o

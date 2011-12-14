@@ -1,7 +1,7 @@
 all: instrument_module
 
 instrument_module: instrument_module.c
-	$(CC) -o $@ $^ -lelf
+	$(CC) -g -Wall -o $@ $^ -lelf
 
 clean:
 	rm -f instrument_module

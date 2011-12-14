@@ -2,6 +2,8 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 
+#include "wrapper.h"
+
 MODULE_AUTHOR("Tsyvarev Andrey");
 MODULE_LICENSE("GPL");
 
@@ -34,6 +36,9 @@ wrapper_exit(void)
 {
     return;
 }
+
+declare_replacement(kfree, kFree);
+declare_replacement(__kmalloc, __kMalloc);
 
 module_init(wrapper_init);
 module_exit(wrapper_exit);
