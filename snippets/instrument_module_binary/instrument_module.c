@@ -48,11 +48,18 @@ static int elf_is32(Elf* e)
 /*
  * Record about symbol version in ELF-file(crossplatform).
  */
-struct symVersion
+struct symVersion32
 {
     int32_t crc;
     char name[0];
 };
+
+struct symVersion64
+{
+    int64_t crc;
+    char name[0];
+};
+
 
 #define align_val(val, alignment) (((val) + ((alignment) - 1)) / (alignment) * (alignment))
 
@@ -61,12 +68,20 @@ struct symVersion
  * 
  * (record should be aligned on 64 bytes)
  */
-static struct symVersion* symVersion_next(struct symVersion* symVer)
+static struct symVersion32* symVersion32_next(struct symVersion32* symVer)
 {
     int size = sizeof(symVer->crc) + strlen(symVer->name) + 1;
     
-    return (struct symVersion*)((char*)symVer + align_val(size, 64));
+    return (struct symVersion32*)((char*)symVer + align_val(size, 64));
 }
+
+static struct symVersion64* symVersion64_next(struct symVersion64* symVer)
+{
+    int size = sizeof(symVer->crc) + strlen(symVer->name) + 1;
+    
+    return (struct symVersion64*)((char*)symVer + align_val(size, 64));
+}
+
 
 /*
  * Description of one function for replace.
@@ -158,7 +173,7 @@ static int replace_functions_in_section32(Elf* e, Elf_Scn* scn,
     data = elf_getdata(scn, NULL);
     CHECK_ELF_FUNCTION_RESULT(data, getdata);
     
-    sym32_end = (typeof(sym32_end))(data->d_buf + data->d_size);
+    sym32_end = (typeof(sym32_end))((char*)data->d_buf + data->d_size);
     
     for(sym32 = (typeof(sym32))data->d_buf; sym32 < sym32_end; sym32++)
     {
@@ -202,7 +217,7 @@ static int replace_functions_in_section64(Elf* e, Elf_Scn* scn,
     data = elf_getdata(scn, NULL);
     CHECK_ELF_FUNCTION_RESULT(data, getdata);
     
-    sym64_end = (typeof(sym64_end))(data->d_buf + data->d_size);
+    sym64_end = (typeof(sym64_end))((char*)data->d_buf + data->d_size);
     
     for(sym64 = (typeof(sym64))data->d_buf; sym64 < sym64_end; sym64++)
     {
@@ -342,30 +357,64 @@ static Elf_Scn* get_versions_section(Elf* e)
  * 
  * Return 0 if at least one function was replaced, 1 otherwise.
  */
-static int replace_functions_versions(Elf* e, Elf_Scn* scn_versions,
+static int replace_functions_versions32(Elf* e, Elf_Scn* scn_versions,
     const struct replacement* replacements)
 {
     Elf_Data* data;
-    struct symVersion* symVer, *symVer_end;
+    struct symVersion32* symVer32, *symVer32_end;
     int is_replaced = 0;
     
     data = elf_getdata(scn_versions, NULL);
     CHECK_ELF_FUNCTION_RESULT(data, getdata);
     
-    symVer_end = (typeof(symVer_end))(data->d_buf + data->d_size);
+    symVer32_end = (typeof(symVer32_end))((char*)data->d_buf + data->d_size);
         
-    for(symVer = (typeof(symVer))data->d_buf;
-        symVer < symVer_end;
-        symVer = symVersion_next(symVer))
+    for(symVer32 = (typeof(symVer32))data->d_buf;
+        symVer32 < symVer32_end;
+        symVer32 = symVersion32_next(symVer32))
     {
         //printf("%.8x %s\n", symVer->crc, symVer->name);
         const struct replacement* repl = replacement_find(
-            symVer->name,
+            symVer32->name,
             replacements);
         if(repl)
         {
-            symVer->crc = repl->replacement_crc;
-            strcpy(symVer->name, repl->replacement_name);
+            symVer32->crc = repl->replacement_crc;
+            strcpy(symVer32->name, repl->replacement_name);
+            printf("Versioning function %s has been replaced with (%8x, %s).\n",
+                repl->function_name, repl->replacement_crc, repl->replacement_name);
+            is_replaced = 1;
+        }
+    }
+    
+    if(is_replaced) elf_flagdata(data, ELF_C_SET, ELF_F_DIRTY);
+    return is_replaced ? 0 : 1;
+}
+
+static int replace_functions_versions64(Elf* e, Elf_Scn* scn_versions,
+    const struct replacement* replacements)
+{
+    Elf_Data* data;
+    struct symVersion64* symVer64, *symVer64_end;
+    int is_replaced = 0;
+    
+    data = elf_getdata(scn_versions, NULL);
+    CHECK_ELF_FUNCTION_RESULT(data, getdata);
+    
+    symVer64_end = (typeof(symVer64_end))((char*)data->d_buf + data->d_size);
+        
+    for(symVer64 = (typeof(symVer64))data->d_buf;
+        symVer64 < symVer64_end;
+        symVer64 = symVersion64_next(symVer64))
+    {
+        //printf("%.8x %s\n", symVer->crc, symVer->name);
+        const struct replacement* repl = replacement_find(
+            symVer64->name,
+            replacements);
+        if(repl)
+        {
+            symVer64->crc = repl->replacement_crc;
+            strcpy(symVer64->name, repl->replacement_name);
             printf("Versioning function %s has been replaced with (%8x, %s).\n",
                 repl->function_name, repl->replacement_crc, repl->replacement_name);
             is_replaced = 1;
@@ -377,7 +426,7 @@ static int replace_functions_versions(Elf* e, Elf_Scn* scn_versions,
 }
 
 static int replace_functions_in_module(const char* module_filename,
-    const struct replacement* replacements)
+    const struct replacement* replacements, int has_versions)
 {
     int fd;
     
@@ -402,6 +451,24 @@ static int replace_functions_in_module(const char* module_filename,
     
     is_elf32 = elf_is32(e);
     
+    scn_versions = get_versions_section(e);
+    if(scn_versions)
+    {
+        if(!has_versions)
+        {
+            printf("Wrapper module contains no symbol versions information, but instrumented module requires it.\n");
+            return -1;
+        }
+    }
+    else
+    {
+        if(has_versions)
+        {
+            printf("Warning: wrapper module contains symbol versions information, but intstrumented module doesn't require it.\n");
+            //not an error
+        }
+    }
+
     for(scn = elf_nextscn(e, NULL); scn != NULL; scn = elf_nextscn(e, scn))
     {
         int result = is_elf32 ? replace_functions_in_section32(e,
@@ -418,7 +485,11 @@ static int replace_functions_in_module(const char* module_filename,
     scn_versions = get_versions_section(e);
     if(scn_versions)
     {
-        if(replace_functions_versions(e, scn_versions, replacements) == 0)
+        int result = is_elf32 ? replace_functions_versions32(e,
+            scn_versions, replacements) : replace_functions_versions64(e,
+            scn_versions, replacements);
+        
+        if(result == 0)
         {
             elf_update(e, ELF_C_WRITE);
             printf("Module content has been updated.\n");
@@ -440,10 +511,12 @@ const char crc_symbol_prefix[] = "__crc_";
  * 
  * Return first replacement, which crc is not filled.
  * Return NULL on error.
+ *
+ * If any crc-symbol is exist in this section, 'has_versions' will be set to non-zero.
  */
 static struct replacement*
 fill_replacements_crc_from_section32(Elf* e,
-    Elf_Scn* scn, struct replacement* replacements)
+    Elf_Scn* scn, struct replacement* replacements, int *has_versions)
 {
     struct replacement* repl_first = replacements;
 
@@ -458,7 +531,7 @@ fill_replacements_crc_from_section32(Elf* e,
     data = elf_getdata(scn, NULL);
     CHECK_ELF_FUNCTION_RESULT(data, getdata);
     
-    sym32_end = (typeof(sym32_end))(data->d_buf + data->d_size);
+    sym32_end = (typeof(sym32_end))((char*)data->d_buf + data->d_size);
 
     if(repl_first->function_name == NULL)
     {
@@ -479,6 +552,8 @@ fill_replacements_crc_from_section32(Elf* e,
         
         if(strncmp(symbol_name, crc_symbol_prefix, crc_symbol_prefix_len))
             continue;
+        
+        *has_versions = 1;
         
         symbol_name_without_prefix = symbol_name + crc_symbol_prefix_len;
         for(repl = repl_first; repl->function_name != NULL; repl++)
@@ -509,7 +584,7 @@ fill_replacements_crc_from_section32(Elf* e,
 
 static struct replacement*
 fill_replacements_crc_from_section64(Elf* e,
-    Elf_Scn* scn, struct replacement* replacements)
+    Elf_Scn* scn, struct replacement* replacements, int* has_versions)
 {
     struct replacement* repl_first = replacements;
 
@@ -524,7 +599,7 @@ fill_replacements_crc_from_section64(Elf* e,
     data = elf_getdata(scn, NULL);
     CHECK_ELF_FUNCTION_RESULT(data, getdata);
     
-    sym64_end = (typeof(sym64_end))(data->d_buf + data->d_size);
+    sym64_end = (typeof(sym64_end))((char*)data->d_buf + data->d_size);
 
     if(repl_first->function_name == NULL)
     {
@@ -545,6 +620,8 @@ fill_replacements_crc_from_section64(Elf* e,
         
         if(strncmp(symbol_name, crc_symbol_prefix, crc_symbol_prefix_len))
             continue;
+        
+        *has_versions = 1;
         
         symbol_name_without_prefix = symbol_name + crc_symbol_prefix_len;
         for(repl = repl_first; repl->function_name != NULL; repl++)
@@ -580,7 +657,7 @@ fill_replacements_crc_from_section64(Elf* e,
 static char* resolve_relocated_str32(Elf* e,
     Elf_Scn* relocation_scn,
     int relocation_index,
-    size_t addr)
+    Elf32_Addr addr)
 {
     char *str;
     
@@ -605,6 +682,8 @@ static char* resolve_relocated_str32(Elf* e,
         Elf32_Rela* relocation = (Elf32_Rela*)relocation_data->d_buf + relocation_index;
 
         symbol_index = ELF32_R_SYM(relocation->r_info);
+        
+        addr += relocation->r_addend;
     }
     else
     {
@@ -643,7 +722,7 @@ static char* resolve_relocated_str32(Elf* e,
 static char* resolve_relocated_str64(Elf* e,
     Elf_Scn* relocation_scn,
     int relocation_index,
-    size_t addr)
+    Elf64_Addr addr)
 {
     char *str;
     
@@ -668,6 +747,8 @@ static char* resolve_relocated_str64(Elf* e,
         Elf64_Rela* relocation = (Elf64_Rela*)relocation_data->d_buf + relocation_index;
 
         symbol_index = ELF64_R_SYM(relocation->r_info);
+        
+        addr += relocation->r_addend;
     }
     else
     {
@@ -1057,10 +1138,12 @@ static struct replacement* get_replacements64(Elf* e_wrapper)
  * Return array of replacements contained in the given wrapper module.
  * 
  * Return NULL on error.
+ *
+ * If 'replacement_crc' fields is filled, set 'has_versions' to non-zero.
  * 
  */
 static struct replacement* get_replacements_from_wrapper(
-    const char* wrapper_filename)
+    const char* wrapper_filename, int* has_versions)
 {
     struct replacement* replacements;
     
@@ -1068,6 +1151,8 @@ static struct replacement* get_replacements_from_wrapper(
     
     Elf* e;
     int is_elf32;
+    
+    int _has_versions;
     
     if (elf_version(EV_CURRENT) == EV_NONE )
         errx(EX_SOFTWARE, "ELF library initialization failed: %s", elf_errmsg(-1));
@@ -1095,11 +1180,14 @@ static struct replacement* get_replacements_from_wrapper(
     if(repl_first->function_name == NULL) goto out;// Full array is already filled
 
     Elf_Scn* scn;
+    _has_versions = 0;
     for(scn = elf_nextscn(e, NULL); scn != NULL; scn = elf_nextscn(e, scn))
     {
-        repl_first = is_elf32  ? fill_replacements_crc_from_section32(e,
-            scn, repl_first) : fill_replacements_crc_from_section64(e,
-            scn, repl_first);
+        repl_first = is_elf32
+            ? fill_replacements_crc_from_section32(e, scn, repl_first,
+                &_has_versions)
+            : fill_replacements_crc_from_section64(e, scn, repl_first,
+                &_has_versions);
         
         if(repl_first == NULL)
         {
@@ -1113,12 +1201,14 @@ out:
     (void)elf_end(e);
     (void)close(fd);
     
-    if(repl_first->function_name != NULL)
+    if(_has_versions && (repl_first->function_name != NULL))
     {
-        errx(EX_DATAERR, "Cannot find crc for function %s.",
-            repl_first->replacement_name);
+        printf("Cannot find crc for function %s.", repl_first->replacement_name);
+        replacements_destroy(replacements);
+        return NULL;
     }
 
+    *has_versions = _has_versions;
     return replacements;
 }
 
@@ -1142,19 +1232,21 @@ main(int argc, char** argv)
     
     struct replacement* replacements;
     
+    int has_versions;
+    
     int result;
 
     result = parse_parameters(argc, argv, &filename, &wrapper_filename);
     
     if(result) return result;
     
-    replacements = get_replacements_from_wrapper(wrapper_filename);
+    replacements = get_replacements_from_wrapper(wrapper_filename, &has_versions);
     
     if(replacements == NULL) return 0;
 
     replacements_print(replacements);
 
-    result = replace_functions_in_module(filename, replacements);
+    result = replace_functions_in_module(filename, replacements, has_versions);
     replacements_destroy(replacements);
     
     if(result) return result;
