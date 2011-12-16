@@ -1,10 +1,8 @@
 Snippet for binary instrumentation of kernel module, which may be used for KEDR in the future.
 
 Snippet change module object file so that calls of some set of functions will be replaced with calls of another ones.
-Currently functions list for replace is hardcoded:
 
-- kfree is replaced with kFree,
-- __kmalloc is replaced with __kMalloc
+List of functions for replace is contained in the wrapper module as additional elf-section.
 
 BUILD.
 
@@ -17,5 +15,5 @@ USAGE.
 Here <module-for-instrument> is module which will be instrumented,
 <wrapper-module> is module which define replacement functions.
 
-Second module is needed for fill crc-fields of replacement functions.
+Second module is needed for fill crc-fields of replacement functions and for extract list of replacements.
 'wrapper_module' directory contains example of this module.
