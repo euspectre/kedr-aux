@@ -75,9 +75,9 @@ Like the dynamic analysis frameworks, such as <a href="http://valgrind.org/">Val
 Out-of-the-box, KEDR provides the tools to do the following:
     </p>
     <ul>
-    	<li><p><em><a href="http://kedr.berlios.de/kedr-doc/using_kedr.html#call_mon">Call monitoring (call tracing)</a></em> During the operation of the module under analysis, the information is collected about the function calls it makes: arguments, return values, etc. The data can be saved to a file (trace) for future analysis. This is similar to what <a href="http://sourceforge.net/projects/strace/">strace</a> utility does for user-space applications.</p></li>
-    	<li><p><em><a href="http://kedr.berlios.de/kedr-doc/using_kedr.html#fault_sim">Fault simulation</a></em> KEDR forces some of the calls made by the target module to fail. In fact, KEDR simulates a failure without actually calling the respective function. The scenarios (the calls to which functions must fail in what conditions) can be controlled and customized by the user.</p></li>
-    	<li><p><em><a href="http://kedr.berlios.de/kedr-doc/using_kedr.html#leak_check">Detecting memory leaks</a></em> KEDR keeps track of memory allocation and deallocation operations made by the target module. After the target module has unloaded, KEDR generates a report listing the memory blocks that have been allocated but not freed by that module along with a call stack for each of these blocks.</p></li>
+    	<li><p><em><a href="http://kedr.berlios.de/kedr-doc/kedr_manual_using_kedr.html#call_mon">Call monitoring (call tracing)</a></em> During the operation of the module under analysis, the information is collected about the function calls it makes: arguments, return values, etc. The data can be saved to a file (trace) for future analysis. This is similar to what <a href="http://sourceforge.net/projects/strace/">strace</a> utility does for user-space applications.</p></li>
+    	<li><p><em><a href="http://kedr.berlios.de/kedr-doc/kedr_manual_using_kedr.html#fault_sim">Fault simulation</a></em> KEDR forces some of the calls made by the target module to fail. In fact, KEDR simulates a failure without actually calling the respective function. The scenarios (the calls to which functions must fail in what conditions) can be controlled and customized by the user.</p></li>
+    	<li><p><em><a href="http://kedr.berlios.de/kedr-doc/kedr_manual_using_kedr.html#leak_check">Detecting memory leaks</a></em> KEDR keeps track of memory allocation and deallocation operations made by the target module. After the target module has unloaded, KEDR generates a report listing the memory blocks that have been allocated but not freed by that module along with a call stack for each of these blocks.</p></li>
     </ul>
     
     <p>
@@ -90,7 +90,7 @@ Detailed description of KEDR can be found in the <a href="http://kedr.berlios.de
     </p>
     
     <p>
-To start working with KEDR, you can take a look at <a href="http://kedr.berlios.de/kedr-doc/getting_started.html"><i>Getting Started</i></a> section in the manual. It describes how to install the framework and use it to analyze kernel modules, step by step.
+To start working with KEDR, you can take a look at <a href="http://kedr.berlios.de/kedr-doc/kedr_manual_getting_started.html"><i>Getting Started</i></a> section in the manual. It describes how to install the framework and use it to analyze kernel modules, step by step.
     </p>
     
     <h2>Downloads</h2>
@@ -109,19 +109,20 @@ Get KEDR framework:
 The source archive also includes the documentation (in DocBook and HTML formats) and the examples.
     </p>
 
-    <h2>Mercurial Repository</h2>
+    <h2>Source Code Repository</h2>
     <p>
 The latest version of KEDR sources can be found in the repositories at the project sites: <a href="http://code.google.com/p/kedr/source/">repository #1</a> and <a href="http://developer.berlios.de/hg/?group_id=11780">repository #2</a>. Both repositories are kept in sync with one another. They are maintained with <a href="http://mercurial.selenic.com/">Mercurial</a> source control management system. 
     </p>
 
-    <h2>Bugs and Features</h2>
+    <h2>Bug Reporting</h2>
     <p>
 If you have found a problem in KEDR or would like to make a feature request, please use the <a href="http://code.google.com/p/kedr/issues/">issue tracking system</a>.
     </p>
     
     <h2>Mailing Lists</h2>
     <p>
-The main mailing list for KEDR project is provided by <b><a href="http://groups.google.com/group/kedr-discuss">kedr-discuss</a></b> Google group. Note that if you would like to post your messages there, you need to join that group. 
+If you have questions, suggestions, proposals, etc., concerning KEDR framework, feel free to join <a href="http://groups.google.com/group/kedr-discuss">kedr-discuss</a> mailing list (Google Group) and write us a message. 
+Note that currently only the members of that list may post messages there.
     </p>        
    
     </td> <!-- maincontent -->
