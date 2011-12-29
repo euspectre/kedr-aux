@@ -1,0 +1,64 @@
+Binary instrumentation of kernel module, which use code template instantiation.
+
+WHY
+
+Template code allows more flexible instrumentation than simple ELF symbols replacements:
+
+1. Replacements for imported functions knows, from which target module them are
+    called(using THIS_MODULE variable).
+2. Interception of module_init/module_exit become possible; replacements for
+    this functions chain original ones.
+3. One doesn't need to have intermediate module, which define replacements
+    functions for target: such functions may be embedded into target module
+    itself.
+
+MODEL
+
+Payload module defines functions for use instead of predefined system-wide ones.
+In the given example payload module contains replacements for __kmalloc and
+kfree. These replacement functions accept all parameters of original ones plus
+information about concrete call. In the example this information include caller
+module.
+
+Also payload module defines functions for use instead of module_init and
+module_exit. These replacement function do some work and then chain to original
+module_init and module_exit correspondingly. Pointer to original functions is
+passed to replacement ones.
+
+Template module defines trampoline(or intermediate) functions, which have same
+signature as original ones. Implementations of these trampoline functions call
+corresponded replacement functions from payload, passing some fake additional
+arguments to them.
+
+Instrumentation process take trampoline functions from template and embed them
+into target module, replacing fake arguments with one's from target module.
+Then all calls of original functions in the target are replaced with calls
+of corresponded trampolines.
+
+EXAMPLE
+
+Payload module is placed in 'payload' subdirectory, template module is placed
+in 'template' subdirectory. Instrumentation program is placed in the root
+directory.
+
+BUILD.
+
+Commands
+
+> make -C payload
+> make -C template
+> make
+
+build payload module, template module and instrumentation program.
+
+USAGE.
+
+Command
+
+> ./instrument_module <module-for-instrument> ./template/template.ko <out-module>
+
+will instrument <module-for-instrument>, placing resulting module in <out-module>.
+'sample_target' module may be used as the target for instrumentation.
+
+For load instrumented module one should preliminary load payload module.
+

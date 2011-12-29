@@ -1,0 +1,5 @@
+module_name=template
+
+ccflags-y = -I$(src)/../payload
+
+obj-m := ${module_name}.o
