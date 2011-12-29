@@ -235,7 +235,7 @@ Elf64_Sym* utils_elf64_find_symbol(Elf* e, const char* symbol_name,
         
         for(sym64 = data->d_buf; sym64 < sym64_end; sym64++)
         {
-            const char* symbol_name_current = elf_strptr(e, names_index, sym64->st_shndx);
+            const char* symbol_name_current = elf_strptr(e, names_index, sym64->st_name);
             CHECK_ELF_FUNCTION_RESULT(symbol_name_current, elf_strptr);
             
             if(strcmp(symbol_name_current, symbol_name) == 0)

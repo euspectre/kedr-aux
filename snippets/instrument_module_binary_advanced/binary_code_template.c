@@ -77,7 +77,7 @@ static void bytes_to_hex16(char hex[35], const char* bytes, size_t len)
 
 void ct_print(struct code_template* template)
 {
-    printf("Section template contains %s-bit code(size - %d):\n",
+    printf("Section template contains %s-bit code(size - %zu):\n",
         template->is_elf32 ? "32" : "64",
         template->code_size);
     

@@ -585,6 +585,31 @@ get_template_replacements64(Elf* template_e,
 
 
 /*
+ * Helper for fill correspondences array.
+ * Add information about symbol with given name into correspondences array.
+ * Return pointer to the next correspondence.
+ *
+ * If cannot file symbol in ELF, do nothing and return pointer to the same
+ * correspondence.
+ */
+static struct ct_symbol_correspondence* fill_correspondence(
+    struct ct_symbol_correspondence* correspondence,
+    Elf* e,
+    const char* symbol_name)
+{
+    void* result = utils_elf_is32(e)
+        ? (void*)utils_elf32_find_symbol(e, symbol_name, &correspondence->index)
+        : (void*)utils_elf64_find_symbol(e, symbol_name, &correspondence->index);
+    
+    if(result)
+    {
+        correspondence->name = symbol_name;
+        return correspondence + 1;
+    }
+    else return correspondence;
+}
+
+/*
  * Perform replacement in the target module, if needed.
  * 
  * Return 0 on success, negative error code on fail and 1 if
@@ -601,13 +626,8 @@ static int replace_import32(struct imported_replacement_info* replacement_info,
         replacement_info->orig_name, NULL);
     if(orig_sym == NULL) return 1; //Nothing to replace
     
-    struct ct_symbol_correspondence correspondences[] =
-    {
-        { .name = NULL/*replacement should be here*/, .index = -1},
-        { .name = "mcount", .index = -1},
-        { .name = "__this_module", .index = -1},
-        { .name = NULL }
-    };
+    struct ct_symbol_correspondence correspondences[4];
+    struct ct_symbol_correspondence* correspondence = correspondences;
 
     // Add replacement function as symbol, and add its index to correspondences.
     Elf_Scn* symbols_scn = utils_elf_get_symbols_section(e);
@@ -619,7 +639,7 @@ static int replace_import32(struct imported_replacement_info* replacement_info,
     Elf_Scn* symbols_name_scn = elf_getscn(e, symbols_shdr32->sh_link);
     CHECK_ELF_FUNCTION_RESULT(symbols_name_scn, elf_getscn);
 
-    correspondences[0].name = replacement_info->repl_name;
+    correspondence->name = replacement_info->repl_name;
 
     size_t repl_name_offset;
     result = utils_elf_add_string(ew, symbols_name_scn,
@@ -627,7 +647,7 @@ static int replace_import32(struct imported_replacement_info* replacement_info,
     assert(result == 0);
     
     result = utils_elf_add_symbol_imported(ew, repl_name_offset,
-        &correspondences[0].index);
+        &correspondence->index);
     assert(result == 0);
     
     if(utils_elf_require_symbol_versions(e))
@@ -636,18 +656,15 @@ static int replace_import32(struct imported_replacement_info* replacement_info,
             replacement_info->repl_name, replacement_info->repl_crc);
         assert(result == 0);
     }
-
-    Elf32_Sym* sym32;
-    // Fill mcount symbol info
-    sym32 = utils_elf32_find_symbol(e, correspondences[1].name,
-        &correspondences[1].index);
-    assert(sym32);
     
-    // Fill __this_module symbol info
-    sym32 = utils_elf32_find_symbol(e, correspondences[2].name,
-        &correspondences[2].index);
-    assert(sym32);
+    correspondence++;
 
+    // Fill mcount symbol info
+    correspondence = fill_correspondence(correspondence, e, "mcount");
+    // Fill __this_module symbol info
+    correspondence = fill_correspondence(correspondence, e, "__this_module");
+    // Terminate correspondences array
+    correspondence->name = NULL;
     // Add intermediate as function symbol...
     Elf32_Sym* intermediate_sym32 = function_template_instantiate32(
         replacement_info->intermediate_template,
@@ -677,13 +694,8 @@ static int replace_import64(struct imported_replacement_info* replacement_info,
         replacement_info->orig_name, NULL);
     if(orig_sym == NULL) return 1; //Nothing to replace
     
-    struct ct_symbol_correspondence correspondences[] =
-    {
-        { .name = NULL/*replacement should be here*/, .index = -1},
-        { .name = "mcount", .index = -1},
-        { .name = "__this_module", .index = -1},
-        { .name = NULL }
-    };
+    struct ct_symbol_correspondence correspondences[4];
+    struct ct_symbol_correspondence* correspondence = correspondences;
 
     Elf_Scn* symbols_scn = utils_elf_get_symbols_section(e);
     assert(symbols_scn);
@@ -694,7 +706,7 @@ static int replace_import64(struct imported_replacement_info* replacement_info,
     Elf_Scn* symbols_name_scn = elf_getscn(e, symbols_shdr64->sh_link);
     CHECK_ELF_FUNCTION_RESULT(symbols_name_scn, elf_getscn);
     // Add replacement function as symbol, and add its index to correspondences.
-    correspondences[0].name = replacement_info->repl_name;
+    correspondence->name = replacement_info->repl_name;
 
     size_t repl_name_offset;
     result = utils_elf_add_string(ew, symbols_name_scn,
@@ -702,7 +714,7 @@ static int replace_import64(struct imported_replacement_info* replacement_info,
     assert(result == 0);
     
     result = utils_elf_add_symbol_imported(ew, repl_name_offset,
-        &correspondences[0].index);
+        &correspondence->index);
     assert(result == 0);
     
     if(utils_elf_require_symbol_versions(e))
@@ -711,18 +723,14 @@ static int replace_import64(struct imported_replacement_info* replacement_info,
             replacement_info->repl_name, replacement_info->repl_crc);
         assert(result == 0);
     }
+    correspondence++;
 
-    Elf64_Sym* sym64;
     // Fill mcount symbol info
-    sym64 = utils_elf64_find_symbol(e, correspondences[1].name,
-        &correspondences[1].index);
-    assert(sym64);
-    
+    correspondence = fill_correspondence(correspondence, e, "mcount");
     // Fill __this_module symbol info
-    sym64 = utils_elf64_find_symbol(e, correspondences[2].name,
-        &correspondences[2].index);
-    assert(sym64);
-
+    correspondence = fill_correspondence(correspondence, e, "__this_module");
+    // Terminate correspondences array
+    correspondence->name = NULL;
     // Add intermediate as function symbol...
     Elf64_Sym* intermediate_sym64 = function_template_instantiate64(
         replacement_info->intermediate_template,
@@ -775,8 +783,41 @@ static Elf32_Sym* link_get_orig32(Elf* e, Elf32_Sym* link32, size_t* offset)
     
     return NULL;
 }
+static Elf64_Sym* link_get_orig64(Elf* e, Elf64_Sym* link64, size_t* offset)
+{
+    Elf_Scn* symbols_scn = utils_elf_get_symbols_section(e);
+    assert(symbols_scn);
+    
+    Elf_Data* symbols_data;
+    for(symbols_data = elf_getdata(symbols_scn, NULL);
+        symbols_data != NULL;
+        symbols_data = elf_getdata(symbols_scn, symbols_data))
+    {
+        Elf64_Sym* sym64;
+        Elf64_Sym* sym64_end = (Elf64_Sym*)
+            ((char*)symbols_data->d_buf + symbols_data->d_size);
+        for(sym64 = symbols_data->d_buf; sym64 < sym64_end; sym64++)
+        {
+            if((sym64->st_shndx == link64->st_shndx)
+                && (sym64->st_value == link64->st_value)
+                && (sym64->st_size == link64->st_size))
+            {
+                if(sym64->st_name == link64->st_name) continue;// Ignore link itself.
+                if(offset)
+                {
+                    *offset = sym64 - (Elf64_Sym*)
+                        ((char*)symbols_data->d_buf - symbols_data->d_off);
+                }
+                return sym64;
+            }
+        }
+    }
+    
+    return NULL;
+}
 
-// Same for link replacements
+
+// Same as replace_import* but for link replacements
 static int replace_link32(struct link_replacement_info* replacement_info,
     ElfWriter* ew, const char* new_section_name)
 {
@@ -788,14 +829,8 @@ static int replace_link32(struct link_replacement_info* replacement_info,
         replacement_info->link_name, NULL);
     if(link_sym32 == NULL) return 1;// nothing to replace
     
-    struct ct_symbol_correspondence correspondences[] =
-    {
-        { .name = NULL/*replacement should be here*/, .index = -1},
-        { .name = NULL/*link_placeholder->orig should be here*/, .index = -1},
-        { .name = "mcount", .index = -1},
-        { .name = "__this_module", .index = -1},
-        { .name = NULL }
-    };
+    struct ct_symbol_correspondence correspondences[5];
+    struct ct_symbol_correspondence* correspondence = correspondences;
 
     // Add replacement function as symbol, and add its index to correspondences.
     Elf_Scn* symbols_scn = utils_elf_get_symbols_section(e);
@@ -807,7 +842,7 @@ static int replace_link32(struct link_replacement_info* replacement_info,
     Elf_Scn* symbols_name_scn = elf_getscn(e, symbols_shdr32->sh_link);
     CHECK_ELF_FUNCTION_RESULT(symbols_name_scn, elf_getscn);
 
-    correspondences[0].name = replacement_info->repl_name;
+    correspondence->name = replacement_info->repl_name;
 
     size_t repl_name_offset;
     result = utils_elf_add_string(ew, symbols_name_scn,
@@ -815,7 +850,7 @@ static int replace_link32(struct link_replacement_info* replacement_info,
     assert(result == 0);
     
     result = utils_elf_add_symbol_imported(ew, repl_name_offset,
-        &correspondences[0].index);
+        &correspondence->index);
     assert(result == 0);
     
     if(utils_elf_require_symbol_versions(e))
@@ -824,12 +859,13 @@ static int replace_link32(struct link_replacement_info* replacement_info,
             replacement_info->repl_name, replacement_info->repl_crc);
         assert(result == 0);
     }
+    correspondence++;
 
     // As link placeholder set symbol to which link points
-    correspondences[1].name = replacement_info->link_placeholder_name;
+    correspondence->name = replacement_info->link_placeholder_name;
     
     Elf32_Sym* orig_sym32 = link_get_orig32(e, link_sym32,
-        &correspondences[1].index);
+        &correspondence->index);
     
     if(orig_sym32 == NULL)
     {
@@ -837,17 +873,14 @@ static int replace_link32(struct link_replacement_info* replacement_info,
             replacement_info->link_name);
         return -EINVAL;
     }
+    correspondence++;
     
-    Elf32_Sym* sym32;
     // Fill mcount symbol info
-    sym32 = utils_elf32_find_symbol(e, correspondences[2].name,
-        &correspondences[2].index);
-    assert(sym32);
-    
+    correspondence = fill_correspondence(correspondence, e, "mcount");
     // Fill __this_module symbol info
-    sym32 = utils_elf32_find_symbol(e, correspondences[3].name,
-        &correspondences[3].index);
-    assert(sym32);
+    correspondence = fill_correspondence(correspondence, e, "__this_module");
+    // Terminate correspondences array
+    correspondence->name = NULL;
 
     // Add intermediate as function symbol...
     Elf32_Sym* intermediate_sym32 = function_template_instantiate32(
@@ -866,6 +899,89 @@ static int replace_link32(struct link_replacement_info* replacement_info,
     
     return 0;
 }
+
+static int replace_link64(struct link_replacement_info* replacement_info,
+    ElfWriter* ew, const char* new_section_name)
+{
+    int result;
+    
+    Elf* e = elf_writer_get_elf(ew);
+    
+    Elf64_Sym* link_sym64 = utils_elf64_find_symbol(e,
+        replacement_info->link_name, NULL);
+    if(link_sym64 == NULL) return 1;// nothing to replace
+    
+    struct ct_symbol_correspondence correspondences[5];
+    struct ct_symbol_correspondence* correspondence = correspondences;
+
+    // Add replacement function as symbol, and add its index to correspondences.
+    Elf_Scn* symbols_scn = utils_elf_get_symbols_section(e);
+    assert(symbols_scn);
+    
+    Elf64_Shdr* symbols_shdr64 = elf64_getshdr(symbols_scn);
+    CHECK_ELF_FUNCTION_RESULT(symbols_shdr64, elf64_getshdr);
+    
+    Elf_Scn* symbols_name_scn = elf_getscn(e, symbols_shdr64->sh_link);
+    CHECK_ELF_FUNCTION_RESULT(symbols_name_scn, elf_getscn);
+
+    correspondence->name = replacement_info->repl_name;
+
+    size_t repl_name_offset;
+    result = utils_elf_add_string(ew, symbols_name_scn,
+        replacement_info->repl_name, &repl_name_offset);
+    assert(result == 0);
+    
+    result = utils_elf_add_symbol_imported(ew, repl_name_offset,
+        &correspondence->index);
+    assert(result == 0);
+    
+    if(utils_elf_require_symbol_versions(e))
+    {
+        result = utils_elf64_add_symbol_version(ew,
+            replacement_info->repl_name, replacement_info->repl_crc);
+        assert(result == 0);
+    }
+    correspondence++;
+
+    // As link placeholder set symbol to which link points
+    correspondence->name = replacement_info->link_placeholder_name;
+    
+    Elf64_Sym* orig_sym64 = link_get_orig64(e, link_sym64,
+        &correspondence->index);
+    
+    if(orig_sym64 == NULL)
+    {
+        printf("Cannot find original symbol for link %s.\n",
+            replacement_info->link_name);
+        return -EINVAL;
+    }
+    correspondence++;
+    
+    // Fill mcount symbol info
+    correspondence = fill_correspondence(correspondence, e, "mcount");
+    // Fill __this_module symbol info
+    correspondence = fill_correspondence(correspondence, e, "__this_module");
+    // Terminate correspondences array
+    correspondence->name = NULL;
+
+    // Add intermediate as function symbol...
+    Elf64_Sym* intermediate_sym64 = function_template_instantiate64(
+        replacement_info->intermediate_template,
+        ew,
+        new_section_name,
+        correspondences,
+        replacement_info->intermediate_name,
+        NULL);
+    assert(intermediate_sym64);
+
+    //.. and set link pointed to it instead of original symbol
+    link_sym64->st_shndx = intermediate_sym64->st_shndx;
+    link_sym64->st_value = intermediate_sym64->st_value;
+    link_sym64->st_size = intermediate_sym64->st_size;
+    
+    return 0;
+}
+
 
 
 int
@@ -1046,13 +1162,17 @@ main(int argc, char** argv)
         }
     }
 
-    result = replace_link32(&init_replacement_info, ew, NEW_SECTION_INIT);
+    result = is_elf32 
+        ? replace_link32(&init_replacement_info, ew, NEW_SECTION_INIT)
+        : replace_link64(&init_replacement_info, ew, NEW_SECTION_INIT);
     assert(result >= 0);
 
     if(result == 0)
         printf("Init function has been replaced.\n");
 
-    result = replace_link32(&exit_replacement_info, ew, NEW_SECTION_EXIT);
+    result = is_elf32
+        ? replace_link32(&exit_replacement_info, ew, NEW_SECTION_EXIT)
+        : replace_link64(&exit_replacement_info, ew, NEW_SECTION_EXIT);
     assert(result >= 0);
 
     if(result == 0)

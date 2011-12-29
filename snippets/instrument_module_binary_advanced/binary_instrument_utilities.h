@@ -10,7 +10,7 @@
 #include <err.h>
 
 #define CHECK_ELF_FUNCTION_RESULT(cond, function) \
-    while(!(cond)) {errx(EX_SOFTWARE, "%s() failed: %s.", #function, elf_errmsg(-1)); }
+    while(!(cond)) {errx(EX_SOFTWARE, "%s:%d: %s() failed: %s.", __FILE__, __LINE__, #function, elf_errmsg(-1)); }
 
 #include "elf_writer.h"
 
