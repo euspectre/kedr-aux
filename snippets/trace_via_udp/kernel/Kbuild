@@ -1,0 +1,5 @@
+module_name=trace_server
+
+ccflags-y = -I$(src)/..
+
+obj-m := ${module_name}.o

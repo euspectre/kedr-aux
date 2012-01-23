@@ -1,0 +1,78 @@
+Prototype for transmitting trace, generated in the kernel, to user-space
+via UDP sockets.
+
+
+Transmitting trace.
+
+The client-server protocol is simple.
+
+Server recognize 2 message types
+(see struct trace_client_msg in trace_server.h):
+
+  -'START', which inform server that sender want to initiate
+session for recieving trace,
+
+  -'STOP', which inform server that sender want to terminate session
+for recieving trace. After terminating session, server will wait
+until another client send START message.
+
+When start session, the server firstly sends SESSION_BEGIN mark
+to the client (see struct trace_server_msg_mark in trace_server.h).
+
+If this is the first session for the server and nobody read trace before,
+server sends additional TRACE_BEGIN mark.
+
+After these, server send messages contained trace events
+(see struct trace_server_msg_packet in trace_server.h).
+
+The last message in the session contains SESSION_END mark.
+
+In case when trace is empty and it is known that nobody can generate
+events(in the given prototype it is a moment when server module is being
+unloaded), the server forcibly terminates session with client(if it is),
+and before SESSION_END mark it sends additional TRACE_END mark.
+
+
+Server.
+
+'kernel' subdirectory contain module, which implements trace sender
+as network server.
+
+When this module is loaded, port 5556 is listened for commands to server.
+When command is arrived, it processed in correspondence with the aboved
+protocol.
+
+Port may be redefined via setting 'TRACE_SERVER_PORT' while compiling
+server or via setting 'server_port' parameter of module while loading it.
+
+In the given prototype trace events are simple arrays of bytes,
+which may be generated via writting to file 'trace_server/events'
+in debugfs.
+
+
+Client.
+
+'user' subdirectory contains user-space client.
+
+The client simply send 'START' message to the server and then receive
+all messages from it and print them. When receive SESSION_END mark,
+the client terminates.
+
+If call as
+    
+    ./trace_reader --events-limit <n>
+
+after recieving <n> messages the client will send 'STOP' message
+to the server.
+
+For see other configuration options of the client, use
+    
+    ./trace_reader -h
+
+
+Directions for futher improvements:
+
+  - client should process dropping messages
+    (including messages with trace events)
+
+  - more than one trace event should be packed into one message
