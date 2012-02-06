@@ -558,6 +558,26 @@ doTarget()
             printMessage "Shutting down the target machine\n"
             execCommandOnTarget ${vm_ip} "/sbin/shutdown -h now"
             sleep ${VM_TIMEOUT}
+            
+            # If the machine is not shut down yet (e.g. if SSH connection 
+            # failed for some reason), try another ways to shut it down:
+            # first, simulate pressing of the power button and if that does 
+            # not help, power it off.
+            VBoxManage list runningvms | grep "${vm_name}" > /dev/null
+            if test $? -eq 0; then
+		printMessage "The machine \"${vm_name}\" is still running. Attempting shutdown...\n" 
+		VBoxManage controlvm ${vm_name} acpipowerbutton >> "${MAIN_LOG}" 2>&1
+		sleep ${VM_TIMEOUT}
+            fi 
+            
+            VBoxManage list runningvms | grep "${vm_name}" > /dev/null
+            if test $? -eq 0; then
+		# The machine have not responded to pressing of the power 
+		# button. Power off is the last resort.
+		printMessage "The machine \"${vm_name}\" is still running. Attempting power off...\n" 
+		VBoxManage controlvm ${vm_name} poweroff >> "${MAIN_LOG}" 2>&1
+		sleep ${VM_TIMEOUT}
+            fi 
         fi  
     fi
 }
