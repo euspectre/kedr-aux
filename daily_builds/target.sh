@@ -72,6 +72,50 @@ exitSuccess()
 }
 
 ########################################################################
+# Build the examples using ${MAKE_CMD} as 'make'.
+########################################################################
+buildExamples()
+{
+	printMessage "===== Checking if the examples can be built w/o KEDR build tree =====\n"
+	# Move the build tree to a temporary location to hide it from the 
+    # installed examples.
+    cd "${WORK_DIR}" || exitFailure
+    mv "${BUILD_DIR}" "${TEMP_DIR}" || exitFailure
+
+    # Copy the installed examples to another directory (the default one 
+    # will probably be read only) and try to build each one of them.
+    cp -r "${INSTALL_DIR}/share/kedr/examples" "${EXAMPLES_DIR}" >> "${LOG_FILE}" 2>&1
+    if test $? -ne 0; then
+        printMessage "Failed to copy the examples from ${INSTALL_DIR}/share/kedr/examples to ${EXAMPLES_DIR}\n"
+        exitFailure
+    fi
+
+    # just in case
+    export PATH=$PATH:${INSTALL_DIR}/bin
+    
+    # Build each example (but there is no need test them here as 
+    # checkScenarioLocal() does this)
+    for dd in ${EXAMPLES_DIR}/examples/* ${EXAMPLES_DIR}/examples/*/*; do
+        if test -f "${dd}/makefile" || test -f "${dd}/Makefile"; then
+            printf "Building example in ${dd}\n" >> "${LOG_FILE}"
+            ${MAKE_CMD} -C "${dd}" >> "${LOG_FILE}" 2>&1
+            if test $? -ne 0; then
+                printMessage "Failed to build the example in ${dd}\n"
+                exitFailure
+            else
+                printf "Successfully built the example in ${dd}\n" >> "${LOG_FILE}"
+            fi
+        fi
+    done
+    
+    cd "${WORK_DIR}" || exitFailure
+
+    # Restore the build tree
+    mv "${TEMP_DIR}/build" . || exitFailure
+    printSeparator
+}
+
+########################################################################
 # Scenario: ("local" installation and self-tests)
 # - configure KEDR
 # - build
@@ -304,45 +348,10 @@ checkScenarioGlobal()
     fi
     printSeparator
 
-    # Move the build tree to a temporary location to hide it from the 
-    # installed examples.
-    cd "${WORK_DIR}" || exitFailure
-    mv "${BUILD_DIR}" "${TEMP_DIR}" || exitFailure
-
-    # Copy the installed examples to another directory (the default one 
-    # will probably be read only) and try to build each one of them.
-    cp -r "${INSTALL_DIR}/share/kedr/examples" "${EXAMPLES_DIR}" >> "${LOG_FILE}" 2>&1
-    if test $? -ne 0; then
-        printMessage "Failed to copy the examples from ${INSTALL_DIR}/share/kedr/examples to ${EXAMPLES_DIR}\n"
-        exitFailure
-    fi
-
-    # just in case
-    export PATH=$PATH:${INSTALL_DIR}/bin
-    
-    # Build each example (but there is no need test them here as 
-    # checkScenarioLocal() does this)
-    for dd in ${EXAMPLES_DIR}/examples/*; do
-        if test -d "${dd}"; then
-            printf "Building example in ${dd}\n" >> "${LOG_FILE}"
-            make -C "${dd}" >> "${LOG_FILE}" 2>&1
-            if test $? -ne 0; then
-                printMessage "Failed to build the example in ${dd}\n"
-                exitFailure
-            else
-                printf "Successfully built the example in ${dd}\n" >> "${LOG_FILE}"
-            fi
-        fi
-    done
-    
+    MAKE_CMD="make"
+	buildExamples
     ####################################################################
-    cd "${WORK_DIR}" || exitFailure
 
-    # Restore the build tree
-    mv "${TEMP_DIR}/build" . || exitFailure
-    printSeparator
-
-    ####################################################################
     # Uninstall
     printMessage "===== Uninstalling the system =====\n"
     cd "${BUILD_DIR}" || exitFailure
@@ -423,46 +432,10 @@ checkParallelBuild()
         exitFailure
     fi
     printSeparator
-
-    # Move the build tree to a temporary location to hide it from the 
-    # installed examples.
-    cd "${WORK_DIR}" || exitFailure
-    mv "${BUILD_DIR}" "${TEMP_DIR}" || exitFailure
-
-    # Copy the installed examples to another directory (the default one 
-    # will probably be read only) and try to build each one of them.
-    cp -r "${INSTALL_DIR}/share/kedr/examples" "${EXAMPLES_DIR}" >> "${LOG_FILE}" 2>&1
-    if test $? -ne 0; then
-        printMessage "Failed to copy the examples from ${INSTALL_DIR}/share/kedr/examples to ${EXAMPLES_DIR}\n"
-        exitFailure
-    fi
-
-    # just in case
-    export PATH=$PATH:${INSTALL_DIR}/bin
-    
-    # Build each example (but there is no need test them here as 
-    # checkScenarioLocal() does this)
-    for dd in ${EXAMPLES_DIR}/examples/*; do
-        if test -d "${dd}"; then
-            printf "Building example in ${dd}\n" >> "${LOG_FILE}"
-            ${MAKE_CMD} -C "${dd}" >> "${LOG_FILE}" 2>&1
-            if test $? -ne 0; then
-                printMessage "Failed to build the example in ${dd}\n"
-                exitFailure
-            else
-                printf "Successfully built the example in ${dd}\n" >> "${LOG_FILE}"
-            fi
-        fi
-    done
-    
+  
+    buildExamples
     ####################################################################
-    cd "${WORK_DIR}" || exitFailure
 
-    # Restore the build tree
-    mv "${TEMP_DIR}/build" . || exitFailure
-    printSeparator
-
-    ####################################################################
     # Uninstall
     printMessage "===== Uninstalling the system =====\n"
     cd "${BUILD_DIR}" || exitFailure
