@@ -72,7 +72,7 @@ exitSuccess()
 }
 
 ########################################################################
-# Build the examples using ${MAKE_CMD} as 'make'.
+# "Hide" the build tree of KEDR and build the examples
 ########################################################################
 buildExamples()
 {
@@ -187,7 +187,7 @@ checkScenarioLocal()
 
     # Build the system
     printMessage "===== Building the system =====\n"
-    KBUILD_VERBOSE=1 make >> "${LOG_FILE}" 2>&1
+    KBUILD_VERBOSE=1 ${MAKE_CMD} >> "${LOG_FILE}" 2>&1
     if test $? -ne 0; then
         printMessage "Failed to build the system\n"
         exitFailure
@@ -197,7 +197,7 @@ checkScenarioLocal()
     if test "t${CHECK_KEDR_SELFTEST}" = "tyes"; then
         # Prepare everything for the tests
         printMessage "===== Preparing everything for the tests =====\n"
-        KBUILD_VERBOSE=1 make build_tests >> "${LOG_FILE}" 2>&1
+        KBUILD_VERBOSE=1 ${MAKE_CMD} build_tests >> "${LOG_FILE}" 2>&1
         if test $? -ne 0; then
             printMessage "Failed to build targets required by the tests\n"
             exitFailure
@@ -207,11 +207,12 @@ checkScenarioLocal()
         # Run the tests. 
         printMessage "===== Running the tests =====\n"
 
-        # We may have used 'make test' instead of 'make check' here as the targets
-        # required for the tests should have already been built by 'make build_tests'.
-        # Still, using 'make check' should make no harm.
+        # We may have used '${MAKE_CMD} test' instead of '${MAKE_CMD} check'
+        # here as the targets required for the tests should have already 
+        # been built by '${MAKE_CMD} build_tests'.
+        # Still, using '${MAKE_CMD} check' should make no harm.
         TESTS_FAILED=0
-        KBUILD_VERBOSE=1 make check >> "${LOG_FILE}" 2>&1
+        KBUILD_VERBOSE=1 ${MAKE_CMD} check >> "${LOG_FILE}" 2>&1
         TESTS_FAILED=$?
 
         # Copy the test logs to ${WORK_DIR} from where they could be automatically
@@ -253,7 +254,7 @@ checkScenarioLocal()
 
     # Install the system
     printMessage "===== Installing the system =====\n"
-    make install >> "${LOG_FILE}" 2>&1
+    ${MAKE_CMD} install >> "${LOG_FILE}" 2>&1
     if test $? -ne 0; then
         printMessage "Failed to install the system to ${INSTALL_DIR}\n"
         exitFailure
@@ -267,7 +268,7 @@ checkScenarioLocal()
     # Uninstall
     printMessage "===== Uninstalling the system =====\n"
     cd "${BUILD_DIR}" || exitFailure
-    make uninstall >> "${LOG_FILE}" 2>&1
+    ${MAKE_CMD} uninstall >> "${LOG_FILE}" 2>&1
     if test $? -ne 0; then
         printMessage "Failed to uninstall the system\n"
         exitFailure
@@ -332,91 +333,6 @@ checkScenarioGlobal()
 
     # Build the system
     printMessage "===== Building the system =====\n"
-    make >> "${LOG_FILE}" 2>&1
-    if test $? -ne 0; then
-        printMessage "Failed to build the system\n"
-        exitFailure
-    fi
-    printSeparator
-    
-    # Install the system
-    printMessage "===== Installing the system =====\n"
-    make install >> "${LOG_FILE}" 2>&1
-    if test $? -ne 0; then
-        printMessage "Failed to install the system to ${INSTALL_DIR}\n"
-        exitFailure
-    fi
-    printSeparator
-
-    MAKE_CMD="make"
-	buildExamples
-    ####################################################################
-
-    # Uninstall
-    printMessage "===== Uninstalling the system =====\n"
-    cd "${BUILD_DIR}" || exitFailure
-    make uninstall >> "${LOG_FILE}" 2>&1
-    if test $? -ne 0; then
-        printMessage "Failed to uninstall the system\n"
-        exitFailure
-    fi
-    printSeparator
-}
-
-########################################################################
-# Scenario: building and installing KEDR with 'make -j N', N > 1
-########################################################################
-checkParallelBuild()
-{
-    printMessage "\n"
-    printMessage "Checking scenario: parallel build\n" 
-    printMessage "\n"
-
-    # CMAKE_INSTALL_PREFIX defaults to "/usr/local" on Linux
-    INSTALL_DIR="/usr/local"    
-
-    cd "${WORK_DIR}" || exitFailure
-    rm -rf "${ARCHIVE_DIR}" "${BUILD_DIR}" 
-    rm -rf "${EXAMPLES_DIR}" "${TEMP_DIR}"
-
-    # make will use the following number of "jobs" to perform the build, etc.
-    KEDR_NJOBS=4
-    MAKE_CMD="make -j ${KEDR_NJOBS}"
-
-    ####################################################################
-    {
-        mkdir -p "${BUILD_DIR}" && \
-        mkdir -p "${EXAMPLES_DIR}" && \
-        mkdir -p "${TEMP_DIR}"
-    } >> "${LOG_FILE}" 2>&1
-
-    # Unpack the archive
-    tar xfj "${ARCHIVE_FILE}" 
-    if test $? -ne 0; then
-        printMessage "Failed to unpack ${ARCHIVE_FILE}\n"
-        exitFailure
-    fi
-    printSeparator
-
-    ####################################################################
-    # Configure, build and install the system
-    cd "${BUILD_DIR}" >> "${LOG_FILE}" 2>&1
-    if test $? -ne 0; then
-        printMessage "Failed to change directory to ${BUILD_DIR}\n"
-        exitFailure
-    fi
-
-    # Configure the build
-    printMessage "===== Configuring the system =====\n"
-    cmake \
-        "${WORK_DIR}/${ARCHIVE_DIR}" >> "${LOG_FILE}" 2>&1
-    if test $? -ne 0; then
-        printMessage "Failed to configure the system\n"
-        exitFailure
-    fi
-
-    # Build the system
-    printMessage "===== Building the system =====\n"
     ${MAKE_CMD} >> "${LOG_FILE}" 2>&1
     if test $? -ne 0; then
         printMessage "Failed to build the system\n"
@@ -432,8 +348,8 @@ checkParallelBuild()
         exitFailure
     fi
     printSeparator
-  
-    buildExamples
+
+	buildExamples
     ####################################################################
 
     # Uninstall
@@ -446,6 +362,7 @@ checkParallelBuild()
     fi
     printSeparator
 }
+
 ########################################################################
 # main()
 ########################################################################
@@ -459,6 +376,16 @@ ARCHIVE_DIR="$1"
 ARCHIVE_FILE="${ARCHIVE_DIR}.tar.bz2"
 
 INSTALL_DIR="${WORK_DIR}/install"
+
+# make will use the following number of "jobs" to perform the build, etc.
+# [NB] 'make' should always be invoked in "parallel mode" (make -j N) here.
+# This may slow the things down a bit on uniprocessor systems but it is OK
+# as we need to check parallel builds anyway.
+# This also makes separate checkParallelBuild() scenarios obsolete.
+#
+# [!!!] Make sure ${MAKE_CMD} is always used here rather than plain 'make'.
+KEDR_NJOBS=4
+MAKE_CMD="make -j ${KEDR_NJOBS}"
 
 rm -rf "${LOG_FILE}" 
 rm -rf "${ARCHIVE_DIR}" "${BUILD_DIR}" "${INSTALL_DIR}" 
@@ -500,9 +427,6 @@ checkScenarioLocal
 # can be built without the binary tree of KEDR available.
 checkScenarioGlobal
 
-# Check building and installing KEDR with 'make -j N' where N > 1.
-checkParallelBuild
-
 # Check local installation without standard payload modules.
 CHECK_KEDR_SELFTEST=yes
 ENABLE_STD_PAYLOADS=no
@@ -513,6 +437,7 @@ checkScenarioLocal
 # correctly, add them here.
 # Use 'exitFailure' to abort this script if a failure has been detected.
 # Use 'printMessage' to output messages.
+# Use ${MAKE_CMD} instead of 'make'.
 
 #######################################################################
 exitSuccess
