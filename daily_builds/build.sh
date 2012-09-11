@@ -493,7 +493,7 @@ doTarget()
                 printf "Warning: failed to restore current snapshot for machine \"${vm_name}\"\n"
             fi
         fi
-        VBoxHeadless --startvm ${vm_name} --vrdp=off &
+        VBoxHeadless --startvm ${vm_name} --vrde=off &
         VBOX_HEADLESS_PID=$!
         # $! is the pid of the last backgroud process launched 
         # from this shell.
