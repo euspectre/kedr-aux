@@ -1,0 +1,101 @@
+# In YAML ':' is used for assignment
+module:
+    name: kedr_lc_common_mm
+    author: Eugene A. Shatokhin
+
+# TODO: multiline value should be here - for generality
+header: #define KEDR_RCU_ADDRESS_LIMIT    4096
+
+function:
+# One way for declare several parameters sets with same name is using of
+# YAML sequence.
+# In that case every new parameters set should start with '-'.
+  - name: kfree
+# Short form of YAML map for 'arg' parameters.
+    arg: {type: void*, name: p}
+
+    # The body of the replacement function.
+
+    # Replace '.' in parameter name with '_': '.' is used as parameter
+    # components delimiter in mist2.
+
+    # 
+    # Multiline values are written using sole '|' at the first line.
+    #
+    # Next line should be indented more than key, and that identation
+    # become base one: it is not counted in the resulted string.
+    #
+    # It seems, there is no (handy) way to save indentation of the
+    # first line in multiline string.
+    #
+    # Multiline value is broken by any less-indented line.
+    # The only exception - empty line or line with only spaces.
+
+    handler_pre : |
+        if (!ZERO_OR_NULL_PTR(p)) 
+            kedr_lc_handle_free(target_module, p, caller_address);
+
+# New sequence element - new parameters set for mist2.
+  - name: __kmalloc
+# Sequence of maps - the most simple form for several arguments.
+    arg:
+      - { type: size_t, name: size}
+      - { type: gfp_t, name: flags}
+    returnType: void*
+
+    handler_post : |
+        if (!ZERO_OR_NULL_PTR(ret_val))
+            kedr_lc_handle_alloc(target_module, ret_val, size, caller_address);
+
+# Another way for declare several parameters set with same name -
+# using same YAML key again.
+#
+# This is forbidden by YAML specification ("map keys should be unique
+# and unordered"), but only on the generic interpretation level.
+#
+# Library used for parsing YAML spec doesn't require map keys uniqueness.
+# Moreover, it arrange key-value pairs into simple array.
+#
+# Note, that in this case we doesn't contradict "unordered" property of
+# map keys - functions may be processed in any order, unlike to
+# function's arguments.
+function:
+    name: krealloc
+    arg:
+      - {type: void*, name: p}
+      - {type: size_t, name: size}
+      - {type: gfp_t, name: flags}
+    returnType: void*
+
+    # The body of the replacement function
+    
+    handler_pre: |
+        if (size == 0 || !ZERO_OR_NULL_PTR(p)) {
+            /* kfree */
+            if (!ZERO_OR_NULL_PTR(p)) 
+                kedr_lc_handle_free(target_module, p, caller_address);
+
+                /* [NB] If size != 0 and p != NULL and later the allocation fails, we will
+                 * need to add a fake allocation event for 'p' to the storage because 'p'
+                 * is not actually freed by krealloc() in this case. */
+        }
+
+    handler_post: |
+        if (size != 0) {
+            if (p == NULL) { 
+                /* kmalloc */
+                if (ret_val != NULL)
+                    kedr_lc_handle_alloc(target_module, ret_val,
+                        size, caller_address);
+            } else {
+                /* kfree + kmalloc if everything succeeds */
+                kedr_lc_handle_alloc(target_module, 
+                    ((ret_val != NULL) ? ret_val : p), 
+                    size, caller_address);
+
+                /* If the allocation failed, we return information about 'p'
+                 * to the storage. A minor issue is that stack trace will 
+                 * now point to this call to krealloc rather than to the call 
+                 * when 'p' was allocated. Should not be much of a problem. */
+            }
+        }

@@ -1,0 +1,9 @@
+Example demonstates correspondence between templates and data files in
+format accepted by 'kedr_gen' with ones in 'mist-yaml' format.
+
+Also, new template engine allows to eliminate auxiliary macros in C code.
+
+Templates ('payload-template' directory) are taken from LeakCheck
+in KEDR and accomodated to the new template engine.
+Data file ('functions.data' file) is combined from ones for kfree,
+__kmalloc and krealloc functions and rewritten in YAML format.
