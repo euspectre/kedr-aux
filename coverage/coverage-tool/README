@@ -1,0 +1,58 @@
+coverage_tool - utility for manipulation with coverage traces, produced
+by lcov.
+
+3 mods are implemented:
+
+- add
+    Sum corresponded counters from traces
+
+- diff
+    Substract counters from the second trace from corresponded ones in
+    the first trace. If counter became negative, it is set to 0.
+
+- new-coverage
+    Reset all positive counters in the first trace, that are also
+    positive in the second one. That is, only those lines
+    (branches, functions) remain covered in the first trace,
+    which are not covered in the second one.
+
+
+                        BUILD
+Build is implemented using cmake utility:
+
+# cd <build-dir>
+# cmake <sources-dir>
+# make
+
+For successfull build, next programs should be installed:
+
+- lex (flex)
+- bison (yacc)
+
+
+After building, 'coverage_tool' utility appears under <build-dir>.
+
+                        USING
+
+    coverage_tool add trace1 trace2 ... [options]
+
+sum all given traces,
+    
+
+    coverage_tool diff trace trace_sub [options]
+
+substract counters of 'trace_sub' from 'trace',
+
+
+    coverage_tool new-coverage trace trace_prev [options]
+
+perform corresponded operation on counters of 'trace' and 'trace_prev'.
+
+
+For all modes, resulted trace is written into STDOUT, or, if option
+
+    -o filename
+
+is present, to the file given in that option.
+
+Currently, '-o' is the only option for utility.
