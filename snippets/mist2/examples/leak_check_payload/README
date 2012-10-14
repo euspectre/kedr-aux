@@ -1,4 +1,4 @@
-Example demonstates correspondence between templates and data files in
+Example demonstrates correspondence between templates and data files in
 format accepted by 'kedr_gen' with ones in 'mist-yaml' format.
 
 Also, new template engine allows to eliminate auxiliary macros in C code.
