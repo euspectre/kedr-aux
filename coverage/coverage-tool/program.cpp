@@ -9,158 +9,145 @@
 #include <cstring> /* strcmp */
 
 #include <vector>
+#include <memory> /* auto_ptr */
 
+#include <stdexcept> /* runtime_error */
 
+#include <cassert>
 
 /*
- * Usage:
- * 
- * coverage_tool <command> args...
- * 
- * where 'command' and its argument may be:
- * 
- * ---  diff <trace-file> <sub-trace-file> [-o <out-file>]
- * 
- *       Substract counters of trace, contained in 'sub-trace-file',
- *     from corresponded counters of trace in 'trace-file'.
- *     Resulted trace is written into stdout or 'out-file'.
- *
- * 
- * ---  add <trace-file> ... [-o <out-file>]
- * 
- *       Add corresponded counters in all traces.
- *     Resulted trace is written into stdout or 'out-file'.
- *
- * 
- * ---  new-coverage <trace-file> <trace-file-prev> [-o <out-file>]
- * 
- *       Determine
- * All positive counters in trace, contained which also positive in
- *          'sub-trace-file',
- *     from corresponded counters of trace in 'trace-file'.
- *     Resulted trace is written into stdout or 'out-file'.
+ * Usage: See 'usage' file.
  */
 
 using namespace std;
 
-static void usage(const char* commandName)
+extern char _binary_usage_start[];
+extern char _binary_usage_end[];
+
+static void usage(void)
 {
-    cerr << "Usage:" << endl
-        << "\t" << commandName << "diff <trace> <trace-sub> [-o <out-file>]" << endl
-        << "\t" << commandName << "add <trace> ... [-o <out-file>]" << endl
-        << "\t" << commandName << "new-coverage <trace> <trace-prev> [-o <out-file>]" << endl
-        << endl
-        << "'diff' command compute per-counter difference between <trace> and <trace-sub>" << endl
-        << "\tThat is, set every counter in <trace>, which is positive and for which" << endl
-        << "\tcorrespondent counter is positive to the difference between these counters." << endl
-        << "\tIf resulter counter become negative, it is set to 0." << endl
-        << endl
-        << "'add' command compute per-counter sum for all given traces." << endl
-        << endl
-        << "'new-coverage' command reset(set to 0) all positive counters in <trace>" << endl
-        << "\nfor which corresponded counters in <trace-prev> are also positive." << endl;
+    cout.write(_binary_usage_start, _binary_usage_end - _binary_usage_start);
 }
 
-/* Base class for commands parameters and parsing process. */
-struct ParamsBase
+/* Base class for processor of the command. */
+class CommandProcessor
 {
+public:
+    CommandProcessor();
+    virtual ~CommandProcessor();
+    
+    virtual int parseParams(int argc, char** argv) = 0;
+    virtual int exec() = 0;
+
+protected:
+    void setOutFile(const char* filename);
+    const char* getOutFile(void) const;
+    
+    ostream& getOutStream(void);
+private:
     const char* outFile;
+    /* 
+     * If outFile is not NULL, output stream will be created when
+     * firstly requested. Otherwise this pointer will simply contain
+     * cout.
+     */
+    ostream* outStream;
     
-    ParamsBase();
-    virtual ~ParamsBase() {}
-
-    int parseParams(int argc, char** argv);
-
-    /* Called when no-option argument is encountered while parse params. */
-    virtual int onNoOpt(const char* arg) = 0;
-    /* Called after all parameters has been parsed. */
-    virtual int checkState(void) = 0;
-    
-    /* Output trace into corresponded file (or stdout) */
-    int outTrace(Trace& trace);
+    void resetOutStream(void);
 };
 
 /* Program execution for 'diff' command. */
-struct DiffProcessor: public ParamsBase
+struct DiffProcessor: public CommandProcessor
 {
     const char* traceFile;
     const char* subTraceFile;
 
     DiffProcessor(void);
-
-    int onNoOpt(const char* arg);
-
-    int checkState(void);
     
+    int parseParams(int argc, char** argv);
     int exec();
 };
 
 /* Program execution for 'add' command. */
-struct AddProcessor: public ParamsBase
+struct AddProcessor: public CommandProcessor
 {
     vector<const char*> traceFiles;
     
-    int onNoOpt(const char* arg);
-
-    int checkState(void);
-    
+    int parseParams(int argc, char** argv);
     int exec();
 };
 
 
 /* Program execution for 'new-coverage' command. */
-struct NewCoverageProcessor: public ParamsBase
+struct NewCoverageProcessor: public CommandProcessor
 {
     const char* traceFile;
     const char* prevTraceFile;
 
     NewCoverageProcessor(void);
 
-    int onNoOpt(const char* arg);
-
-    int checkState(void);
-    
+    int parseParams(int argc, char** argv);
     int exec();
 };
 
+/* Program execution for 'stat' command */
+struct StatProcessor: public CommandProcessor
+{
+    const char* traceFile;
+    const char* format;
+    
+    StatProcessor(void);
+
+    int parseParams(int argc, char** argv);
+    int exec();
+private:
+    static const char* defaultFormat;
+};
 
 int main(int argc, char** argv)
 {
     if(argc < 1)
     {
         cerr << argv[0] << ": Command argument is required." << endl;
-        usage(argv[0]);
+        usage();
         return 1;
     }
-    
-    if(strcmp(argv[1], "diff") == 0)
+
+
+    auto_ptr<CommandProcessor> commandProcessor;
+#define isCommand(command) (strcmp(argv[1], command) == 0)
+    if(isCommand("diff"))
     {
-        DiffProcessor diffProcessor;
-        if(diffProcessor.parseParams(argc - 1, argv + 1)) return 1;
-        
-        return diffProcessor.exec();
+        commandProcessor.reset(new DiffProcessor());
     }
-    else if(strcmp(argv[1], "add") == 0)
+    else if(isCommand("add"))
     {
-        AddProcessor addProcessor;
-        if(addProcessor.parseParams(argc - 1, argv + 1)) return 1;
-        
-        return addProcessor.exec();
+        commandProcessor.reset(new AddProcessor());
     }
-    else if(strcmp(argv[1], "new-coverage") == 0)
+    else if(isCommand("new-coverage"))
     {
-        NewCoverageProcessor newCoverageProcessor;
-        if(newCoverageProcessor.parseParams(argc - 1, argv + 1)) return 1;
-        
-        return newCoverageProcessor.exec();
+        commandProcessor.reset(new NewCoverageProcessor());
+    }
+    else if(isCommand("stat"))
+    {
+        commandProcessor.reset(new StatProcessor());
+    }
+    else if(isCommand("-h") || isCommand("--help"))
+    {
+        cerr << "Invalid command: " << argv[1] << endl;
+        usage();
     }
     else
     {
         cerr << "Invalid command: " << argv[1] << endl;
-        usage(argv[0]);
+        cerr << "Use " << argv[0] << " -h for help" << endl;
+        return 1;
     }
+#undef isCommand
+
+    if(commandProcessor->parseParams(argc - 1, argv + 1)) return 1;
     
-    return 0;
+    return commandProcessor->exec();
 }
 
 /************************* Helpers ************************************/
@@ -184,43 +171,112 @@ static int traceReadFromFile(Trace& trace, const char* filename)
     
     return 0;
 }
-/* Print warnings about difference in elements in the traces */
-class EventNotifierWarnNew: public TraceModifierEventNotifier
+
+/* 
+ * Modifier class, which print warning messages when new elements
+ * are found in traces.
+ */
+class TraceModifierWarnNew: public Trace::Modifier, public Trace::FileInfo::Modifier
 {
 public:
-    void onFileGroupEndNew()
+    void onFileGroupEndNew(Trace& /*traceModified*/)
     {
         cerr << "Traces has different file groups." << endl;
     }
 
-    void onSourceEndNew()
+    void onSourceEndNew(Trace::FileGroupID& /*groupModified*/)
     {
         cerr << "Traces has different sources." << endl;
     }
-    
-    void newFunc()
+
+    Trace::FileInfo::Modifier* onSourceStart(
+        const std::map<std::string, Trace::FileInfo>::value_type& /*source*/)
+    {
+        return this;
+    }
+
+
+    void newFunc(Trace::FileInfo& /*fileModified*/)
     {
         cerr << "Traces has different functions." << endl;
     }
 
-    void newBranch()
+    void newBranch(Trace::FileInfo& /*fileModified*/)
     {
         cerr << "Traces has different branches." << endl;
     }
 
-    void newLine()
+    void newLine(Trace::FileInfo& /*fileModified*/)
     {
         cerr << "Traces has different lines." << endl;
     }
 };
 
-/* Base parameters class */
-ParamsBase::ParamsBase(): outFile(NULL) {}
 
-int ParamsBase::parseParams(int argc, char** argv)
+/* Base CommandProcessor class */
+CommandProcessor::CommandProcessor(): outFile(NULL), outStream(NULL) {}
+
+void CommandProcessor::resetOutStream(void)
 {
-    static const char options[] = "-o:";
-    int result;
+    if(outStream)
+    {
+        if(outFile)
+        {
+            ofstream* realStream = static_cast<ofstream*>(outStream);
+            realStream->close();
+            delete realStream;
+        }
+        outStream = NULL;
+    }
+}
+
+CommandProcessor::~CommandProcessor()
+{
+    resetOutStream();
+}
+
+void CommandProcessor::setOutFile(const char* filename)
+{
+    resetOutStream();
+    outFile = filename;
+}
+
+const char* CommandProcessor::getOutFile(void) const
+{
+    return outFile;
+}
+
+ostream& CommandProcessor::getOutStream(void)
+{
+    if(!outStream)
+    {
+        if(outFile)
+        {
+            ofstream* realStream = new ofstream(outFile);
+            if(!realStream)
+            {
+                cerr << "Failed to open file '" << outFile << "' for write." << endl;
+                delete realStream;
+                throw runtime_error("Failed to open file");
+            }
+            outStream = realStream;
+        }
+        else
+        {
+            outStream = &cout;
+        }
+    }
+    return *outStream;
+}
+
+
+/********************* Difference implementation **********************/
+/* Params */
+DiffProcessor::DiffProcessor(): traceFile(NULL), subTraceFile(NULL) {}
+
+int DiffProcessor::parseParams(int argc, char** argv)
+{
+    static const char options[] = "+o:";
     
     for(int opt = getopt(argc, argv, options);
         opt != -1;
@@ -232,85 +288,32 @@ int ParamsBase::parseParams(int argc, char** argv)
             //error in options
             return -1;
         case 'o':
-            if(outFile)
-            {
-                cerr << "Double '-o' option" << endl;
-                return -1;
-            }
-            outFile = optarg;
-            break;
-        case 1:
-            result = onNoOpt(optarg);
-            if(result) return result;
+            setOutFile(optarg);
             break;
         default:
             return -1;
         }
     }
-    return checkState();
-}
-
-int ParamsBase::outTrace(Trace& trace)
-{
-    if(outFile)
+    
+    char** argv_rest = argv + optind;
+    int argc_rest = argc - optind;
+    
+    if(argc_rest != 2)
     {
-        ofstream os(outFile);
-        if(!os)
-        {
-            cerr << "Failed to open file '"  << outFile << "' for write trace." << endl;
-            return 1;
-        }
-        trace.write(os);
-    }
-    else
-    {
-        trace.write(cout);
-    }
-
-    return 0;
-}
-
-/********************* Difference implementation **********************/
-/* Params */
-DiffProcessor::DiffProcessor(): traceFile(NULL), subTraceFile(NULL) {}
-
-int DiffProcessor::onNoOpt(const char* arg)
-{
-    if(!traceFile)
-    {
-        traceFile = optarg;
-    }
-    else if(!subTraceFile)
-    {
-        subTraceFile = optarg;
-    }
-    else
-    {
-        cerr << "Exceeded command-line argument: " << optarg << endl;
+        if(argc_rest == 0) cerr << "Trace file is missed." << endl;
+        if(argc_rest == 1) cerr << "File with substracted trace is missed." << endl;
+        else cerr << "Exceeded command-line argument: " << optarg << endl;
         return -1;
     }
+    
+    traceFile = argv_rest[0];
+    subTraceFile = argv_rest[1];
     
     return 0;
 }
 
-int DiffProcessor::checkState(void)
-{
-    if(!traceFile)
-    {
-        cerr << "Trace file is missed." << endl;
-        return -1;
-    }
-    else if(!subTraceFile)
-    {
-        cerr << "File for substracted trace is missed." << endl;
-        return -1;
-    }
-    
-    return 0;
-}
-
-/* Trace */
-class EventNotifierDiff: public EventNotifierWarnNew
+/* Trace modifier */
+class TraceModifierDiff: public TraceModifierWarnNew
 {
 public:
     bool onFunction(const map<string, Trace::FuncInfo>::value_type& func)
@@ -318,10 +321,10 @@ public:
         /* Needn't process function if its counter non-positive */
         return func.second.counter <= 0;
     }
-    void modifyFuncCounter(counter_t& counter,
-        counter_t counterAnother)
+    void modifyFuncCounter(counter_t counter,
+        counter_t& counterModified)
     {
-        diffCounter(counter, counterAnother);
+        diffCounter(counter, counterModified);
     }
 
     bool onBranch(const map<Trace::BranchID, counter_t>::value_type& branch)
@@ -329,9 +332,9 @@ public:
         return branch.second <= 0;
     }
 
-    void modifyBranchCounter(counter_t& counter, counter_t counterAnother)
+    void modifyBranchCounter(counter_t counter, counter_t& counterModified)
     {
-        diffCounter(counter, counterAnother);
+        diffCounter(counter, counterModified);
     }
 
     bool onLine(const map<int, counter_t>::value_type& line)
@@ -339,22 +342,22 @@ public:
         return line.second <= 0;
     }
 
-    void modifyLineCounter(counter_t& counter, counter_t counterAnother)
+    void modifyLineCounter(counter_t counter, counter_t& counterModified)
     {
-        diffCounter(counter, counterAnother);
+        diffCounter(counter, counterModified);
     }
 private:
-    void diffCounter(counter_t& counter, counter_t counterAnother)
+    void diffCounter(counter_t counter, counter_t& counterModified)
     {
-        if(counter > 0)
+        if(counterModified > 0)
         {
-            if(counterAnother >= counter)
+            if(counter >= counterModified)
             {
-                counter = 0;
+                counterModified = 0;
             }
             else
             {
-                counter -= counterAnother;
+                counterModified -= counter;
             }
         }
     }
@@ -373,33 +376,58 @@ int DiffProcessor::exec()
     if(result) return result;
 
     
-    EventNotifierDiff notifier;
-    modifyTrace(trace, traceSub, notifier);
+    TraceModifierDiff modifier;
+    modifyTrace(traceSub, modifier, trace);
 
-    return outTrace(trace);
-}
-/************************* Add implementation *************************/
-/* Params */
-
-int AddProcessor::onNoOpt(const char* arg)
-{
-    traceFiles.push_back(optarg);
-    return 0;
-}
-
-int AddProcessor::checkState()
-{
-    if(traceFiles.empty())
+    ostream& outStream = getOutStream();
+    trace.write(outStream);
+    if(!outStream)
     {
-        cerr << "At least one trace should be given for 'add' command." << endl;
-        return -1;
+        cerr << "Errors occure while write trace." << endl;
+        return 1;
     }
     
     return 0;
 }
+/************************* Add implementation *************************/
+/* Params */
+int AddProcessor::parseParams(int argc, char** argv)
+{
+    static const char options[] = "+o:";
+    
+    for(int opt = getopt(argc, argv, options);
+        opt != -1;
+        opt = getopt(argc, argv, options))
+    {
+        switch(opt)
+        {
+        case '?':
+            //error in options
+            return -1;
+        case 'o':
+            setOutFile(optarg);
+            break;
+        default:
+            return -1;
+        }
+    }
+    
+    char** argv_rest = argv + optind;
+    int argc_rest = argc - optind;
+    
+    if(argc_rest < 1)
+    {
+        cerr << "At least one trace file should be specified for 'add' command." << endl;
+        return -1;
+    }
+    
+    traceFiles.insert(traceFiles.end(), argv_rest, argv_rest + argc_rest);
+    
+    return 0;
+}
 
-/* Trace */
-class EventNotifierAdd: public EventNotifierWarnNew
+/* Trace modifier */
+class TraceModifierAdd: public TraceModifierWarnNew
 {
 public:
     bool onFunction(const map<string, Trace::FuncInfo>::value_type& func)
@@ -407,10 +435,10 @@ public:
         /* Needn't process function if its counter non-positive */
         return func.second.counter <= 0;
     }
-    void modifyFuncCounter(counter_t& counter,
-        counter_t counterAnother)
+    void modifyFuncCounter(counter_t counter,
+        counter_t& counterModified)
     {
-        addCounter(counter, counterAnother);
+        addCounter(counter, counterModified);
     }
 
     bool onBranch(const map<Trace::BranchID, counter_t>::value_type& branch)
@@ -418,9 +446,9 @@ public:
         return branch.second <= 0;
     }
 
-    void modifyBranchCounter(counter_t& counter, counter_t counterAnother)
+    void modifyBranchCounter(counter_t counter, counter_t& counterModified)
     {
-        addCounter(counter, counterAnother);
+        addCounter(counter, counterModified);
     }
 
     bool onLine(const map<int, counter_t>::value_type& line)
@@ -428,20 +456,20 @@ public:
         return line.second <= 0;
     }
 
-    void modifyLineCounter(counter_t& counter, counter_t counterAnother)
+    void modifyLineCounter(counter_t counter, counter_t& counterModified)
     {
-        addCounter(counter, counterAnother);
+        addCounter(counter, counterModified);
     }
 private:
-    void addCounter(counter_t& counter, counter_t counterAnother)
+    void addCounter(counter_t counter, counter_t& counterModified)
     {
-        if(counter > 0)
+        if(counterModified > 0)
         {
-            counter+= counterAnother;
+            counterModified += counter;
         }
         else
         {
-            counter = counterAnother;
+            counterModified = counter;
         }
     }
 };
@@ -454,18 +482,26 @@ int AddProcessor::exec()
     result = traceReadFromFile(trace, traceFiles[0]);
     if(result) return result;
 
-    EventNotifierAdd notifier;
+    TraceModifierAdd modifier;
     
-    for(int i = 1; i < traceFiles.size(); i++)
+    for(int i = 1; i < (int)traceFiles.size(); i++)
     {
         Trace traceAdd;
         result = traceReadFromFile(traceAdd, traceFiles[i]);
         if(result) return result;
 
-        modifyTrace(trace, traceAdd, notifier);
+        modifyTrace(traceAdd, modifier, trace);
     }
 
-    return outTrace(trace);
+    ostream& outStream = getOutStream();
+    trace.write(outStream);
+    if(!outStream)
+    {
+        cerr << "Errors occure while write trace." << endl;
+        return 1;
+    }
+    
+    return 0;
 }
 
 /************************ New coverage implementation *****************/
@@ -473,43 +509,47 @@ int AddProcessor::exec()
 NewCoverageProcessor::NewCoverageProcessor()
     : traceFile(NULL), prevTraceFile(NULL) {}
 
-int NewCoverageProcessor::onNoOpt(const char* arg)
+int NewCoverageProcessor::parseParams(int argc, char** argv)
 {
-    if(!traceFile)
+    static const char options[] = "+o:";
+    
+    for(int opt = getopt(argc, argv, options);
+        opt != -1;
+        opt = getopt(argc, argv, options))
     {
-        traceFile = optarg;
+        switch(opt)
+        {
+        case '?':
+            //error in options
+            return -1;
+        case 'o':
+            setOutFile(optarg);
+            break;
+        default:
+            return -1;
+        }
     }
-    else if(!prevTraceFile)
+    
+    char** argv_rest = argv + optind;
+    int argc_rest = argc - optind;
+    
+    if(argc_rest != 2)
     {
-        prevTraceFile = optarg;
-    }
-    else
-    {
-        cerr << "Exceeded command-line argument: " << optarg << endl;
+        if(argc_rest == 0) cerr << "Trace file is missed." << endl;
+        if(argc_rest == 1) cerr << "File with substracted trace is missed." << endl;
+        else cerr << "Exceeded command-line argument: " << optarg << endl;
         return -1;
     }
-
-    return 0;
-}
-
-int NewCoverageProcessor::checkState()
-{
-    if(!traceFile)
-    {
-        cerr << "Trace file is missed." << endl;
-        return -1;
-    }
-    else if(!prevTraceFile)
-    {
-        cerr << "File for base(previous) trace is missed." << endl;
-        return -1;
-    }
+    
+    traceFile = argv_rest[0];
+    prevTraceFile = argv_rest[1];
     
     return 0;
 }
 
-/* Trace */
-class EventNotifierNewCoverage: public EventNotifierWarnNew
+
+/* Trace modifier */
+class TraceModifierNewCoverage: public TraceModifierWarnNew
 {
 public:
     bool onFunction(const map<string, Trace::FuncInfo>::value_type& func)
@@ -517,10 +557,10 @@ public:
         /* Needn't process function if its counter non-positive */
         return func.second.counter <= 0;
     }
-    void modifyFuncCounter(counter_t& counter,
-        counter_t counterAnother)
+    void modifyFuncCounter(counter_t counter,
+        counter_t& counterModified)
     {
-        newCounter(counter, counterAnother);
+        newCounter(counter, counterModified);
     }
 
     bool onBranch(const map<Trace::BranchID, counter_t>::value_type& branch)
@@ -528,9 +568,9 @@ public:
         return branch.second <= 0;
     }
 
-    void modifyBranchCounter(counter_t& counter, counter_t counterAnother)
+    void modifyBranchCounter(counter_t counter, counter_t& counterModified)
     {
-        newCounter(counter, counterAnother);
+        newCounter(counter, counterModified);
     }
 
     bool onLine(const map<int, counter_t>::value_type& line)
@@ -538,16 +578,16 @@ public:
         return line.second <= 0;
     }
 
-    void modifyLineCounter(counter_t& counter, counter_t counterAnother)
+    void modifyLineCounter(counter_t counter, counter_t& counterModified)
     {
-        newCounter(counter, counterAnother);
+        newCounter(counter, counterModified);
     }
 private:
-    void newCounter(counter_t& counter, counter_t counterAnother)
+    void newCounter(counter_t counter, counter_t& counterModified)
     {
-        if(counterAnother > 0)
+        if(counter > 0)
         {
-            counter = 0;
+            counterModified = 0;
         }
     }
 };
@@ -564,8 +604,273 @@ int NewCoverageProcessor::exec()
     result = traceReadFromFile(tracePrev, prevTraceFile);
     if(result) return result;
 
-    EventNotifierNewCoverage notifier;
-    modifyTrace(trace, tracePrev, notifier);
+    TraceModifierNewCoverage modifier;
+    modifyTrace(tracePrev, modifier, trace);
 
-    return outTrace(trace);
+    ostream& outStream = getOutStream();
+    trace.write(outStream);
+    if(!outStream)
+    {
+        cerr << "Errors occure while write trace." << endl;
+        return 1;
+    }
+    
+    return 0;
+}
+
+/***************************** Stat implementation ********************/
+/* Params */
+const char* StatProcessor::defaultFormat =
+    "Lines: %pl%% (%l of %L)\n"
+    "Functions: %pf%% (%f of %F)\n"
+    "Branches: %pb%% (%b of %B)\n";
+
+StatProcessor::StatProcessor(): traceFile(NULL), format(defaultFormat) {}
+
+int StatProcessor::parseParams(int argc, char** argv)
+{
+    static const char options[] = "+o:f:";
+    
+    for(int opt = getopt(argc, argv, options);
+        opt != -1;
+        opt = getopt(argc, argv, options))
+    {
+        switch(opt)
+        {
+        case '?':
+            //error in options
+            return -1;
+        case 'o':
+            setOutFile(optarg);
+            break;
+        case 'f':
+            format = optarg;
+            break;
+        default:
+            return -1;
+        }
+    }
+    
+    char** argv_rest = argv + optind;
+    int argc_rest = argc - optind;
+    
+    if(argc_rest != 1)
+    {
+        if(argc_rest == 0) cerr << "Trace file is missed." << endl;
+        else cerr << "Exceeded command-line argument: " << optarg << endl;
+        return -1;
+    }
+    
+    traceFile = argv_rest[0];
+    
+    return 0;
+}
+
+/* Output */
+
+class StatPrinter
+{
+public:
+    StatPrinter(Trace& trace, ostream& os);
+    
+    void print(const char* format);
+private:
+    Trace& trace;
+    ostream& os;
+    /* Print specificator. Return pointer to the end of specificator. */
+    const char* printSpec(const char* specPointer);
+    /* Print escape sequence. Return pointer to the end of the sequence. */
+    const char* printEsc(const char* seqPointer);
+
+    int linesTotal;
+    int linesTotalHit;
+    int functionsTotal;
+    int functionsTotalHit;
+    int branchesTotal;
+    int branchesTotalHit;
+    
+    int getLinesTotal(void)
+    {
+        if(linesTotal == -1) linesTotal = trace.linesTotal();
+        return linesTotal;
+    }
+    int getLinesTotalHit(void)
+    {
+        if(linesTotalHit == -1) linesTotalHit = trace.linesTotalHit();
+        return linesTotalHit;
+    }
+    int getFunctionsTotal(void)
+    {
+        if(functionsTotal == -1) functionsTotal = trace.functionsTotal();
+        return functionsTotal;
+    }
+    int getFunctionsTotalHit(void)
+    {
+        if(functionsTotalHit == -1) functionsTotalHit = trace.functionsTotalHit();
+        return functionsTotalHit;
+    }
+    int getBranchesTotal(void)
+    {
+        if(branchesTotal == -1) branchesTotal = trace.branchesTotal();
+        return branchesTotal;
+    }
+    int getBranchesTotalHit(void)
+    {
+        if(branchesTotalHit == -1) branchesTotalHit = trace.branchesTotalHit();
+        return branchesTotalHit;
+    }
+
+    void printPercent(int a, int A);
+};
+
+StatPrinter::StatPrinter(Trace& trace, ostream& os)
+    : trace(trace), os(os),
+        linesTotal(-1), linesTotalHit(-1),
+        functionsTotal(-1), functionsTotalHit(-1),
+        branchesTotal(-1), branchesTotalHit(-1)
+{}
+
+void StatPrinter::print(const char* format)
+{
+    const char* p = format;
+    while(*p) switch(*p)
+    {
+    case '%':
+        p = printSpec(p + 1);
+        break;
+    case '\\':
+        p = printEsc(p + 1);
+        break;
+    default:
+        os << *p;
+        p++;
+        break;
+    }
+}
+
+const char* StatPrinter::printSpec(const char* specPointer)
+{
+    int count;
+    switch(*specPointer)
+    {
+    case 'l':
+        count = getLinesTotalHit();
+        cout << "Counter is " << count << "." << endl;
+        os << count;
+        break;
+    case 'L':
+        os << getLinesTotal();
+        break;
+    case 'f':
+        os << getFunctionsTotalHit();
+        break;
+    case 'F':
+        os << getFunctionsTotal();
+        break;
+    case 'b':
+        os << getBranchesTotalHit();
+        break;
+    case 'B':
+        os << getBranchesTotal();
+        break;
+    case 'p':
+        switch(specPointer[1])
+        {
+        case 'l':
+            printPercent(getLinesTotalHit(), getLinesTotal());
+            break;
+        case 'f':
+            printPercent(getFunctionsTotalHit(), getFunctionsTotal());
+            break;
+        case 'b':
+            printPercent(getBranchesTotalHit(), getBranchesTotal());
+            break;
+        case '\0':
+            cerr << "WARINING: Unknown specificator '%p' at the end of stat format." << endl;
+            return specPointer;
+        default:
+            cerr << "WARINING: Unknown specificator '%p" << specPointer[1] << "' in stat format." << endl;
+            return specPointer;
+        }
+        return specPointer + 2;
+    case '%':
+        os << '%';
+        break;
+    case '\0':
+        cerr << "WARINING: '%' at the end of stat format." << endl;
+        return specPointer;
+    default:
+        cerr << "WARINING: Unknown specificator '%" << specPointer[0] << "' in stat format." << endl;
+        return specPointer;
+    }
+    return specPointer + 1;
+}
+
+const char* StatPrinter::printEsc(const char* seqPointer)
+{
+    switch(*seqPointer)
+    {
+    case '\\':
+        os << '\\';
+        break;
+    case 'n':
+        os << '\n';
+        break;
+    case 't':
+        os << '\t';
+        break;
+    case '\0':
+        cerr << "WARINING: '\\' at the end of stat format." << endl;
+        return seqPointer;
+    default:
+        cerr << "WARINING: Unknown escape sequence '\\" << seqPointer[0] << "' in stat format." << endl;
+        return seqPointer;
+    }
+    return seqPointer + 1;
+}
+
+void StatPrinter::printPercent(int a, int A)
+{
+    assert(a <= A);
+    if(A == 0)
+    {
+        os << '*';
+    }
+    int whole = (a * 100) / A;
+    int frac = (a * 10000 / A - whole * 100);
+    
+    if((whole == 0) && (frac == 0))
+    {
+        if(a > 0) frac = 1;/* 0% only when a == 0 */
+    }
+    
+    os << whole << ".";
+    
+    int oldWidth = os.width(2);
+    os << frac;
+    os.width(oldWidth);
+}
+
+/* Exec */
+int StatProcessor::exec()
+{
+    int result;
+    
+    Trace trace;
+    result = traceReadFromFile(trace, traceFile);
+    if(result) return result;
+
+    trace.groupFiles();
+    
+    ostream& outStream = getOutStream();
+    StatPrinter printer(trace, outStream);
+    printer.print(format);
+
+    if(!outStream)
+    {
+        cerr << "Errors occure while write statistic." << endl;
+        return 1;
+    }
+    
+    return 0;
 }
