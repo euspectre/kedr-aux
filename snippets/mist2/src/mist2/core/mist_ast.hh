@@ -9,14 +9,14 @@
 #include <cstdlib> /* malloc/free */
 #include <cassert> /* assert() */
 #include <memory> /* auto_ptr */
+#include <algorithm> /* for_each */
 
 /* Forward declaration of template subclasses */
 class MistASTTemplateRef;
 class MistASTText;
 class MistASTIf;
-class MistASTJoin;
 class MistASTWith;
-class MistASTTemplateSequence;
+class MistASTFunction;
 
 /* Base AST Template class. */
 class MistASTTemplate
@@ -36,8 +36,8 @@ public:
             (const MistASTText& astText) = 0;
         virtual void visitIf
             (const MistASTIf& astIf) = 0;
-        virtual void visitJoin
-            (const MistASTJoin& astJoin) = 0;
+        virtual void visitFunc
+            (const MistASTFunction& astFunction) = 0;
         virtual void visitWith
             (const MistASTWith& astWith) = 0;
 
@@ -48,7 +48,12 @@ public:
 
 };
 
-/* Template consisted from sequence of zero or more templates */
+/* 
+ * Template consisted from sequence of zero or more templates.
+ * 
+ * NOTE: sequence is not subclass of template because it never can be
+ * messed with other template subclasses.
+ */
 class MistASTTemplateSequence
 {
 public:
@@ -119,38 +124,50 @@ public:
 class MistASTIf: public MistASTTemplate
 {
 public:
-    /* Condition - template checked for emptyness*/
-    std::auto_ptr<MistASTTemplate> condition;
-    /* Template corresponded to non-empty condition */
-    std::auto_ptr<MistASTTemplateSequence> positivePart;
-    /* Template corresponded to empty condition, may be NULL. */
-    std::auto_ptr<MistASTTemplateSequence> negativePart;
+    /* One condition - template pair. */
+    struct ConditionPart
+    {
+        /* Condition - template checked for emptyness*/
+        std::auto_ptr<MistASTTemplate> condition;
+        /* Template corresponded to non-empty condition */
+        std::auto_ptr<MistASTTemplateSequence> positivePart;
+        
+        ConditionPart(std::auto_ptr<MistASTTemplate> condition,
+            std::auto_ptr<MistASTTemplateSequence> positivePart)
+            : condition(condition), positivePart(positivePart) {}
+    };
+    std::vector<ConditionPart*> conditionParts;
     
+    /* Template corresponded to case when all conditions are emtpy. */
+    std::auto_ptr<MistASTTemplateSequence> elsePart;
+
     MistASTIf(std::auto_ptr<MistASTTemplate> condition,
-        std::auto_ptr<MistASTTemplateSequence> positivePart,
-        std::auto_ptr<MistASTTemplateSequence> negativePart = std::auto_ptr<MistASTTemplateSequence>(NULL) ):
-        condition(condition),
-        positivePart(positivePart), negativePart(negativePart) {}
+            std::auto_ptr<MistASTTemplateSequence> positivePart)
+    {
+        addConditionPart(condition, positivePart);
+    }
+    
+    void addConditionPart(std::auto_ptr<MistASTTemplate> condition,
+        std::auto_ptr<MistASTTemplateSequence> positivePart)
+    {
+        std::auto_ptr<ConditionPart> newPart(
+            new ConditionPart(condition, positivePart));
+        
+        conditionParts.push_back(newPart.get());
+        newPart.release();
+    }
 
     void visit(Visitor& visitor) const
         {return visitor.visitIf(*this);}
-};
 
-/* Join statement as template */
-class MistASTJoin: public MistASTTemplate
-{
-public:
-    /* Template reference which is joined */
-    std::auto_ptr<MistASTTemplateRef> joinedPart;
-    /* Text for insert between templates. May be NULL. */
-    std::auto_ptr<std::string> textBetween;
-
-    MistASTJoin(std::auto_ptr<MistASTTemplateRef> joinedPart,
-        std::auto_ptr<std::string> textBetween):
-        joinedPart(joinedPart), textBetween(textBetween) {}
-
-    void visit(Visitor& visitor) const
-        {return visitor.visitJoin(*this);}
+    
+    ~MistASTIf()
+    {
+        std::for_each(conditionParts.begin(), conditionParts.end(), deleteConditionPart);
+    }
+private:
+    static void deleteConditionPart(ConditionPart* conditionPart)
+        {delete conditionPart;}
 };
 
 /* With statement as template */
@@ -170,6 +187,28 @@ public:
         {return visitor.visitWith(*this);}
 };
 
+/* General function. */
+class MistASTFunction: public MistASTTemplate
+{
+public:
+    /* Name of the function */
+    std::auto_ptr<std::string> name;
+
+    /* Optional text parameter */
+    std::auto_ptr<std::string> param;
+    
+    /* Function argument */
+    std::auto_ptr<MistASTTemplate> templateInternal;
+
+    MistASTFunction(std::auto_ptr<std::string> name) : name(name) {}
+    
+    MistASTFunction(std::auto_ptr<std::string> name,
+        std::auto_ptr<std::string> param):
+        name(name), param(param) {}
+    
+    void visit(Visitor& visitor) const
+        {return visitor.visitFunc(*this);}
+};
 
 /************************** AST itself ********************************/
 class MistAST

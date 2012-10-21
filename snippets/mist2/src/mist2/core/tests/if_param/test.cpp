@@ -1,3 +1,5 @@
+/* Check that 'if' construction is interpreted correctly. */
+
 #include <mist2/mist.hh>
 
 #include "mist_test_common.hh"

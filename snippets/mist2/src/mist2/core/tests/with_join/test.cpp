@@ -1,4 +1,4 @@
-/* Check that 'join' correctly works inside 'with' scope. */
+/* Check that 'join' for 'with' scope is correctly parsed. */
 
 #include <mist2/mist.hh>
 
@@ -16,12 +16,7 @@ public:
     {
         if(name == "main")
         {
-            istringstream ss("<$subtemplate: join \"\\n\"$>");
-            return new Mist::Template(ss, "");
-        }
-        if(name == "subtemplate")
-        {
-            istringstream ss("<$with param$><$param.param1: join \",\"$><$endwith$>");
+            istringstream ss("<$with param$><$param.param1: join \",\"$><$endwith: join \"\\n\"$>");
             return new Mist::Template(ss, "");
         }
 

@@ -1,0 +1,3 @@
+#!/bin/sh
+
+@CMAKE_BINARY_DIR@/src/mist-yaml @CMAKE_CURRENT_SOURCE_DIR@/template @CMAKE_CURRENT_SOURCE_DIR@/objects.data > code.c

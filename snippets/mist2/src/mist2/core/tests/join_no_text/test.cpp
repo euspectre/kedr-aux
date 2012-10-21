@@ -1,3 +1,5 @@
+/* Check that 'join' without text is correctly parsed and work.*/
+
 #include <mist2/mist.hh>
 
 #include "mist_test_common.hh"

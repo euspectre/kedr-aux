@@ -30,7 +30,7 @@ private:
         void visitRef(const MistASTTemplateRef& astRef);
         void visitText(const MistASTText& astText);
         void visitIf(const MistASTIf& astIf);
-        void visitJoin(const MistASTJoin& astJoin);
+        void visitFunc(const MistASTFunction& astFunction);
         void visitWith(const MistASTWith& astWith);
         void visitSequence(const MistASTTemplateSequence& astSequence);
     private:
@@ -78,21 +78,35 @@ Template::Impl* Mist::Template::Builder::InternalTemplateBuilder::build(
 void Mist::Template::Builder::InternalTemplateBuilder::visitIf(
     const MistASTIf& astIf)
 {
-    const MistASTTemplate& condition = *astIf.condition;
-    Template::Impl* conditionTemplate = builder.buildTemplate(condition);
+    assert(!astIf.conditionParts.empty());
+
+    MistASTIf::ConditionPart* lastPart = astIf.conditionParts.back();
     
-    Template::Impl* ifTemplate;
     Template::Impl* elseTemplate;
     
-    ifTemplate = builder.buildSequence(*astIf.positivePart);
-
-    if(astIf.negativePart.get())
-        elseTemplate = builder.buildSequence(*astIf.negativePart);
+    if(astIf.elsePart.get())
+    {
+        elseTemplate = builder.buildSequence(*astIf.elsePart);
+    }
     else
+    {
         elseTemplate = new MistTemplateEmpty();
-
-    result = new MistTemplateIf(conditionTemplate,
-        ifTemplate, elseTemplate);
+    }
+    
+    result = new MistTemplateIf(
+        builder.buildTemplate(*lastPart->condition),
+        builder.buildSequence(*lastPart->positivePart),
+        elseTemplate);
+    
+    for(int i = (int)astIf.conditionParts.size() - 2; i>= 0; i--)
+    {
+        MistASTIf::ConditionPart* part = astIf.conditionParts[i];
+        
+        result = new MistTemplateIf(
+            builder.buildTemplate(*part->condition),
+            builder.buildSequence(*part->positivePart),
+            result);
+    }
 }
 
 
@@ -109,15 +123,44 @@ void Mist::Template::Builder::InternalTemplateBuilder::visitText(
     result = new MistTemplateText(*astText.text);
 }
 
-void Mist::Template::Builder::InternalTemplateBuilder::visitJoin(
-    const MistASTJoin& astJoin)
+void Mist::Template::Builder::InternalTemplateBuilder::visitFunc(
+    const MistASTFunction& astFunction)
 {
-    string textBetween;
-    if(astJoin.textBetween.get())
-        textBetween = *astJoin.textBetween;
+    const string& name = *astFunction.name;
+    
+    if(name == "join")
+    {
+        string textBetween;
+        if(astFunction.param.get())
+            textBetween = *astFunction.param;
 
-    result = new MistTemplateJoin(
-        builder.buildTemplate(*astJoin.joinedPart), textBetween);
+        result = new MistTemplateJoin(
+            builder.buildTemplate(*astFunction.templateInternal), textBetween);
+    }
+    else if(name == "rjoin")
+    {
+        string textBetween;
+        if(astFunction.param.get())
+            textBetween = *astFunction.param;
+
+        result = new MistTemplateRJoin(
+            builder.buildTemplate(*astFunction.templateInternal), textBetween);
+    }
+    else if(name == "indent")
+    {
+        string indent;
+        if(astFunction.param.get())
+            indent = *astFunction.param;
+
+        result = new MistTemplateIndent(
+            builder.buildTemplate(*astFunction.templateInternal), indent);
+    }
+
+    else
+    {
+        cerr << "Unknown function: " << *astFunction.name << endl;
+        throw logic_error("Unknown function");
+    }
 }
 
 void Mist::Template::Builder::InternalTemplateBuilder::visitWith(

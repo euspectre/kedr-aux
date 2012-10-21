@@ -1,3 +1,5 @@
+/* Check that parameter reference is parsed and work as expected. */
+
 #include <mist2/mist.hh>
 
 #include "mist_test_common.hh"

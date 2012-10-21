@@ -1,3 +1,5 @@
+/* Check that 'join' is correctly work for template contained 'if'. */
+
 #include <mist2/mist.hh>
 
 #include "mist_test_common.hh"

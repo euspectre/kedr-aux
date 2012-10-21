@@ -1,3 +1,5 @@
+/* Check that relative parameter names are correctly interpreted. */
+
 #include <mist2/mist.hh>
 
 #include "mist_test_common.hh"

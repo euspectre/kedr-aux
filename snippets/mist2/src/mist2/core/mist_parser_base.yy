@@ -47,9 +47,7 @@ static std::string& getFilename(MistParser* outerParser);
 
 %token BEGIN_MARKER END_MARKER
 
-%token IF_KEYWORD ELSE_KEYWORD ENDIF_KEYWORD
-
-%token JOIN_KEYWORD CONCAT_KEYWORD
+%token IF_KEYWORD ENDIF_KEYWORD ELSE_KEYWORD ELSEIF_KEYWORD
 
 %token WITH_KEYWORD ENDWITH_KEYWORD
 
@@ -81,11 +79,11 @@ static std::string& getFilename(MistParser* outerParser);
     MistASTTemplateRef* astRef;
     MistASTText* astText;
     MistASTIf* astIf;
-    MistASTJoin* astJoin;
     MistASTWith* astWith;
     MistASTTemplateSequence* astSequence;
+    MistASTFunction* astFunction;
 }
-%destructor {delete $$;} <astRef, astText, astIf, astJoin, astWith, astSequence>
+%destructor {delete $$;} <astRef, astText, astIf, astWith, astSequence, astFunction>
 
 %start whole_template
 
@@ -95,28 +93,35 @@ static std::string& getFilename(MistParser* outerParser);
 
 %type <templateName> template_name
 
-%type <astRef> template_ref
-%type <astText> text
-%type <astIf> if_statement
-%type <astJoin> join_statement
-%type <astWith> with_scope
+%type <astTemplate> template_ref
+%type <astTemplate> text
+%type <astTemplate> if_statement
+%type <astTemplate> with_scope
 
-/* Condition part of 'if' directive */
-%type <astTemplate> if_condition
-/* Join expression */
-%type <astJoin> join_expression
+/* Function without argument. */
+%type <astFunction> func_apply
 
-/* Template reference expression */
-%type <astRef> ref_expression
+/* 
+ * Common part of any if statement:
+ *  'if' + condition + sequence [+ 'elseif' + condition + sequence]* BEGIN_MARKER
+ */
+%type <astIf> if_statement_common
+
+/*
+ * If statement up to 'endif' keyword [+ func_apply]*
+ */
+%type <astTemplate> if_statement_terminated
 
 
-/* 'if' directive contain only condition semantic, so it has same type */
-%type <astTemplate> if_directive
+/* Template argument: name [+ func_apply]* */
+%type <astTemplate> template_arg
 
-%type <str> join_text
 
-/* 'with' directive contain only parameter name semantic, so it has same type */
-%type <templateName> with_directive
+
+/*
+ * With scope up to 'endwith' keyword [+ func_apply]*
+ */
+%type <astTemplate> with_scope_terminated
 
 
 %%
@@ -129,59 +134,49 @@ template_sequence       : /* empty */
                         {$$ = $1; $$->addTemplate(ptr($2));}
 
 template_internal       : template_ref
-                        {$$ = $1;}
                         | text
-                        {$$ = $1;}
                         | if_statement
-                        {$$ = $1;}
-                        | join_statement
-                        {$$ = $1;}
                         | with_scope
-                        {$$ = $1;}
 
 
-template_ref            : BEGIN_MARKER ref_expression END_MARKER
+template_ref            : BEGIN_MARKER template_arg END_MARKER
                         {$$ = $2;}
 
-ref_expression          : template_name
+template_arg            : template_name
                         {$$ = new MistASTTemplateRef(ptr($1));}
+                        | template_arg func_apply
+                        {$2->templateInternal = ptr($1); $$ = $2;}
+
+func_apply              : ':' ID
+                        {$$ = new MistASTFunction(ptr($2)); }
+                        | ':' ID TEXT
+                        {$$ = new MistASTFunction(ptr($2), ptr($3)); }
 
 text                    : TEXT
                         {$$ = new MistASTText(ptr($1));}
 
-if_statement            : if_directive template_sequence endif_directive
-                        {$$ = new MistASTIf(ptr($1), ptr($2));}
-                        | if_directive template_sequence else_directive template_sequence endif_directive
-                        {$$ = new MistASTIf(ptr($1), ptr($2), ptr($4));}
+if_statement            : if_statement_terminated END_MARKER
 
-if_directive            : BEGIN_MARKER IF_KEYWORD if_condition END_MARKER
-                            {$$ = $3;}
-
-else_directive          : BEGIN_MARKER ELSE_KEYWORD END_MARKER
-endif_directive         : BEGIN_MARKER ENDIF_KEYWORD END_MARKER
-
-if_condition            : ref_expression
+if_statement_terminated : if_statement_common ENDIF_KEYWORD
                         {$$ = $1;}
-                        | join_expression
-                        {$$ = $1;}
+                        | if_statement_common ELSE_KEYWORD END_MARKER template_sequence BEGIN_MARKER ENDIF_KEYWORD
+                        {$1->elsePart = ptr($4); $$ = $1;}
+                        | if_statement_terminated func_apply
+                        {$2->templateInternal = ptr($1); $$ = $2;}
 
-join_expression         : ref_expression ':' JOIN_KEYWORD join_text
-                        { $$ = new MistASTJoin(ptr($1), ptr($4));}
-
-join_text               : TEXT {$$ = $1;}
-                        | /* empty */ {$$ = NULL;}
-
-join_statement          : BEGIN_MARKER join_expression END_MARKER
-                        {$$ = $2;}
-
+if_statement_common     : BEGIN_MARKER IF_KEYWORD template_arg END_MARKER template_sequence BEGIN_MARKER
+                        {$$ = new MistASTIf(ptr($3), ptr($5));}
+                        | if_statement_common ELSEIF_KEYWORD template_arg END_MARKER template_sequence BEGIN_MARKER
+                        {$$ = $1; $$->addConditionPart(ptr($3), ptr($5)); }
                         
-with_scope              : with_directive template_sequence endwith_directive
-                        {$$ = new MistASTWith(ptr($1), ptr($2));}
+with_scope              : with_scope_terminated END_MARKER
+                        {$$ = $1;}
 
-with_directive          : BEGIN_MARKER WITH_KEYWORD template_name END_MARKER
-                            {$$ = $3;}
-endwith_directive       : BEGIN_MARKER ENDWITH_KEYWORD END_MARKER
-
+with_scope_terminated   : BEGIN_MARKER WITH_KEYWORD template_name END_MARKER template_sequence BEGIN_MARKER ENDWITH_KEYWORD
+                        {$$ = new MistASTWith(ptr($3), ptr($5));}
+                        | with_scope_terminated func_apply
+                        {$2->templateInternal = ptr($1); $$ = $2;}
+                        
 template_name           : ID
                         {$$ = new MistASTTemplateName(ptr($1));}
                         | '.' ID

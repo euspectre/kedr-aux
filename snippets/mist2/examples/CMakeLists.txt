@@ -1,1 +1,3 @@
 add_subdirectory(leak_check_payload)
+add_subdirectory(leak_check_payload_enhanced)
+add_subdirectory(init_destroy)

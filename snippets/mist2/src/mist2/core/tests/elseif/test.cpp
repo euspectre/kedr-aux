@@ -1,4 +1,4 @@
-/* Check that simple text is processed correctly. */
+/* Check that 'elseif' construction is interpreted correctly. */
 
 #include <mist2/mist.hh>
 
@@ -16,7 +16,7 @@ public:
     {
         if(name == "main")
         {
-            istringstream ss("abc");
+            istringstream ss("<$if param$><$param$><$elseif param1$><$param1$><$else$>unknown<$endif$>");
             return new Mist::Template(ss, "");
         }
         else return NULL;
@@ -26,14 +26,19 @@ public:
 int main(void)
 {
     Mist::ParamSet paramSet;
-    
     OneTemplate templateCollection;
-    
     Mist::TemplateGroup templateGroup(templateCollection, "main");
     
     string result = templateGroup.instantiate(paramSet);
+    assert_instantiation(result, "unknown");
     
-    assert_instantiation(result, "abc");
+    paramSet.addParameter("param1", "value1");
+    result = templateGroup.instantiate(paramSet);
+    assert_instantiation(result, "value1");
     
+    paramSet.addParameter("param", "value");
+    result = templateGroup.instantiate(paramSet);
+    assert_instantiation(result, "value");
+
     return 0;
 }

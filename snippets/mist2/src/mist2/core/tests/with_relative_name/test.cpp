@@ -1,3 +1,5 @@
+/* Check that relative name may be used even in 'with' directive */
+
 #include <mist2/mist.hh>
 
 #include "mist_test_common.hh"

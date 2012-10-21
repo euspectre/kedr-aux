@@ -1,3 +1,5 @@
+/* Check that subtemplate may be used in main template. */
+
 #include <mist2/mist.hh>
 
 #include "mist_test_common.hh"

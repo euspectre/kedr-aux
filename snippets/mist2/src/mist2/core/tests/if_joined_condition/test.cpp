@@ -1,3 +1,5 @@
+/* Check that 'if' correctly work when condition use 'join' */
+
 #include <mist2/mist.hh>
 
 #include "mist_test_common.hh"

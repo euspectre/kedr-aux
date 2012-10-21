@@ -1,0 +1,62 @@
+global: |
+    /* Declare some dynamically allocated buffer. */
+    char* name;
+
+code:
+    # Name is needed for generate different identificators for
+    # functions for different 'code' aggregates.
+    # When 'id' will be implemented in templates, 'name' become unneeded.
+    name: name
+    init: |
+        /* Allocate buffer */
+        name = malloc(100);
+        if(name == NULL) return -ENOMEM;
+        return 0;
+    destroy: |
+        /* Need to destroy buffer at exit. */
+        free(name);
+
+
+global: |
+    /* Declare another dynamically allocated buffer. */
+    char* name1;
+
+code:
+    name: name1
+    init: |
+        /* Allocate buffer */
+        name1 = malloc(200);
+        if(name1 == NULL) return -ENOMEM;
+        return 0;
+    destroy: |
+        /* Need to destroy buffer at exit. */
+        free(name1);
+
+global: |
+    /* Declare some integer variable. */
+    int a;
+
+
+code:
+    name: a
+    init: |
+        a = 10;
+        /* Always success*/
+        return 0;
+# Integer variable doesn't require destuctor.
+
+global: |
+    /* Declare some auxiliary buffer, which may be used by the program.
+     * Initially this buffer is NULL and should be allocated if needed.
+     *
+     * Example: pointer to the line content in getline() "C" function.
+     */
+    char* line = NULL;
+
+
+code:
+    name: line
+    # Doesn't need constructor - already initialized.
+    destroy: |
+        /* Destroy buffer if it is allocated. */
+        free(line);

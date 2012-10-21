@@ -126,16 +126,26 @@ public:
 class MistTemplateIf: public Template::Impl
 {
 public:
+    /* 
+     * Normally, there is only one condition in if statement
+     * (without 'elseif').
+     * 
+     * So do not disturb with condition part arrays - them can be
+     * emulated with cascading.
+     */
+
     auto_ptr<Template::Impl> conditionTemplate;
-    auto_ptr<Template::Impl> ifTemplate;
+    auto_ptr<Template::Impl> positiveTemplate;
+    /* May not be NULL */
     auto_ptr<Template::Impl> elseTemplate;
     
     MistTemplateIf(Template::Impl* conditionTemplate,
-        Template::Impl* ifTemplate,
+        Template::Impl* positiveTemplate,
         Template::Impl* elseTemplate):
             conditionTemplate(conditionTemplate),
-            ifTemplate(ifTemplate), elseTemplate(elseTemplate) {}
-    
+            positiveTemplate(positiveTemplate),
+            elseTemplate(elseTemplate) {}
+
     MistTemplateGroupBlock* createGroup(
         Mist::TemplateGroup::Builder& groupBuilder) const;
 };
@@ -143,7 +153,7 @@ public:
 /* 
  * Join statement.
  * 
- * In general, repeating some template and insert some text between
+ * In general, repeat some template and insert some text between
  * repetitions.
  */
 class MistTemplateJoin: public Template::Impl
@@ -175,6 +185,41 @@ public:
     MistTemplateWith(Template::Impl* templateInternal,
         const MistTemplateName& context):
         templateInternal(templateInternal), context(context) {}
+    
+    MistTemplateGroupBlock* createGroup(
+        Mist::TemplateGroup::Builder& groupBuilder) const;
+};
+
+
+/* 
+ * Reverse join statement.
+ * 
+ * Like join, repeat some template and insert some text between
+ * repetitions. But repetitions is written in reverse order.
+ */
+class MistTemplateRJoin: public MistTemplateJoin
+{
+public:
+    MistTemplateRJoin(Template::Impl* templateInternal,
+        const string& textBetween)
+        : MistTemplateJoin(templateInternal, textBetween) {}
+    
+    MistTemplateGroupBlock* createGroup(
+        Mist::TemplateGroup::Builder& groupBuilder) const;
+};
+
+/*
+ * Indent functionality.
+ */
+class MistTemplateIndent: public Template::Impl
+{
+public:
+    auto_ptr<Template::Impl> templateInternal;
+    string indent;
+    
+    MistTemplateIndent(Template::Impl* templateInternal,
+        const string& indent)
+        : templateInternal(templateInternal), indent(indent) {}
     
     MistTemplateGroupBlock* createGroup(
         Mist::TemplateGroup::Builder& groupBuilder) const;
