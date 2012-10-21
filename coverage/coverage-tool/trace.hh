@@ -11,6 +11,11 @@
 
 struct Trace
 {
+	Trace();
+	
+	Trace(const Trace& trace);//TODO
+	Trace& operator=(const Trace& trace);//TODO
+
 	~Trace();
 
 	/* 
@@ -25,69 +30,12 @@ struct Trace
 	/* Store trace to the stream */
 	void write(std::ostream& os) const;
 
-	/* Information about function */
-	struct FuncInfo
-	{
-		/* 
-		 * Line where function starts.
-		 * 
-		 * Sometimes, gcov miss definition of function, while define
-		 * counter for it.
-		 * It may occure, e.g., when inline function calls another
-		 * inline function: in that case line for caller is not defined
-		 * in trace file, but counter is.
-		 * Value -1 is used for signal that situation.
-		 */
-		int lineStart;
-		/* Hit counter for function */
-		counter_t counter;
-		
-		/* 'counter should be set after constructor '*/
-		FuncInfo(int lineStart): lineStart(lineStart) {}
-	};
 
-	/* Branch identificator */
-	struct BranchID
-	{
-		/* Line of the branch in the file */
-		int line;
-		/* 
-		 * Block and branch numbers - gcov internals for uniquely
-		 * identify branch.
-		 */
-		int blockNumber;
-		int branchNumber;
-		
-		BranchID(int line, int blockNumber, int branchNumber):
-			line(line), blockNumber(blockNumber), branchNumber(branchNumber) {}
+	struct FuncInfo;
+	struct BranchID;
+	struct FileInfo;
+	
 
-		/* This operator allows to use branch identificator as key in map. */
-		bool operator<(const BranchID& branchID) const
-		{
-			if(line < branchID.line) return true;
-			else if(line > branchID.line) return false;
-
-			if(blockNumber < branchID.blockNumber) return true;
-			else if(blockNumber > branchID.blockNumber) return false;
-
-			if(branchNumber < branchID.branchNumber) return true;
-			return false;
-		}
-	};
-	/* Information about one file(source or header) */
-	struct FileInfo
-	{
-		/* Function information for each function name in file. */
-		std::map<std::string, FuncInfo> functions;
-		/* Counter for each line in file. */
-		std::map<int, counter_t> lines;
-		/* 
-		 * Counter for each branch in file.
-		 * 
-		 * value -1 corresponds to '-' in BRDA directive in trace file.
-		 */
-		std::map<BranchID, counter_t> branches;
-	};
 	/* 
 	 * Identificator of files group.
 	 * 
@@ -124,19 +72,7 @@ struct Trace
 		std::string filename;
 		
 		/* This operator allows to use group identificator as key in map. */
-		bool operator<(const FileGroupID& groupID) const
-		{
-			/* 
-			 * Test name is rarely used when create traces, so
-			 * 'testName' is usually empty string.
-			 * 
-			 * Because of this compare 'testName' after 'filename'
-			 */
-			if(filename < groupID.filename) return true;
-			else if(filename > groupID.filename) return false;
-			
-			return testName < groupID.testName;
-		}
+		bool operator<(const FileGroupID& groupID) const;
 		/* Pretty printer for error-reporting. */
 		friend std::ostream& operator<<(std::ostream& os, const FileGroupID& groupId);
 	};
@@ -166,8 +102,104 @@ struct Trace
 	 */
 	std::map<FileGroupID, FileGroupInfo*> fileGroups;
 	
+	/* 
+	 * Make every group to contain only one file.
+	 * 
+	 * All statistic for files with same names and different groups is
+	 * joined.
+	 */
+	void groupFiles(void);
+
+	/* 
+	 * Useful functions for calculate statistic for all files.
+	 * 
+	 * NOTE: Theese functions assume files with same names different,
+	 * if they belong to file groups with difference name. So, statistic
+	 * for such files sums instead of joined.
+	 * 
+	 * If you want to assume files with same name identical, use
+	 * groupFiles() method before call these functions.
+	 */
+	int linesTotal(void) const;
+	int linesTotalHit(void) const;
+
+	int branchesTotal(void) const;
+	int branchesTotalHit(void) const;
+
+	int functionsTotal(void) const;
+	int functionsTotalHit(void) const;
+	
+	class Modifier;
 private:
 	class TraceBuilder;
 };
+
+/* Information about function in file */
+struct Trace::FuncInfo
+{
+	/* 
+	 * Line where function starts.
+	 * 
+	 * Sometimes, gcov misses definition of function, while define
+	 * counter for it.
+	 * It may occure, e.g., when inline function calls another
+	 * inline function: in that case line for caller is not defined
+	 * in trace file, but counter is.
+	 * Value -1 is used for signal that situation.
+	 */
+	int lineStart;
+	/* Hit counter for function */
+	counter_t counter;
+	
+	/* 'counter should be set after constructor '*/
+	FuncInfo(int lineStart): lineStart(lineStart) {}
+};
+
+/* Branch identificator in the file */
+struct Trace::BranchID
+{
+	/* Line of the branch in the file */
+	int line;
+	/* 
+	 * Block and branch numbers - gcov internals for uniquely
+	 * identify branch.
+	 */
+	int blockNumber;
+	int branchNumber;
+	
+	BranchID(int line, int blockNumber, int branchNumber):
+		line(line), blockNumber(blockNumber), branchNumber(branchNumber) {}
+
+	/* This operator allows to use branch identificator as key in map. */
+	bool operator<(const BranchID& branchID) const;
+};
+
+/* Information about one file(source or header) in trace */
+struct Trace::FileInfo
+{
+	/* Function information for each function name in file. */
+	std::map<std::string, FuncInfo> functions;
+	/* Counter for each line in file. */
+	std::map<int, counter_t> lines;
+	/* 
+	 * Counter for each branch in file.
+	 * 
+	 * value -1 corresponds to '-' in BRDA directive in trace file.
+	 */
+	std::map<BranchID, counter_t> branches;
+	
+	/* Useful functions for calculate per-file statistic */
+	int linesTotal(void) const;
+	int linesTotalHit(void) const;
+
+	int branchesTotal(void) const;
+	int branchesTotalHit(void) const;
+
+	int functionsTotal(void) const;
+	int functionsTotalHit(void) const;
+
+	class Modifier;
+};
+
 
 #endif /* TRACE_H_INCLUDED */

@@ -1,0 +1,45 @@
+Usage:
+    @PROGRAM_NAME@ diff [-o <out-file>] <trace> <trace-sub>
+    @PROGRAM_NAME@ add [-o <out-file>] <trace> ... 
+    @PROGRAM_NAME@ new-coverage [-o <out-file>] <trace> <trace-prev> 
+    @PROGRAM_NAME@ stat [-o <out-file>] [-f format] <trace> 
+    
+
+'diff' command compute per-counter difference between <trace> and
+    <trace-sub>. That is, set every counter in <trace>, which is
+    positive and for which correspondent counter is positive to the
+    difference between these counters. If resulter counter become
+    negative, it is set to 0.
+
+'add' command compute per-counter sum for all given traces.
+
+'new-coverage' command reset(set to 0) all positive counters in <trace>
+    for which corresponded counters in <trace-prev> are also positive.
+
+'stat' command output statistic information about trace according to
+    format.
+
+Options:
+    -o <out-file>
+        Instead of output result into STDOUT, save it in given file.
+    -f format
+        Use given format instead of default for output statistic about
+        trace. Aside from text, which is output 'as is', next
+        specificators are accepted:
+        
+        %L - output total number of lines,
+        %l - output number of lines which are hit,
+        %pl - output percents of lines which are hit,
+        %F - output total number of functions,
+        %f - output number of functions which are hit,
+        %pf - output percents of functions which are hit,
+        %B - output total number of branches,
+        %b - output number of branches which are hit,
+        %pb - output percents of branches which are hit
+        
+        %% - output '%' character
+        
+
+    @PROGRAM_NAME@ -h|--help
+        
+        print given usage information and exit.

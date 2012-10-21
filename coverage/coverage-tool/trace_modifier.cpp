@@ -1,122 +1,169 @@
 #include "trace_modifier.hh"
+#include <algorithm>
 
 using namespace std;
 
-static void modifyFileInfo(Trace::FileInfo& fileInfo,
-    const Trace::FileInfo& fileInfoAnother,
-    TraceModifierEventNotifier& notifier)
+/*********************** Trace::Modifier members **********************/
+/* Internal Trace::FileInfo::Modifier object. */
+Trace::FileInfo::Modifier modifierInternal;
+
+Trace::FileInfo::Modifier* Trace::Modifier::onSourceStart(
+    const std::map<std::string, Trace::FileInfo>::value_type& /*source*/)
 {
-    /* Modify functions counters */
-    map<string, Trace::FuncInfo>::const_iterator
-        funcIterAnother = fileInfoAnother.functions.begin(),
-        funcIterAnotherEnd = fileInfoAnother.functions.end();
-    for(; funcIterAnother != funcIterAnotherEnd; ++funcIterAnother)
+    return &modifierInternal;
+}
+
+class TraceFileModifierTraversal
+{
+public:
+    TraceFileModifierTraversal(Trace::FileInfo::Modifier& modifier,
+        Trace::FileInfo& traceFileModified)
+        : modifier(modifier), traceFileModified(traceFileModified) {}
+    
+    void traverseFile(const Trace::FileInfo& traceFile)
     {
-        if(notifier.onFunction(*funcIterAnother)) continue;
+        for_each(traceFile.functions.begin(), traceFile.functions.end(), *this);
+        for_each(traceFile.branches.begin(), traceFile.branches.end(), *this);
+        for_each(traceFile.lines.begin(), traceFile.lines.end(), *this);
+    }
+    
+    void operator()(const map<string, Trace::FuncInfo>::value_type& func)
+    {
+        if(modifier.onFunction(func)) return;
         
-        map<string, Trace::FuncInfo>::iterator funcIter =
-            fileInfo.functions.find(funcIterAnother->first);
+        map<string, Trace::FuncInfo>::iterator funcIterModified =
+            traceFileModified.functions.find(func.first);
         
-        if(funcIter != fileInfo.functions.end())
+        if(funcIterModified != traceFileModified.functions.end())
         {
-            if((funcIter->second.lineStart > 0)
-                && (funcIterAnother->second.lineStart > 0)
-                && (funcIter->second.lineStart != funcIterAnother->second.lineStart))
+            if((func.second.lineStart > 0)
+                && (funcIterModified->second.lineStart > 0)
+                && (funcIterModified->second.lineStart != func.second.lineStart))
             {
-                cerr << "Warning: Start lines of function " << funcIter->first
+                cerr << "Warning: Start lines of function " << func.first
                     << " in traces differ." << endl;
             }
             
-            notifier.modifyFuncCounter(funcIter->second.counter,
-                funcIterAnother->second.counter);
+            modifier.modifyFuncCounter(func.second.counter,
+                funcIterModified->second.counter);
         }
         else
         {
-            notifier.newFunc();
+            modifier.newFunc(traceFileModified);
         }
     }
-    /* Modify branches */
-    map<Trace::BranchID, counter_t>::const_iterator
-        branchIterAnother = fileInfoAnother.branches.begin(),
-        branchIterAnotherEnd = fileInfo.branches.end();
-    for(; branchIterAnother != branchIterAnother; ++branchIterAnother)
+    
+    void operator()(const map<Trace::BranchID, counter_t>::value_type& branch)
     {
-        if(notifier.onBranchCounter(*branchIterAnother)) continue;
+        if(modifier.onBranchCounter(branch)) return;
         
         map<Trace::BranchID, counter_t>::iterator
-            branchIter = fileInfo.branches.find(branchIterAnother->first);
-        if(branchIter != fileInfo.branches.end())
+            branchIterModified = traceFileModified.branches.find(branch.first);
+        if(branchIterModified != traceFileModified.branches.end())
         {
-            notifier.modifyBranchCounter(branchIter->second,
-                branchIterAnother->second);
+            modifier.modifyBranchCounter(branch.second,
+                branchIterModified->second);
         }
         else
         {
-            notifier.newBranch();
+            modifier.newBranch(traceFileModified);
         }
     }
-    /* Diff for lines */
-    map<int, counter_t>::const_iterator
-        lineIterAnother = fileInfoAnother.lines.begin(),
-        lineIterAnotherEnd = fileInfoAnother.lines.end();
-    for(; lineIterAnother != lineIterAnotherEnd; ++lineIterAnother)
+
+    void operator()(const map<int, counter_t>::value_type& line)
     {
-        if(notifier.onLine(*lineIterAnother)) continue;
+        if(modifier.onLine(line)) return;
         
         map<int, counter_t>::iterator
-            lineIter = fileInfo.lines.find(lineIterAnother->first);
-        if(lineIter != fileInfo.lines.end())
+            lineIterModified = traceFileModified.lines.find(line.first);
+        if(lineIterModified != traceFileModified.lines.end())
         {
-            notifier.modifyLineCounter(lineIter->second,
-                lineIterAnother->second);
+            modifier.modifyLineCounter(line.second,
+                lineIterModified->second);
         }
         else
         {
-            notifier.newLine();
+            modifier.newLine(traceFileModified);
         }
     }
+
+
+private:
+    Trace::FileInfo::Modifier& modifier;
+    Trace::FileInfo& traceFileModified;
+};
+
+void modifyTraceFile(const Trace::FileInfo& traceFile,
+	Trace::FileInfo::Modifier& modifier,
+	Trace::FileInfo& traceFileModified)
+{
+    TraceFileModifierTraversal traversal(modifier, traceFileModified);
+    traversal.traverseFile(traceFile);
 }
 
-void modifyTrace(Trace& trace, const Trace& traceAnother,
-    TraceModifierEventNotifier& notifier)
+
+class TraceModifierTraversal
 {
-    map<Trace::FileGroupID, Trace::FileGroupInfo*>::const_iterator
-        groupIterAnother = traceAnother.fileGroups.begin(),
-        groupIterAnotherEnd = traceAnother.fileGroups.end();
-    for(;groupIterAnother != groupIterAnotherEnd; ++groupIterAnother)
+public:
+    TraceModifierTraversal(Trace::Modifier& modifier,
+        Trace& traceModified)
+        : modifier(modifier), traceModified(traceModified) {}
+
+    void traverseTrace(const Trace& trace)
     {
-        if(notifier.onFileGroupStart(*groupIterAnother)) continue;
+        for_each(trace.fileGroups.begin(), trace.fileGroups.end(), *this);
+    }
+
+    void operator()(const map<Trace::FileGroupID, Trace::FileGroupInfo*>::value_type& group)
+    {
+        if(modifier.onFileGroupStart(group)) return;
         
         map<Trace::FileGroupID, Trace::FileGroupInfo*>::iterator
-            groupIter = trace.fileGroups.find(groupIterAnother->first);
-        if(groupIter == trace.fileGroups.end())
+            groupIterModified = traceModified.fileGroups.find(group.first);
+        if(groupIterModified != traceModified.fileGroups.end())
         {
-            notifier.onFileGroupEndNew();
-            continue;
+            currentGroupModified = &*groupIterModified;
+            for_each(group.second->files.begin(), group.second->files.end(), *this);
+            modifier.onFileGroupEnd();
         }
-        
-        map<string, Trace::FileInfo>::const_iterator
-            sourceIterAnother = groupIterAnother->second->files.begin(),
-            sourceIterAnotherEnd = groupIterAnother->second->files.end();
-        for(; sourceIterAnother != sourceIterAnotherEnd; ++sourceIterAnother)
+        else
         {
-            if(notifier.onSourceStart(*sourceIterAnother)) continue;
-            
-            map<string, Trace::FileInfo>::iterator
-                sourceIter = groupIter->second->files.find(sourceIterAnother->first);
-
-            if(sourceIterAnother == groupIterAnother->second->files.end())
-            {
-                notifier.onSourceEndNew();
-                continue;
-            }
-            
-            modifyFileInfo(sourceIter->second, sourceIterAnother->second,
-                notifier);
-            
-            notifier.onSourceEnd();
+            modifier.onFileGroupEndNew(traceModified);
         }
-        
-        notifier.onFileGroupEnd();
     }
+
+    void operator()(const map<string, Trace::FileInfo>::value_type& file)
+    {
+        Trace::FileInfo::Modifier* fileModifier =
+            modifier.onSourceStart(file);
+        if(fileModifier == NULL) return;
+        
+        map<string, Trace::FileInfo>::iterator
+            sourceIterModified = currentGroupModified->second->files.find(file.first);
+
+        if(sourceIterModified != currentGroupModified->second->files.end())
+        {
+            modifyTraceFile(file.second, *fileModifier,
+                sourceIterModified->second);
+            
+            modifier.onSourceEnd();
+        }
+        else
+        {
+            modifier.onSourceEndNew(*currentGroupModified->second);
+        }
+    }
+
+private:
+    Trace::Modifier& modifier;
+    Trace& traceModified;
+    /* Group currently modified */
+    map<Trace::FileGroupID, Trace::FileGroupInfo*>::value_type* currentGroupModified;
+};
+
+void modifyTrace(const Trace& trace, Trace::Modifier& modifier,
+    Trace& traceModified)
+{
+    TraceModifierTraversal traversal(modifier, traceModified);
+    traversal.traverseTrace(trace);
 }
