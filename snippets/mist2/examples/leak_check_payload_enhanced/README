@@ -2,6 +2,11 @@ Example demonstrates some features of mist2, like joining of templates,
 bounded by 'with' scope and 'if' statement, and indentation of template
 value.
 
-Note, that number of additional templates is reduced from 5 to 2 
-compared with 'leak_check_payload' example and template code become more
-localized.
+Also example demonstrate such feature of YAML as anchored nodes and
+how to use this feature for 'global storage' of functions prototypes.
+
+Some complexity of templates adds possibility to redefine any part of
+function prototype, taken from storage: name used for handler or
+arguments list for redefine name(s) of them.
+Otherwise number of additional templates may be easily reduced to 2
+('argumentSpec_comma' and 'argumentsSpec_comma').

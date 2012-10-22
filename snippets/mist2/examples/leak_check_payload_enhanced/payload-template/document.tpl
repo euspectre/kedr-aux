@@ -36,15 +36,15 @@ static struct module *target_module = NULL;
 /* ====================================================================== */
 <$! Note, that handlers are written in the main template, and joined at
 the end of 'with' scope definition.
-$><$with function$>/* Interception of the <$.name$> function */
-<$if .handler_pre$>void pre_<$.name$>(<$argumentSpec_comma$>struct kedr_function_call_info* call_info)
+$><$with function$>/* Interception of the <$functionName$> function */
+<$if .handler_pre$>void pre_<$handlerName$>(<$argumentsSpec_comma$>struct kedr_function_call_info* call_info)
 {
     void* caller_address = call_info->return_address;
 <$! Indentation of user-defined code. So, user should't bother about at
 what indentation level his code will be.
 $><$.handler_pre: indent "    "$>
 }
-<$endif$><$if .handler_post$>void post_<$.name$>(<$argumentSpec_comma$><$if .returnType$><$.returnType$> ret_val, <$endif$>struct kedr_function_call_info* call_info)
+<$endif$><$if .handler_post$>void post_<$handlerName$>(<$argumentsSpec_comma$><$if returnType$><$returnType$> ret_val, <$endif$>struct kedr_function_call_info* call_info)
 {
     void* caller_address = call_info->return_address;
 <$.handler_post: indent "    "$>
@@ -58,8 +58,8 @@ static struct kedr_pre_pair pre_pairs[] =
 <$! References to handlers are formed in the main template, and joined
 at the end of 'if' statement.
 $><$if function.handler_pre$>    {
-        .orig = (void*)&<$function.name$>,
-        .pre  = (void*)&pre_<$function.name$>
+        .orig = (void*)&<$functionName$>,
+        .pre  = (void*)&pre_<$handlerName$>
     },
 <$endif: join$>{
         .orig = NULL
@@ -69,8 +69,8 @@ $><$if function.handler_pre$>    {
 static struct kedr_post_pair post_pairs[] =
 {
 <$if function.handler_post$>    {
-        .orig = (void*)&<$function.name$>,
-        .pre  = (void*)&post_<$function.name$>
+        .orig = (void*)&<$functionName$>,
+        .pre  = (void*)&post_<$handlerName$>
     },
 <$endif: join$>
     {
