@@ -4,6 +4,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <vector>
+#include <sstream> /*for rjoin */
 
 #include "mist_template_group.hh"
 
@@ -232,7 +233,7 @@ MistTemplateGroupBlock* MistTemplateIf::createGroup(
     Mist::TemplateGroup::Builder& groupBuilder) const
 {
     return new MistIfGroup(conditionTemplate->createGroup(groupBuilder),
-        ifTemplate->createGroup(groupBuilder),
+        positiveTemplate->createGroup(groupBuilder),
         elseTemplate->createGroup(groupBuilder));
 }
 
@@ -301,11 +302,11 @@ bool MistJoinGroup::isEmpty(const ParamSetSlice& slice) const
     subslice.resetMask(submask);
     
     if(!block->isEmpty(joinSlice)) return false;
+    if(subslice.isSetLast()) return true;
+    if(!textBetween.empty()) return false;
     
-    while(!subslice.isSetLast())
+    for(subslice.nextSet(); !subslice.isSetLast(); subslice.nextSet())
     {
-        if(!textBetween.empty()) return false;
-        subslice.nextSet();
         if(!block->isEmpty(joinSlice)) return false;
     }
     
@@ -342,6 +343,183 @@ MistTemplateGroupBlock* MistTemplateWith::createGroup(
     groupBuilder.pushGroupParamName(context);
     MistTemplateGroupBlock* block = templateInternal->createGroup(groupBuilder);
     groupBuilder.popGroupParamName();
+    
+    return block;
+}
+
+/**********************************************************************/
+/* Reverse join is very similar to normal join. */
+class MistRJoinGroup: public MistJoinGroup
+{
+public:
+    MistRJoinGroup(MistTemplateGroupBlock* block,
+        const MistParamNameAbs& context,
+        const string& textBetween):
+        MistJoinGroup(block, context, textBetween) {}
+    /* The only method differs from one in join. */
+    ostream& evaluate(const ParamSetSlice& slice, ostream& os) const;
+};
+
+ostream& MistRJoinGroup::evaluate(const ParamSetSlice& slice, ostream& os) const
+{
+    ParamSetSlice joinSlice(slice);
+    
+    ParamSetSlice& subslice = joinSlice.getSubslice(context);
+    subslice.resetMask(submask);
+    
+    /* Store evaluation results in string array. */
+    vector<string> strings;
+    
+    ostringstream oss;
+    
+    block->evaluate(joinSlice, oss);
+    strings.push_back(oss.str());
+    
+    while(!subslice.isSetLast())
+    {
+        /* Before writing next string, clear string in temporary stream */
+        oss.str("");
+
+        subslice.nextSet();
+        /*os << textBetween;*/
+        block->evaluate(joinSlice, oss);
+        strings.push_back(oss.str());
+    }
+    
+    /* Output stored strings in reverse order. */
+    vector<string>::reverse_iterator iter = strings.rbegin(),
+        iterEnd = strings.rend();
+    
+    os << *iter;
+    for(++iter; iter != iterEnd; ++iter)
+    {
+        os << textBetween;
+        os << *iter;
+    }
+    
+    return os;
+}
+
+
+MistTemplateGroupBlock* MistTemplateRJoin::createGroup(
+    Mist::TemplateGroup::Builder& groupBuilder) const
+{
+    MistTemplateGroupBlock* blockInternal =
+        templateInternal->createGroup(groupBuilder);
+    return new MistRJoinGroup(blockInternal,
+        groupBuilder.getGroupParamName(),
+        textBetween);
+}
+/*********** Stream wrapper used for 'indent' functionality*************/
+/* 
+ * Writes to the controlled stream some text each time when stream is
+ * created or '\n' is written into it.
+ */
+
+class IndentedStream: public ostream
+{
+public:
+    IndentedStream(ostream& os, const string& indent);
+private:
+    class IndentedStreamBuffer: public streambuf
+    {
+    public:
+        typedef streambuf::int_type int_type;
+        typedef streambuf::traits_type traits_type;
+    
+        IndentedStreamBuffer(ostream& os, const string& indent);
+
+        ostream& os;
+        string indent;
+    protected:
+        /* No buffering here. */
+        int_type overflow(int_type c);
+
+    };
+    IndentedStreamBuffer buffer;
+};
+
+IndentedStream::IndentedStream(ostream& os, const string& indent):
+    ostream(&buffer), buffer(os, indent) {}
+
+IndentedStream::IndentedStreamBuffer::IndentedStreamBuffer
+    (ostream& os, const string& indent): os(os), indent(indent)
+{
+    os.write(indent.data(), indent.size());
+}
+
+IndentedStream::IndentedStreamBuffer::int_type
+IndentedStream::IndentedStreamBuffer::IndentedStreamBuffer::overflow(
+    int_type c)
+{
+    os.put(c);
+    if(c == '\n')
+    {
+        os.write(indent.data(), indent.size());
+    }
+    
+    if(!os)
+    {
+        return traits_type::eof();
+    }
+    else if(traits_type::eq_int_type(c ,traits_type::eof()))
+    {
+        return traits_type::not_eof(c);
+    }
+    else
+    {
+        return c;
+    }
+}
+
+/**********************************************************************/
+class MistIndentGroup: public MistTemplateGroupBlock
+{
+public:
+    MistTemplateGroupBlockRef block;
+    string indent;
+    
+    MistIndentGroup(MistTemplateGroupBlock* block,
+        const string& indent): block(block), indent(indent) {}
+    
+    ostream& evaluate(const ParamSetSlice& slice, ostream& os) const;
+
+    bool isEmpty(const ParamSetSlice& slice) const;
+
+    MistParamMask getParamMask() const;
+    MistParamMask getParamMaskAll() const;
+};
+
+ostream& MistIndentGroup::evaluate(const ParamSetSlice& slice, ostream& os) const
+{
+    IndentedStream indentedStream(os, indent);
+    block->evaluate(slice, indentedStream);
+    
+    return os;
+}
+
+bool MistIndentGroup::isEmpty(const ParamSetSlice& slice) const
+{
+    return !indent.empty() && block->isEmpty(slice);
+}
+
+MistParamMask MistIndentGroup::getParamMask() const
+{
+    return block->getParamMask();
+}
+
+MistParamMask MistIndentGroup::getParamMaskAll() const
+{
+    return block->getParamMaskAll();
+}
+
+
+MistTemplateGroupBlock* MistTemplateIndent::createGroup(
+    Mist::TemplateGroup::Builder& groupBuilder) const
+{
+    MistTemplateGroupBlock* block = templateInternal->createGroup(groupBuilder);
+    if(!indent.empty())
+        block = new MistIndentGroup(block, indent);
     
     return block;
 }

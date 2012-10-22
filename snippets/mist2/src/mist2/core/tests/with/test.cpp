@@ -1,3 +1,5 @@
+/* Check that 'join' correctly works inside 'with' scope. */
+
 #include <mist2/mist.hh>
 
 #include "mist_test_common.hh"

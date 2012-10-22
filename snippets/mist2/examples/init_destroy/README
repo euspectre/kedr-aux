@@ -1,0 +1,25 @@
+Example demonstrates usage of 'rjoin' function for call destructors of
+some objects in reverse order.
+
+Parameters declare some global objects('global'), and code of functions,
+needed to their initialization/destruction('code.init' and 'code.destroy')
+
+'init' functions are called in global init(), and their result is checked.
+'destroy' functions are called in global destroy().
+Also 'destroy' functions are called if some init() function fail.
+In the last case destroy() functions are called only for those objects,
+('code' aggregates) for which init() functions is called and return
+success.
+
+Init or destroy function may be omitted, if some object doesn't require
+initialization or finalization.
+
+NOTE: In the current template engine implementation(on 21.10.2012)
+init() and destroy() functions for 'code' aggregate 'name1' are generaged
+and called BEFORE ones for 'code' aggregate 'name'. While 'code'
+aggregate 'name1' is defined AFTER 'name'.
+
+It is not an error, because ordering YAML map keys, generally speaking
+is unspecified.
+When order is critical, use YAML sequence for one key instead using
+same keys with different values.

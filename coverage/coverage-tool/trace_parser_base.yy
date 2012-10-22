@@ -110,7 +110,7 @@ directive_da        : KEY_DA ':' NUMBER ',' NUMBER
 					| KEY_DA ':' NUMBER ',' '-' NUMBER
                         {
 							// TODO: Add option to not print this warning
-							std::cerr << @$ << "Warning: negative line counter. Assume it to be zero." << std::endl; 
+							//std::cerr << @$ << " Warning: negative line counter. Assume it to be zero." << std::endl; 
 							EP->onLineCounter($3, 0, @$.begin.line);
 						}
 directive_lf        : KEY_LF ':' NUMBER

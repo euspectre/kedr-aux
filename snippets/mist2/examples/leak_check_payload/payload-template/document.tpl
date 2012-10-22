@@ -1,8 +1,7 @@
 /* ====================================================================== */
 /* Module: <$module.name$> */
 /* ====================================================================== */
-<$! Text for join is encloused into '""', not a '()'. 
-    This is the only inconsistence in template format. $>
+<$! Text for join is encloused into '""', not a '()'.$>
 <$header : join "\n\n" $>
 
 #include <linux/module.h>

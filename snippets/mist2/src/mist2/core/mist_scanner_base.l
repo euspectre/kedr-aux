@@ -143,8 +143,8 @@ newline         \n
 if              return token::IF_KEYWORD;
 endif           return token::ENDIF_KEYWORD;
 else            return token::ELSE_KEYWORD;
-concat          return token::CONCAT_KEYWORD;
-join            return token::JOIN_KEYWORD;
+elseif          return token::ELSEIF_KEYWORD;
+
 with            return token::WITH_KEYWORD;
 endwith         return token::ENDWITH_KEYWORD;
 

@@ -1,0 +1,7 @@
+Example demonstrates some features of mist2, like joining of templates,
+bounded by 'with' scope and 'if' statement, and indentation of template
+value.
+
+Note, that number of additional templates is reduced from 5 to 2 
+compared with 'leak_check_payload' example and template code become more
+localized.

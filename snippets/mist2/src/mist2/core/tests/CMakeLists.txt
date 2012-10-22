@@ -14,3 +14,10 @@ add_subdirectory(with)
 add_subdirectory(join_external_param)
 add_subdirectory(relative_names)
 add_subdirectory(with_relative_name)
+
+# Extensions 
+add_subdirectory(with_join)
+add_subdirectory(if_join)
+add_subdirectory("elseif")
+add_subdirectory(param_rjoin)
+add_subdirectory(indent_param)

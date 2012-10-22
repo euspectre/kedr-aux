@@ -1,0 +1,62 @@
+Usage:
+    @PROGRAM_NAME@ diff [-o <out-file>] <trace> <trace-sub>
+    @PROGRAM_NAME@ add [-o <out-file>] <trace> ... 
+    @PROGRAM_NAME@ new-coverage [-o <out-file>] <trace> <trace-prev> 
+    @PROGRAM_NAME@ stat [-o <out-file>] [-f format] <trace> 
+    @PROGRAM_NAME@ optimize-tests [-o <out-file>] <tests-file>
+
+    @PROGRAM_NAME@ -h|--help
+        print given usage information and exit.    
+
+
+'diff' command compute per-counter difference between <trace> and
+    <trace-sub>. That is, set every counter in <trace>, which is
+    positive and for which correspondent counter is positive to the
+    difference between these counters. If resulter counter become
+    negative, it is set to 0.
+
+'add' command compute per-counter sum for all given traces.
+
+'new-coverage' command reset(set to 0) all positive counters in <trace>
+    for which corresponded counters in <trace-prev> are also positive.
+
+'stat' command output statistic information about trace according to
+    format.
+
+'optimize-tests' command accept <tests-file> described set of the tests.
+    Each line of that file describe one test in format
+    
+        <weight> <trace-file>
+
+    where 'trace-file' is a file contained coverage information for test
+    and 'weight' is floating-point characteristic of the test,
+    which  allow to arrange tests subsets: the less sum of the weights,
+    the more preferrable test subset.
+    
+    Command find tests subset with minimal total weight which has same
+    lines coverage as whole set.
+    
+    Command output list of coverage trace files in minimal tests subset.
+
+Options:
+    -o <out-file>
+        Instead of output result into STDOUT, save it in the given file.
+    -f format
+        Use given format instead of default for output statistic about
+        trace. Aside from text, which is output 'as is', next
+        specificators are accepted:
+        
+        %L - output total number of lines,
+        %l - output number of lines which are hit,
+        %pl - output percents of lines which are hit,
+        %F - output total number of functions,
+        %f - output number of functions which are hit,
+        %pf - output percents of functions which are hit,
+        %B - output total number of branches,
+        %b - output number of branches which are hit,
+        %pb - output percents of branches which are hit
+        
+        %% - output '%' character
+        
+
+    

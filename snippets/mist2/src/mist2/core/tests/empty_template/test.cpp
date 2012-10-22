@@ -1,3 +1,5 @@
+/* Check text generated for empty template. */
+
 #include <mist2/mist.hh>
 
 #include "mist_test_common.hh"

@@ -7,6 +7,8 @@
 #include <stdexcept>
 #include <cassert>
 
+#include <algorithm>
+
 using namespace std;
 
 /* 
@@ -19,7 +21,35 @@ using namespace std;
 cerr << traceLine << ": " << msg << endl; \
 throw runtime_error("Incorrect trace file");
 
-/* Out file group identificator to the stream for error reporting. */
+/********************* BranchID methods ****************************/
+bool Trace::BranchID::operator<(const BranchID& branchID) const
+{
+	if(line < branchID.line) return true;
+	else if(line > branchID.line) return false;
+
+	if(blockNumber < branchID.blockNumber) return true;
+	else if(blockNumber > branchID.blockNumber) return false;
+
+	if(branchNumber < branchID.branchNumber) return true;
+	return false;
+}
+
+/********************* FileGroupID methods ****************************/
+bool Trace::FileGroupID::operator<(const FileGroupID& groupID) const
+{
+	/* 
+	 * Test name is rarely used when create traces, so
+	 * 'testName' is usually empty string.
+	 * 
+	 * Because of this compare 'testName' after 'filename'
+	 */
+	if(filename < groupID.filename) return true;
+	else if(filename > groupID.filename) return false;
+	
+	return testName < groupID.testName;
+}
+
+
 ostream& operator<<(ostream& os, const Trace::FileGroupID& groupId)
 {
 	os << "{";
@@ -38,6 +68,11 @@ static bool isSource(const std::string& filename)
 	return (len > 2) && (filename[len - 2] == '.') && (filename[len - 1] == 'c');
 }
 
+
+/*********************** Trace class methods **************************/
+
+Trace::Trace() {}
+
 Trace::~Trace()
 {
 	map<FileGroupID, FileGroupInfo*>::iterator iter = fileGroups.begin(),
@@ -48,6 +83,446 @@ Trace::~Trace()
 	}
 }
 
+Trace::Trace(const Trace& trace)
+{
+	*this = trace;
+}
+
+Trace& Trace::operator=(const Trace& trace)
+{
+	fileGroups = trace.fileGroups;
+	
+	map<FileGroupID, FileGroupInfo*>::iterator iter = fileGroups.begin(),
+		iterEnd = fileGroups.end();
+	for(;iter != iterEnd; ++iter)
+	{
+		iter->second = new FileGroupInfo(*iter->second);
+	}
+	
+	return *this;
+}
+
+/* Calculate statistic */
+class LinesTotalCollector
+{
+public:
+    LinesTotalCollector(void): linesTotal(0) {}
+    
+    int linesTotal;
+    
+    void operator()(const map<Trace::FileGroupID, Trace::FileGroupInfo*>::value_type& group)
+    {
+		*this = for_each(group.second->files.begin(), group.second->files.end(), *this);
+	}
+    
+    void operator()(const map<string, Trace::FileInfo>::value_type& file)
+    {
+		*this = for_each(file.second.lines.begin(), file.second.lines.end(), *this);
+	}
+
+    void operator()(const map<int, counter_t>::value_type& /*line*/)
+    {
+        linesTotal++;
+    }
+    
+    void addTrace(const Trace& trace)
+    {
+		*this = for_each(trace.fileGroups.begin(), trace.fileGroups.end(), *this);
+	}
+};
+
+int Trace::linesTotal(void) const
+{
+    LinesTotalCollector collector;
+    collector.addTrace(*this);
+    return collector.linesTotal;
+}
+
+class LinesTotalHitCollector
+{
+public:
+	LinesTotalHitCollector(): linesTotalHit(0) {}
+
+    int linesTotalHit;
+    
+    void operator()(const map<Trace::FileGroupID, Trace::FileGroupInfo*>::value_type& group)
+    {
+		*this = for_each(group.second->files.begin(), group.second->files.end(), *this);
+	}
+    
+    void operator()(const map<string, Trace::FileInfo>::value_type& file)
+    {
+		*this = for_each(file.second.lines.begin(), file.second.lines.end(), *this);
+	}
+
+    void operator()(const map<int, counter_t>::value_type& line)
+    {
+        if(line.second > 0) linesTotalHit++;
+    }
+    
+    void addTrace(const Trace& trace)
+    {
+		*this = for_each(trace.fileGroups.begin(), trace.fileGroups.end(), *this);
+	}
+};
+
+int Trace::linesTotalHit(void) const
+{
+    LinesTotalHitCollector collector;
+    collector.addTrace(*this);
+    return collector.linesTotalHit;
+}
+
+class BranchesTotalCollector
+{
+public:
+	BranchesTotalCollector(): branchesTotal(0) {}
+
+    int branchesTotal;
+    
+    void operator()(const map<Trace::FileGroupID, Trace::FileGroupInfo*>::value_type& group)
+    {
+		*this = for_each(group.second->files.begin(), group.second->files.end(), *this);
+	}
+    
+    void operator()(const map<string, Trace::FileInfo>::value_type& file)
+    {
+		*this = for_each(file.second.branches.begin(), file.second.branches.end(), *this);
+	}
+
+    void operator()(const map<Trace::BranchID, counter_t>::value_type& /*branch*/)
+    {
+        branchesTotal++;
+    }
+    
+    void addTrace(const Trace& trace)
+    {
+		*this = for_each(trace.fileGroups.begin(), trace.fileGroups.end(), *this);
+	}
+};
+
+int Trace::branchesTotal(void) const
+{
+    BranchesTotalCollector collector;
+    collector.addTrace(*this);
+    return collector.branchesTotal;
+}
+
+class BranchesTotalHitCollector
+{
+public:
+	BranchesTotalHitCollector(): branchesTotalHit(0) {}
+
+    int branchesTotalHit;
+    
+    void operator()(const map<Trace::FileGroupID, Trace::FileGroupInfo*>::value_type& group)
+    {
+		*this = for_each(group.second->files.begin(), group.second->files.end(), *this);
+	}
+    
+    void operator()(const map<string, Trace::FileInfo>::value_type& file)
+    {
+		*this = for_each(file.second.branches.begin(), file.second.branches.end(), *this);
+	}
+
+    void operator()(const map<Trace::BranchID, counter_t>::value_type& branch)
+    {
+        if(branch.second > 0) branchesTotalHit++;
+    }
+    
+    void addTrace(const Trace& trace)
+    {
+		*this = for_each(trace.fileGroups.begin(), trace.fileGroups.end(), *this);
+	}
+};
+
+int Trace::branchesTotalHit(void) const
+{
+    BranchesTotalHitCollector collector;
+    collector.addTrace(*this);
+    return collector.branchesTotalHit;
+}
+
+
+class FunctionsTotalCollector
+{
+public:
+	FunctionsTotalCollector(): functionsTotal(0) {}
+
+    int functionsTotal;
+    
+    void operator()(const map<Trace::FileGroupID, Trace::FileGroupInfo*>::value_type& group)
+    {
+		*this = for_each(group.second->files.begin(), group.second->files.end(), *this);
+	}
+    
+    void operator()(const map<string, Trace::FileInfo>::value_type& file)
+    {
+		*this = for_each(file.second.functions.begin(), file.second.functions.end(), *this);
+	}
+
+    void operator()(const map<string, Trace::FuncInfo>::value_type& /*function*/)
+    {
+        functionsTotal++;
+    }
+    
+    void addTrace(const Trace& trace)
+    {
+		*this = for_each(trace.fileGroups.begin(), trace.fileGroups.end(), *this);
+	}
+};
+
+int Trace::functionsTotal(void) const
+{
+    FunctionsTotalCollector collector;
+    collector.addTrace(*this);
+    return collector.functionsTotal;
+}
+
+class FunctionsTotalHitCollector
+{
+public:
+	FunctionsTotalHitCollector(): functionsTotalHit(0) {}
+
+    int functionsTotalHit;
+    
+    void operator()(const map<Trace::FileGroupID, Trace::FileGroupInfo*>::value_type& group)
+    {
+		*this = for_each(group.second->files.begin(), group.second->files.end(), *this);
+	}
+    
+    void operator()(const map<string, Trace::FileInfo>::value_type& file)
+    {
+		*this = for_each(file.second.functions.begin(), file.second.functions.end(), *this);
+	}
+
+    void operator()(const map<string, Trace::FuncInfo>::value_type& function)
+    {
+        if(function.second.counter > 0) functionsTotalHit++;
+    }
+    
+    void addTrace(const Trace& trace)
+    {
+		*this = for_each(trace.fileGroups.begin(), trace.fileGroups.end(), *this);
+	}
+};
+
+int Trace::functionsTotalHit(void) const
+{
+    FunctionsTotalHitCollector collector;
+    collector.addTrace(*this);
+    return collector.functionsTotalHit;
+}
+
+/* 
+ * Group files.
+ * 
+ * NOTE: Files are grouped only within test (usually there is only one
+ * test with empty name).
+ */
+class FilesGrouper
+{
+public:
+    void group(Trace& trace)
+    {
+		this->trace = &trace;
+
+		for_each(trace.fileGroups.begin(), trace.fileGroups.end(), *this);
+	}
+
+    void operator()(map<Trace::FileGroupID, Trace::FileGroupInfo*>::value_type& group)
+    {
+		currentGroup = &group;
+		
+		map<string, Trace::FileInfo>& files = group.second->files;
+		/* 
+		 * First, move content of all non-source files into
+		 * another groups.
+		 */
+		for_each(group.second->files.begin(), group.second->files.end(), *this);
+		/*
+		 * Second, remove all non-source files.
+		 */
+		map<string, Trace::FileInfo>::iterator
+			fileIter = files.begin(),
+			fileIterEnd = files.end();
+		while(fileIter != fileIterEnd)
+		{
+			if(fileIter->first != group.first.filename)
+			{
+				files.erase(fileIter++);
+			}
+			else
+			{
+				++fileIter;
+			}
+		}
+	}
+
+    void operator()(map<string, Trace::FileInfo>::value_type& file)
+    {
+		if(file.first == currentGroup->first.filename) return;/* Already grouped */
+		
+		/* It is needed to move file into another group. */
+		Trace::FileGroupID newGroupID;
+		newGroupID.testName = currentGroup->first.testName;
+		newGroupID.filename = file.first;
+		
+		groupIter iter = trace->fileGroups.find(newGroupID);
+		if(iter != trace->fileGroups.end())
+		{
+			/* Merge file with same file in the existed group. */
+			map<string, Trace::FileInfo>::iterator fileIter =
+				iter->second->files.find(file.first);
+			/* Group always have file with name which coincide with group's one. */
+			assert(fileIter != iter->second->files.end());
+			
+			CombineFile combineFile(fileIter->second);
+			combineFile.addFile(file.second);
+		}
+		else
+		{
+			/* Need to create group to which file will be moved. */
+			Trace::FileGroupInfo* newGroup = new Trace::FileGroupInfo();
+			
+			trace->fileGroups.insert(make_pair(newGroupID, newGroup));
+			pair<map<string, Trace::FileInfo>::iterator, bool> newFileIter =
+				newGroup->files.insert(make_pair(newGroupID.filename, Trace::FileInfo()));
+			swapFiles(newFileIter.first->second, file.second);
+		}
+	}
+	
+private:
+	Trace* trace;
+	
+	typedef map<Trace::FileGroupID, Trace::FileGroupInfo*>::iterator groupIter;
+	groupIter::value_type* currentGroup;
+	
+	/* 
+	 * Swap content of files. Helper for move file from one group into another.
+	 */
+	static void swapFiles(Trace::FileInfo& file1, Trace::FileInfo& file2)
+	{
+		swap(file1.lines, file2.lines);
+		swap(file1.functions, file2.functions);
+		swap(file1.branches, file2.branches);
+	}
+
+	/* Combine counters in files. */
+	class CombineFile
+	{
+	public:
+		CombineFile(Trace::FileInfo& destFile) : destFile(destFile) {}
+		void addFile(const Trace::FileInfo& file)
+		{
+			for_each(file.lines.begin(), file.lines.end(), *this);
+			for_each(file.branches.begin(), file.branches.end(), *this);
+			for_each(file.functions.begin(), file.functions.end(), *this);
+		}
+		
+		void operator()(const map<int, counter_t>::value_type& line)
+		{
+			map<int, counter_t>::iterator iter = destFile.lines.find(line.first);
+			if(iter == destFile.lines.end())
+			{
+				destFile.lines.insert(line);
+			}
+			else
+			{
+				iter->second += line.second;
+			}
+		}
+		
+		/* 
+		 * Combine branch counters.
+		 * Take into account that '-1' corresponds to '-' in trace file
+		 * and is "arranged before" '0'.
+		 */
+		static void combineBranchCounter(counter_t& counter,
+			counter_t counterAnother)
+		{
+			if(counter == -1)
+			{
+				if(counterAnother != -1) counter = counterAnother;
+			}
+			if(counterAnother > 0)
+			{
+				counter += counterAnother;
+			}
+		}
+
+		void operator()(const map<Trace::BranchID, counter_t>::value_type& branch)
+		{
+			map<Trace::BranchID, counter_t>::iterator iter =
+				destFile.branches.find(branch.first);
+			
+			if(iter == destFile.branches.end())
+			{
+				destFile.branches.insert(branch);
+			}
+			else
+			{
+				combineBranchCounter(iter->second, branch.second);
+			}
+		}
+
+		/* 
+		 * Update(if needed) function start line 'line' using
+		 * 'lineAnother'.
+		 */
+		//debug - return bool
+		static bool updateFuncLine(int &line, int lineAnother)
+		{
+			if(line == -1)
+			{
+				if(lineAnother >= 0) line = lineAnother;
+			}
+			else if(lineAnother != -1)
+			{
+				if(line != lineAnother)
+				{
+					static bool isFirst = true;
+					if(isFirst)
+					{
+						cerr << "Function has different lines in different "
+							"coverage groups. This warning is reported once." << endl;
+						isFirst = false;
+					}
+					return false;
+				}
+			}
+			return true;
+		}
+		void operator()(const map<string, Trace::FuncInfo>::value_type& func)
+		{
+			map<string, Trace::FuncInfo>::iterator iter =
+				destFile.functions.find(func.first);
+			if(iter == destFile.functions.end())
+			{
+				destFile.functions.insert(func);
+			}
+			else
+			{
+				updateFuncLine(iter->second.lineStart, func.second.lineStart);
+				
+				iter->second.counter += func.second.counter;
+			}
+		}
+
+
+	public:
+		Trace::FileInfo& destFile;
+	};
+
+};
+
+
+void Trace::groupFiles(void)
+{
+	FilesGrouper grouper;
+	grouper.group(*this);
+}
+/********************** Builder of the trace **************************/
 class Trace::TraceBuilder: private TraceEventProcessor
 {
 public:
@@ -241,6 +716,24 @@ void Trace::read(std::istream& is, const char* filename)
 {
 	TraceParser parser;
 	read(is, parser, filename);
+}
+
+void Trace::read(const char* filename, TraceParser& parser)
+{
+	ifstream is(filename);
+    if(!is)
+    {
+        cerr << "Failed to open file '" << filename << "' for read trace." << endl;
+        throw runtime_error("Cannot open file");
+    }
+    
+    read(is, parser, filename);
+}
+
+void Trace::read(const char* filename)
+{
+	TraceParser parser;
+	read(filename, parser);
 }
 
 

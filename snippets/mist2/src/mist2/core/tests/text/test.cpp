@@ -1,3 +1,5 @@
+/* Check that simple text is processed correctly. */
+
 #include <mist2/mist.hh>
 
 #include "mist_test_common.hh"
