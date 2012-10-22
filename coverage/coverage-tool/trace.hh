@@ -26,6 +26,9 @@ struct Trace
 	void read(std::istream& is, const char* filename = "");
 	/* Same but use already existed parser instead of create new one. */
 	void read(std::istream& is, TraceParser& parser, const char* filename = "");
+	/* Load trace from file. */
+	void read(const char* filename);
+	void read(const char* filename, TraceParser& parser);
 
 	/* Store trace to the stream */
 	void write(std::ostream& os) const;

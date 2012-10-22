@@ -2,6 +2,8 @@
 
 #include "trace_modifier.hh"
 
+#include "optimize_tests.hh"
+
 #include <iostream>
 #include <fstream>
 
@@ -14,6 +16,10 @@
 #include <stdexcept> /* runtime_error */
 
 #include <cassert>
+
+#include <unistd.h> /* FILE, getline() */
+#include <stdlib.h> /* strtod */
+
 
 /*
  * Usage: See 'usage' file.
@@ -104,6 +110,20 @@ private:
     static const char* defaultFormat;
 };
 
+/* Program execution for 'optimize-tests' */
+struct OptimizeTestsProcessor: public CommandProcessor
+{
+    const char* testsFile;
+    
+    OptimizeTestsProcessor(void);
+
+    int parseParams(int argc, char** argv);
+    int exec();
+private:
+    /* Load tests from file. */
+    void loadTests(vector<TestCoverageDesc>& tests);
+};
+
 int main(int argc, char** argv)
 {
     if(argc < 1)
@@ -132,6 +152,11 @@ int main(int argc, char** argv)
     {
         commandProcessor.reset(new StatProcessor());
     }
+    else if(isCommand("optimize-tests"))
+    {
+        commandProcessor.reset(new OptimizeTestsProcessor());
+    }
+
     else if(isCommand("-h") || isCommand("--help"))
     {
         cerr << "Invalid command: " << argv[1] << endl;
@@ -873,4 +898,95 @@ int StatProcessor::exec()
     }
     
     return 0;
+}
+
+/****************** Optimize-tests implementation *********************/
+/* Params */
+OptimizeTestsProcessor::OptimizeTestsProcessor()
+    : testsFile(NULL) {}
+
+int OptimizeTestsProcessor::parseParams(int argc, char** argv)
+{
+    static const char options[] = "+o:";
+    
+    for(int opt = getopt(argc, argv, options);
+        opt != -1;
+        opt = getopt(argc, argv, options))
+    {
+        switch(opt)
+        {
+        case '?':
+            //error in options
+            return -1;
+        case 'o':
+            setOutFile(optarg);
+            break;
+        default:
+            return -1;
+        }
+    }
+    
+    char** argv_rest = argv + optind;
+    int argc_rest = argc - optind;
+    
+    if(argc_rest != 1)
+    {
+        if(argc_rest == 0) cerr << "Tests file is missed." << endl;
+        else cerr << "Exceeded command-line argument: " << optarg << endl;
+        return -1;
+    }
+    
+    testsFile = argv_rest[0];
+    
+    return 0;
+}
+
+int OptimizeTestsProcessor::exec()
+{
+    vector<TestCoverageDesc> tests;
+    
+    loadTests(tests);
+    
+    vector<TestCoverageDesc> optTests;
+    
+    optimizeTests(tests, optTests);
+    
+    ostream& os = getOutStream();
+    
+    for(int i = 0; i < (int)tests.size(); i++)
+    {
+        os << optTests[i].traceFile << endl;
+    }
+    return 0;
+}
+
+void OptimizeTestsProcessor::loadTests(vector<TestCoverageDesc>& tests)
+{
+    FILE* f = fopen(testsFile, "r");
+    if(f == NULL)
+    {
+        cerr << "Failed to open file with tests." << endl;
+        throw runtime_error("Failed to open file");
+    }
+    
+    char* line = NULL;
+    size_t buffer_size;
+    ssize_t len;
+    while((len = getline(&line, &buffer_size, f)) != -1)
+    {
+        /* Drop delimiter if it is. */
+        if((len > 0) && (line[len - 1] == '\n')) line[len - 1] = '\0';
+        /* Ignore empty lines and lines started with '#' */
+        if((line[0] == '\0') || (line[0] == '#')) continue;
+        
+        char* filename_start;
+        
+        double weight = strtod(line, &filename_start);
+        
+        while(isspace(*filename_start)) ++filename_start;
+        
+        tests.push_back(TestCoverageDesc(filename_start, weight));
+    }
+    
+    free(line);
 }

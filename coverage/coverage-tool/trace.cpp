@@ -718,6 +718,24 @@ void Trace::read(std::istream& is, const char* filename)
 	read(is, parser, filename);
 }
 
+void Trace::read(const char* filename, TraceParser& parser)
+{
+	ifstream is(filename);
+    if(!is)
+    {
+        cerr << "Failed to open file '" << filename << "' for read trace." << endl;
+        throw runtime_error("Cannot open file");
+    }
+    
+    read(is, parser, filename);
+}
+
+void Trace::read(const char* filename)
+{
+	TraceParser parser;
+	read(filename, parser);
+}
+
 
 /* 
  * Write file information into stream.

@@ -29,6 +29,7 @@ add_executable(${tool_name}
 	"${CMAKE_CURRENT_BINARY_DIR}/trace_scanner.cc"
 	"trace.cpp"
 	"trace_modifier.cpp"
+	"optimize_tests.cpp"
 	
 	"${CMAKE_CURRENT_BINARY_DIR}/trace_parser_base.tab.hh"
 	"${CMAKE_CURRENT_BINARY_DIR}/location.hh")
