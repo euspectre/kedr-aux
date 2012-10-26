@@ -69,7 +69,7 @@ yy::location* yylloc)
 
 
 /* 
- * Convert text chunk to integer.
+ * Convert text chunk to long integer.
  * 
  * The thing is that we cannot use strtol() because text chunk is not
  * null-terminated.
@@ -77,7 +77,7 @@ yy::location* yylloc)
  * NOTE: For simplicity, function expects all symbols in text chunk
  * are valid for decimal integer.
  */
-static int str_to_int(const char* str, int str_len);
+static unsigned long str_to_long(const char* str, int str_len);
 %}
 
 /* State when parse directive parameters */
@@ -183,7 +183,7 @@ path        \/[[:alnum:]_\/@\-\.]+
                     }
 
 {integernz}         {
-                        yylval->number = str_to_int(yytext, yyleng);
+                        yylval->number = str_to_long(yytext, yyleng);
                         return token::NUMBER;
                     }
 
@@ -243,9 +243,9 @@ int TraceScanner::yylex(yy::parser::semantic_type* yylval,
     return ::yylex(scanner, yylval, yylloc);
 }
 
-int str_to_int(const char* str, int str_len)
+unsigned long str_to_long(const char* str, int str_len)
 {
-    int result = 0;
+    unsigned long result = 0;
     for(int i = 0; i < str_len; i++)
         result = result * 10 + (str[i] - '0');
     

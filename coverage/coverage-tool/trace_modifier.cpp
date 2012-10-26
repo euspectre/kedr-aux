@@ -55,7 +55,7 @@ public:
     
     void operator()(const map<Trace::BranchID, counter_t>::value_type& branch)
     {
-        if(modifier.onBranchCounter(branch)) return;
+        if(modifier.onBranch(branch)) return;
         
         map<Trace::BranchID, counter_t>::iterator
             branchIterModified = traceFileModified.branches.find(branch.first);

@@ -2,7 +2,7 @@
 
 #include "trace_modifier.hh"
 
-#include "optimize_tests.hh"
+#include "test_set_optimizer.hh"
 
 #include <iostream>
 #include <fstream>
@@ -114,6 +114,7 @@ private:
 struct OptimizeTestsProcessor: public CommandProcessor
 {
     const char* testsFile;
+    bool verbose;
     
     OptimizeTestsProcessor(void);
 
@@ -176,68 +177,6 @@ int main(int argc, char** argv)
 }
 
 /************************* Helpers ************************************/
-
-
-/* 
- * Read trace from given file.
- * 
- * Return 0 on success and negative error on fail.
- */
-static int traceReadFromFile(Trace& trace, const char* filename)
-{
-    ifstream is(filename);
-    if(!is)
-    {
-        cerr << "Failed to open file '"  << filename << "' for read trace." << endl;
-        return 1;
-    }
-    
-    trace.read(is, filename);
-    
-    return 0;
-}
-
-/* 
- * Modifier class, which print warning messages when new elements
- * are found in traces.
- */
-class TraceModifierWarnNew: public Trace::Modifier, public Trace::FileInfo::Modifier
-{
-public:
-    void onFileGroupEndNew(Trace& /*traceModified*/)
-    {
-        cerr << "Traces has different file groups." << endl;
-    }
-
-    void onSourceEndNew(Trace::FileGroupID& /*groupModified*/)
-    {
-        cerr << "Traces has different sources." << endl;
-    }
-
-    Trace::FileInfo::Modifier* onSourceStart(
-        const std::map<std::string, Trace::FileInfo>::value_type& /*source*/)
-    {
-        return this;
-    }
-
-
-    void newFunc(Trace::FileInfo& /*fileModified*/)
-    {
-        cerr << "Traces has different functions." << endl;
-    }
-
-    void newBranch(Trace::FileInfo& /*fileModified*/)
-    {
-        cerr << "Traces has different branches." << endl;
-    }
-
-    void newLine(Trace::FileInfo& /*fileModified*/)
-    {
-        cerr << "Traces has different lines." << endl;
-    }
-};
-
-
 /* Base CommandProcessor class */
 CommandProcessor::CommandProcessor(): outFile(NULL), outStream(NULL) {}
 
@@ -338,68 +277,75 @@ int DiffProcessor::parseParams(int argc, char** argv)
 }
 
 /* Trace modifier */
-class TraceModifierDiff: public TraceModifierWarnNew
+class TraceModifierDiff: public Trace::Modifier
 {
 public:
-    bool onFunction(const map<string, Trace::FuncInfo>::value_type& func)
+    Trace::FileInfo::Modifier* onSourceStart(
+        const std::map<std::string, Trace::FileInfo>::value_type& source)
     {
-        /* Needn't process function if its counter non-positive */
-        return func.second.counter <= 0;
-    }
-    void modifyFuncCounter(counter_t counter,
-        counter_t& counterModified)
-    {
-        diffCounter(counter, counterModified);
+        return &fileModifier;
     }
 
-    bool onBranch(const map<Trace::BranchID, counter_t>::value_type& branch)
-    {
-        return branch.second <= 0;
-    }
-
-    void modifyBranchCounter(counter_t counter, counter_t& counterModified)
-    {
-        diffCounter(counter, counterModified);
-    }
-
-    bool onLine(const map<int, counter_t>::value_type& line)
-    {
-        return line.second <= 0;
-    }
-
-    void modifyLineCounter(counter_t counter, counter_t& counterModified)
-    {
-        diffCounter(counter, counterModified);
-    }
 private:
-    void diffCounter(counter_t counter, counter_t& counterModified)
+    class FileModifier: public Trace::FileInfo::Modifier
     {
-        if(counterModified > 0)
+    public:
+        bool onFunction(const map<string, Trace::FuncInfo>::value_type& func)
         {
-            if(counter >= counterModified)
+            /* Needn't process function if its counter non-positive */
+            return func.second.counter <= 0;
+        }
+        void modifyFuncCounter(counter_t counter,
+            counter_t& counterModified)
+        {
+            diffCounter(counter, counterModified);
+        }
+
+        bool onBranch(const map<Trace::BranchID, counter_t>::value_type& branch)
+        {
+            return branch.second <= 0;
+        }
+
+        void modifyBranchCounter(counter_t counter, counter_t& counterModified)
+        {
+            diffCounter(counter, counterModified);
+        }
+
+        bool onLine(const map<int, counter_t>::value_type& line)
+        {
+            return line.second <= 0;
+        }
+
+        void modifyLineCounter(counter_t counter, counter_t& counterModified)
+        {
+            diffCounter(counter, counterModified);
+        }
+    private:
+        void diffCounter(counter_t counter, counter_t& counterModified)
+        {
+            if(counterModified > 0)
             {
-                counterModified = 0;
-            }
-            else
-            {
-                counterModified -= counter;
+                if(counter >= counterModified)
+                {
+                    counterModified = 0;
+                }
+                else
+                {
+                    counterModified -= counter;
+                }
             }
         }
-    }
+
+    }fileModifier;
 };
 
 int DiffProcessor::exec()
 {
-    int result;
-    
     Trace trace;
-    result = traceReadFromFile(trace, traceFile);
-    if(result) return result;
+    trace.read(traceFile);
     
     Trace traceSub;
-    result = traceReadFromFile(traceSub, subTraceFile);
-    if(result) return result;
-
+    traceSub.read(subTraceFile);
     
     TraceModifierDiff modifier;
     modifyTrace(traceSub, modifier, trace);
@@ -452,70 +398,122 @@ int AddProcessor::parseParams(int argc, char** argv)
 }
 
 /* Trace modifier */
-class TraceModifierAdd: public TraceModifierWarnNew
+class TraceModifierAdd: public Trace::Modifier
 {
 public:
-    bool onFunction(const map<string, Trace::FuncInfo>::value_type& func)
+    bool onFileGroupStart(
+        const map<Trace::FileGroupID, Trace::FileGroupInfo*>::value_type& group)
     {
-        /* Needn't process function if its counter non-positive */
-        return func.second.counter <= 0;
+        currentGroup = &group;
+        return false;
     }
-    void modifyFuncCounter(counter_t counter,
-        counter_t& counterModified)
+    void onFileGroupEndNew(Trace& traceModified)
     {
-        addCounter(counter, counterModified);
-    }
-
-    bool onBranch(const map<Trace::BranchID, counter_t>::value_type& branch)
-    {
-        return branch.second <= 0;
+        pair<map<Trace::FileGroupID, Trace::FileGroupInfo*>::iterator, bool>
+            iterNew = traceModified.fileGroups.insert(*currentGroup);
+        iterNew.first->second =
+            new Trace::FileGroupInfo(*iterNew.first->second);
     }
 
-    void modifyBranchCounter(counter_t counter, counter_t& counterModified)
+    Trace::FileInfo::Modifier* onSourceStart(
+        const std::map<std::string, Trace::FileInfo>::value_type& source)
     {
-        addCounter(counter, counterModified);
+        currentFile = &source;
+        return &fileModifier;
     }
-
-    bool onLine(const map<int, counter_t>::value_type& line)
+    
+    void onSourceEndNew(Trace::FileGroupInfo& groupModified)
     {
-        return line.second <= 0;
-    }
-
-    void modifyLineCounter(counter_t counter, counter_t& counterModified)
-    {
-        addCounter(counter, counterModified);
+        groupModified.files.insert(*currentFile);
     }
 private:
-    void addCounter(counter_t counter, counter_t& counterModified)
+    class FileModifier: public Trace::FileInfo::Modifier
     {
-        if(counterModified > 0)
+    public:
+        bool onFunction(const map<string, Trace::FuncInfo>::value_type& func)
         {
-            counterModified += counter;
+            current.func = &func;
+            return false;
         }
-        else
+        void modifyFuncCounter(counter_t counter,
+            counter_t& counterModified)
         {
-            counterModified = counter;
+            addCounter(counter, counterModified);
         }
-    }
+        void newFunc(Trace::FileInfo& fileModified)
+        {
+            fileModified.functions.insert(*current.func);
+        }
+        
+        bool onBranch(const map<Trace::BranchID, counter_t>::value_type& branch)
+        {
+            current.branch = &branch;
+            return false;
+        }
+        void modifyBranchCounter(counter_t counter, counter_t& counterModified)
+        {
+            addCounter(counter, counterModified);
+        }
+        void newBranch(Trace::FileInfo& fileModified)
+        {
+            fileModified.branches.insert(*current.branch);
+        }
+
+        bool onLine(const map<int, counter_t>::value_type& line)
+        {
+            current.line = &line;
+            return false;
+        }
+        void modifyLineCounter(counter_t counter, counter_t& counterModified)
+        {
+            addCounter(counter, counterModified);
+        }
+        void newLine(Trace::FileInfo& fileModified)
+        {
+            fileModified.lines.insert(*current.line);
+        }
+    private:
+        void addCounter(const counter_t counter, counter_t& counterModified)
+        {
+            if(counter > 0)
+            {
+                if(counterModified > 0)
+                {
+                    counterModified += counter;
+                }
+                else
+                {
+                    counterModified = counter;
+                }
+            }
+        }
+        
+        union currentType
+        {
+            const map<string, Trace::FuncInfo>::value_type* func;
+            const map<Trace::BranchID, counter_t>::value_type* branch;
+            const map<int, counter_t>::value_type* line;
+        }current;
+    } fileModifier;
+    
+    const map<Trace::FileGroupID, Trace::FileGroupInfo*>::value_type*
+        currentGroup;
+    const map<std::string, Trace::FileInfo>::value_type* currentFile;
 };
 
 int AddProcessor::exec()
 {
-    int result;
-
     Trace trace;
-    result = traceReadFromFile(trace, traceFiles[0]);
-    if(result) return result;
+    trace.read(traceFiles[0]);
 
     TraceModifierAdd modifier;
     
     for(int i = 1; i < (int)traceFiles.size(); i++)
     {
-        Trace traceAdd;
-        result = traceReadFromFile(traceAdd, traceFiles[i]);
-        if(result) return result;
+        Trace traceAdded;
+        traceAdded.read(traceFiles[i]);
 
-        modifyTrace(traceAdd, modifier, trace);
+        modifyTrace(traceAdded, modifier, trace);
     }
 
     ostream& outStream = getOutStream();
@@ -574,60 +572,65 @@ int NewCoverageProcessor::parseParams(int argc, char** argv)
 
 
 /* Trace modifier */
-class TraceModifierNewCoverage: public TraceModifierWarnNew
+class TraceModifierNewCoverage: public Trace::Modifier
 {
 public:
-    bool onFunction(const map<string, Trace::FuncInfo>::value_type& func)
+    Trace::FileInfo::Modifier* onSourceStart(
+        const map<std::string, Trace::FileInfo>::value_type& source)
     {
-        /* Needn't process function if its counter non-positive */
-        return func.second.counter <= 0;
-    }
-    void modifyFuncCounter(counter_t counter,
-        counter_t& counterModified)
-    {
-        newCounter(counter, counterModified);
-    }
-
-    bool onBranch(const map<Trace::BranchID, counter_t>::value_type& branch)
-    {
-        return branch.second <= 0;
-    }
-
-    void modifyBranchCounter(counter_t counter, counter_t& counterModified)
-    {
-        newCounter(counter, counterModified);
-    }
-
-    bool onLine(const map<int, counter_t>::value_type& line)
-    {
-        return line.second <= 0;
-    }
-
-    void modifyLineCounter(counter_t counter, counter_t& counterModified)
-    {
-        newCounter(counter, counterModified);
+        return &fileModifier;
     }
 private:
-    void newCounter(counter_t counter, counter_t& counterModified)
+    class FileModifier: public Trace::FileInfo::Modifier
     {
-        if(counter > 0)
+        bool onFunction(const map<string, Trace::FuncInfo>::value_type& func)
         {
-            counterModified = 0;
+            /* Needn't process function if its counter non-positive */
+            return func.second.counter <= 0;
         }
-    }
+        void modifyFuncCounter(counter_t counter,
+            counter_t& counterModified)
+        {
+            newCounter(counter, counterModified);
+        }
+
+        bool onBranch(const map<Trace::BranchID, counter_t>::value_type& branch)
+        {
+            return branch.second <= 0;
+        }
+
+        void modifyBranchCounter(counter_t counter, counter_t& counterModified)
+        {
+            newCounter(counter, counterModified);
+        }
+
+        bool onLine(const map<int, counter_t>::value_type& line)
+        {
+            return line.second <= 0;
+        }
+
+        void modifyLineCounter(counter_t counter, counter_t& counterModified)
+        {
+            newCounter(counter, counterModified);
+        }
+    private:
+        void newCounter(counter_t counter, counter_t& counterModified)
+        {
+            if(counter > 0)
+            {
+                counterModified = 0;
+            }
+        }
+    }fileModifier;
 };
 
 int NewCoverageProcessor::exec()
 {
-    int result;
-    
     Trace trace;
-    result = traceReadFromFile(trace, traceFile);
-    if(result) return result;
+    trace.read(traceFile);
 
     Trace tracePrev;
-    result = traceReadFromFile(tracePrev, prevTraceFile);
-    if(result) return result;
+    tracePrev.read(prevTraceFile);
 
     TraceModifierNewCoverage modifier;
     modifyTrace(tracePrev, modifier, trace);
@@ -780,7 +783,6 @@ const char* StatPrinter::printSpec(const char* specPointer)
     {
     case 'l':
         count = getLinesTotalHit();
-        cout << "Counter is " << count << "." << endl;
         os << count;
         break;
     case 'L':
@@ -879,11 +881,8 @@ void StatPrinter::printPercent(int a, int A)
 /* Exec */
 int StatProcessor::exec()
 {
-    int result;
-    
     Trace trace;
-    result = traceReadFromFile(trace, traceFile);
-    if(result) return result;
+    trace.read(traceFile);
 
     trace.groupFiles();
     
@@ -903,11 +902,11 @@ int StatProcessor::exec()
 /****************** Optimize-tests implementation *********************/
 /* Params */
 OptimizeTestsProcessor::OptimizeTestsProcessor()
-    : testsFile(NULL) {}
+    : testsFile(NULL), verbose(false) {}
 
 int OptimizeTestsProcessor::parseParams(int argc, char** argv)
 {
-    static const char options[] = "+o:";
+    static const char options[] = "+o:v";
     
     for(int opt = getopt(argc, argv, options);
         opt != -1;
@@ -920,6 +919,9 @@ int OptimizeTestsProcessor::parseParams(int argc, char** argv)
             return -1;
         case 'o':
             setOutFile(optarg);
+            break;
+        case 'v':
+            verbose = true;
             break;
         default:
             return -1;
@@ -944,16 +946,14 @@ int OptimizeTestsProcessor::parseParams(int argc, char** argv)
 int OptimizeTestsProcessor::exec()
 {
     vector<TestCoverageDesc> tests;
-    
     loadTests(tests);
     
-    vector<TestCoverageDesc> optTests;
-    
-    optimizeTests(tests, optTests);
-    
+    TestSetOptimizer optimizer(tests);
+    const vector<TestCoverageDesc>& optTests = optimizer.optimize(verbose);
+
     ostream& os = getOutStream();
     
-    for(int i = 0; i < (int)tests.size(); i++)
+    for(int i = 0; i < (int)optTests.size(); i++)
     {
         os << optTests[i].traceFile << endl;
     }

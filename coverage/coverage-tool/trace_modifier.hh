@@ -45,7 +45,7 @@ public:
      * 
      * If return true, processing of branch will be canceled.
      */
-    virtual bool onBranchCounter(
+    virtual bool onBranch(
         const std::map<Trace::BranchID, counter_t>::value_type& /*branch*/)
         {return false;}
     /* Modify branch counter. */

@@ -8,6 +8,8 @@
 #include <vector>
 #include <string>
 
+#include "trace.hh"
+
 /* Coverage-related descriptor of the test. */
 struct TestCoverageDesc
 {
@@ -28,6 +30,30 @@ struct TestCoverageDesc
     TestCoverageDesc(const std::string& traceFile, double weight):
         traceFile(traceFile), weight(weight) {}
 };
+
+
+class TestSetOptimizer
+{
+public:
+    /* 
+     * Load given test set into optimizer.
+     */
+    TestSetOptimizer(const std::vector<TestCoverageDesc>& tests);
+    /* 
+     * Return test set which has same line coverage as one, passed to
+     * constructor, but minimal weight.
+     * 
+     * Order is be preserved.
+     * 
+     * Resulted array exists while object itself exists.
+     */
+    const std::vector<TestCoverageDesc>& optimize(bool verbose);
+private:
+    /* Input and output(optimal) tests set. */
+    std::vector<TestCoverageDesc> tests;
+};
+
+
 
 /* 
  * Accept set of tests descriptors.

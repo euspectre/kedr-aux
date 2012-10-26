@@ -3,7 +3,7 @@ Usage:
     @PROGRAM_NAME@ add [-o <out-file>] <trace> ... 
     @PROGRAM_NAME@ new-coverage [-o <out-file>] <trace> <trace-prev> 
     @PROGRAM_NAME@ stat [-o <out-file>] [-f format] <trace> 
-    @PROGRAM_NAME@ optimize-tests [-o <out-file>] <tests-file>
+    @PROGRAM_NAME@ optimize-tests [-v] [-o <out-file>] <tests-file>
 
     @PROGRAM_NAME@ -h|--help
         print given usage information and exit.    
@@ -57,6 +57,8 @@ Options:
         %pb - output percents of branches which are hit
         
         %% - output '%' character
-        
+    
+    -v
+        Output additional information into stderr.
 
     

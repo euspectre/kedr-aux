@@ -34,6 +34,12 @@ bool Trace::BranchID::operator<(const BranchID& branchID) const
 	return false;
 }
 
+std::ostream& operator<<(std::ostream& os, const Trace::BranchID& branchID)
+{
+	return os << "{" << branchID.line << ", " << branchID.blockNumber << ", "
+		<< branchID.branchNumber << "}";
+}
+
 /********************* FileGroupID methods ****************************/
 bool Trace::FileGroupID::operator<(const FileGroupID& groupID) const
 {
@@ -645,6 +651,9 @@ public:
     {
 		BranchID branchID(branchLine, blockNumber, branchNumber);
 		
+		if(branchLine > 1000000)
+			cerr << traceLine << ": Branch with line number " << branchLine << " is found." << endl;
+		
 		pair<map<BranchID, counter_t>::iterator, bool> newIter = 
 			currentFile->branches.insert(make_pair(branchID, counter));
 		if(!newIter.second)
@@ -791,7 +800,7 @@ static void writeFileInfoToStream(const Trace::FileInfo& fileInfo, ostream& os)
 			<< branchIter->first.blockNumber << ','
 			<< branchIter->first.branchNumber << ',';
 		
-		int counter = branchIter->second;
+		counter_t counter = branchIter->second;
 
 		if(counter != -1)
 			os << counter;
