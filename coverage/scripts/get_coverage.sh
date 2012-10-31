@@ -240,8 +240,8 @@ reset)
         gcov_reset_file="${debug_fs}/gcov/reset"
         if ! echo 0 > "$gcov_reset_file"; then
             printf_error "Failed to reset coverage counters.\n"
+            exit 1
         fi
-        exit 1
     fi
     ;;
 esac

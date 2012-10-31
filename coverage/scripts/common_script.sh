@@ -21,7 +21,7 @@ print_usage()
 cat <<EOF
 Usage:
 
-   common_script.sh [OPTIONS] <scenario_program> [params...]
+   common_script.sh OPTIONS <scenario_program> [params...]
 
 Run
    <scenario_program> [params...]
@@ -33,10 +33,10 @@ for storing coverage trace are performed successfully. Otherwise
 return 1, and futher executiong this program are meaningless: it failed
 to prepare to the test.
 
-Coverage trace include filesystem(s) mouning and module loading before test
+Coverage trace include device(s) mouning and module loading before test
 and filesystem unmount and module unloading after test.
-If failed to unmount filesystem or module unloading, coverage trace will
-be stored as possible, but error indicator will be returned.
+If failed to unmount device or unload module, coverage trace will
+be stored anyway (if possible), but error indicator will be returned.
 
 
 	common_script.sh -h|--help
@@ -44,22 +44,38 @@ be stored as possible, but error indicator will be returned.
 Print given help and return.
 
 Options:
+	-f|filesystem <fs>
+		Filesystem to be tested (as it is given in mkfs).
+		This option is required.
 	-d|--directory <dir>
 		Directory where to store resulted files: coverage trace and file.
 		If not specified, current directory ('.') is used.
-	
-	-f|--filesystem <fs>
-		File system to be mount during scenario. There should be a line
-		in '/etc/fstab', which describe mounting of that system.
-		Currently only device path is supported as filesystem: /dev/sdb.
+
+	--device <dev>
+		Block device to be mount during scenario. There should be a line
+		in '/etc/fstab', which describe mounting of that device.
+		Currently only device path is supported: /dev/sdb.
 		
-		Before mounting, filesystem is formatted, so every scenario sees
-		empty filesystem.
+		Before mounting, device is formatted to the testing filesystem,
+		so every scenario sees empty filesystem.
 		
 		Several options may be specified, in that case all given
-		filesystems will be mounted.
+		devices will be mounted.
 		
 		If not specified, /dev/hdb filesystem is used.
+	--format-command <command>
+		Command format device(s) under test to tested filesystem.
+		Note, that currently arguments are not supported for command(TODO).
+		By default,
+		
+			mkfs -t <fs> <dev>
+		
+		is used for every device under test.
+	-m|--module <module>
+		Module which supports filesystem under test.
+		This module is (re)loading before test, unloaded after test,
+		then coverage for it is stored.
+		Default is	"<fs>"
 EOF
 }
 
@@ -71,7 +87,14 @@ if test -z "${time_utility}"; then
 	exit 1
 fi
 
-TEMP=`getopt -o "+d:f:h" -l "directory:filesystem:,help" -n "$0" -- "$@"`
+# Script for collect module coverage
+get_coverage_script="`dirname $0`/get_coverage.sh"
+
+
+
+TEMP=`getopt -o "+d:f:m:h" \
+-l "directory:,filesystem:,module:,device:,format-command:,help" \
+-n "$0" -- "$@"`
 
 if test $? != 0; then
     print_usage
@@ -83,10 +106,17 @@ eval set -- "$TEMP"
 
 # Default directory for store results.
 result_dir=.
-# Array of filesystems, delimited by ' '.
+# Array of devices, delimited by ' '.
 # NOTE: Do not use real arrays, because them are not supported by some
 # shells (like dash).
+test_dev=
+# Filesystem under test.
 test_fs=
+# Module which supports given filesystem.
+module_name=
+# Device format command.
+format_command=
+
 
 while true ; do
     case "$1" in
@@ -94,13 +124,22 @@ while true ; do
         result_dir="$2"
         shift 2;;
 	-f|--filesystem)
+		test_fs="$2"
+		shift 2;;
+	--device)
 		# Push back value into 'test_fs' array.
-		if test -z "${test_fs}"; then
-			test_fs="$2"
+		if test -z "${test_dev}"; then
+			test_dev="$2"
 		else
-			test_fs="${test_fs} $2"
+			test_dev="${test_dev} $2"
 		fi
         shift 2;;
+    -m|--module)
+		module_name="$2"
+		shift 2;;
+	--format-command)
+		format_command="$2"
+		shift 2;;
     -h|--help)
         print_usage
         exit 0;;
@@ -110,37 +149,42 @@ while true ; do
 done
 
 if test -z "${test_fs}"; then
-	# Default fs (currently hardcoded)
-	test_fs="/dev/hdb"
+	printf_error "Filesystem for test should be specified\n"
+	exit 1
 fi
 
-# Name of the tested module(currently hardcoded)
-module_name=xfs
-# Deduce filesystem type from fs driver name.
-fs_type=${module_name}
+if test -z "${module_name}"; then
+	module_name=${test_fs}
+fi
+
+if test -z "${test_dev}"; then
+	# Default device
+	test_dev="/dev/hdb"
+fi
+
 # Deduce source directory for module
 module_source_dir="fs/${module_name}"
 
-# Check whether given filesystem is mounted.
+# Check whether given device is mounted.
 # Return 0 if it is, 1 if it is not.
 #
-# Usage: fs_is_mount fs
-fs_is_mount()
+# Usage: dev_is_mount dev
+dev_is_mount()
 {
-	fs=$1
-	mount | grep "${fs}" > /dev/null
+	dev=$1
+	mount | grep "^${dev} " > /dev/null
 }
 
-# Mount given filesystem
+# Mount given device
 # Return 0 on success, otherwise print error message and return non-zero.
 #
-# Usage: fs_mount fs
+# Usage: dev_mount dev
 
-fs_mount()
+dev_mount()
 {
-	fs=$1
-	if ! mount "${fs}"; then
-		printf_error "Failed to mount filesystem '%s'\n" "${fs}"
+	dev=$1
+	if ! mount "${dev}"; then
+		printf_error "Failed to mount devices '%s'\n" "${dev}"
 		return 1
 	fi
 	
@@ -148,30 +192,30 @@ fs_mount()
 }
 
 
-# Unmount given filesystem
+# Unmount given device
 # Return 0 on success, otherwise print error message and return non-zero.
 #
-# Usage: fs_unmount fs
+# Usage: dev_unmount dev
 
-fs_unmount()
+dev_unmount()
 {
-	fs=$1
-	if ! umount $fs; then
-		printf_error "Failed to unmount filesystem '%s'\n" "${fs}"
+	dev=$1
+	if ! umount $dev; then
+		printf_error "Failed to unmount device '%s'\n" "${dev}"
 		return 1
 	fi
 	
 	return 0
 }
 
-# (Re)Load module and (re)mount filesystems
+# (Re)Load module and (re)mount devices
 # Return 0 on success and non-zero code on fail.
 prepare_all()
 {
-	for fs in ${test_fs}; do
-		if fs_is_mount "${fs}"; then
-			printf_status "Unmount already mounted filesystem '%s'...\n" "${fs}"
-			if ! fs_unmount $fs; then
+	for dev in ${test_dev}; do
+		if dev_is_mount "${dev}"; then
+			printf_status "Unmount already mounted device '%s'...\n" "${dev}"
+			if ! dev_unmount $dev; then
 				return 1
 			fi
 		fi
@@ -185,22 +229,28 @@ prepare_all()
 	fi
 
 	printf_status "Create/clean filesystem(s) for test...\n"
-	for fs in ${test_fs}; do
-		if ! mkfs -t ${fs_type} -q -f ${fs}; then
-			printf_error "Failed to create filesystem on device '%s' for test.\n" "${fs}"
+	if test -n "${format_command}"; then
+		if ! $format_command; then
+			printf_error "Failed to format device(s) for test.\n"
 			return 1
 		fi
-	done
-
+	else
+		for dev in ${test_dev}; do
+			if ! mkfs -t ${test_fs} ${dev}; then
+				printf_error "Failed to create filesystem on device '%s' for test.\n" "${dev}"
+				return 1
+			fi
+		done
+	fi
 	printf_status "Load module %s.\n" "${module_name}"
 	if ! modprobe "${module_name}"; then
 		printf_error "Failed to load module %s\n" "${module_name}"
 		return 1
 	fi
 
-	printf_status "Mount filesystem(s) for test.\n"
-	for fs in ${test_fs}; do
-		if ! fs_mount "${fs}"; then
+	printf_status "Mount device(s) for test.\n"
+	for dev in ${test_dev}; do
+		if ! dev_mount "${dev}"; then
 			return 1
 		fi
 	done
@@ -212,10 +262,10 @@ prepare_all()
 # Return 0 on success and non-zero code on fail.
 finalize_all()
 {
-	printf_status "Unmount filesystem(s) used in tests.\n"
-	for fs in ${test_fs}; do
-		if fs_is_mount "${fs}"; then
-			if ! fs_unmount "${fs}"; then
+	printf_status "Unmount device(s) used in tests.\n"
+	for dev in ${test_dev}; do
+		if dev_is_mount "${dev}"; then
+			if ! dev_unmount "${dev}"; then
 				return 1
 			fi
 		fi
@@ -224,18 +274,10 @@ finalize_all()
 	printf_status "Unload module %s.\n" "${module_name}"
 	if ! modprobe -r "${module_name}"; then
 		printf_error "Failed to unload module.\n"
-		printf_status "Attempt to store trace, while it is not full...\n"
-		if ${get_coverage_script} "${trace_file}"; then
-			printf_status "Partial trace has been stored into '%s'.\n" "${trace_file}"
-		fi
-		exit 1
+		return 1
 	fi
 
 }
-
-# Script for collect module coverage
-get_coverage_script="/home/tester/kedr/aux-sources/coverage/scripts/get_coverage.sh -d ${module_source_dir}"
-
 
 if test "$#" -eq "0"; then
 	printf_error "Command for execute test scenario should be specified.\n"
@@ -265,7 +307,7 @@ ${time_utility} -f "%e" -o ${time_file} --quiet "$@"
 # Finalize
 if ! finalize_all; then
 	printf_status "Attempt to store coverage trace, while it is not full..."
-	if ${get_coverage_script} "${trace_file}"; then
+	if ${get_coverage_script} -d "${module_source_dir}" "${trace_file}"; then
 		printf_status "Partial trace has been stored into '%s'.\n" "${trace_file}"
 	fi
 	
@@ -274,7 +316,7 @@ fi
 
 # Store trace
 printf_status "Store coverage trace...\n"
-if ! ${get_coverage_script} "${trace_file}"; then
+if ! ${get_coverage_script} -d "${module_source_dir}" "${trace_file}"; then
 	exit 1
 fi
 printf_status "Trace has been stored into '%s'.\n" "${trace_file}"
