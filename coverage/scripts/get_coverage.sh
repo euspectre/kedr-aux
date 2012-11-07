@@ -126,7 +126,7 @@ source_dir=
 # Request type. "default" - write trace, "reset" - reset, "check" - check.
 mode="default"
 
-TEMP=`getopt -o "d:hcr" -l "directory:,check,reset" -n "$0" -- "$@"`
+TEMP=`getopt -o "d:hcr" -l "directory:,check,reset,help" -n "$0" -- "$@"`
 
 if test $? != 0; then
     print_usage
