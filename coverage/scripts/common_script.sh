@@ -242,6 +242,14 @@ prepare_all()
 			fi
 		done
 	fi
+
+	# Clear coverage. By default, GCOV remember coverage between
+	# unloading module and loading it again.
+	if ! ${get_coverage_script} --reset; then
+		printf_error "Failed to reset coverage counters.\n"
+		return 1
+	fi
+
 	printf_status "Load module %s.\n" "${module_name}"
 	if ! modprobe "${module_name}"; then
 		printf_error "Failed to load module %s\n" "${module_name}"
@@ -306,7 +314,7 @@ ${time_utility} -f "%e" -o ${time_file} --quiet "$@"
 
 # Finalize
 if ! finalize_all; then
-	printf_status "Attempt to store coverage trace, while it is not full..."
+	printf_status "Attempt to store coverage trace, while it is not full...\n"
 	if ${get_coverage_script} -d "${module_source_dir}" "${trace_file}"; then
 		printf_status "Partial trace has been stored into '%s'.\n" "${trace_file}"
 	fi
