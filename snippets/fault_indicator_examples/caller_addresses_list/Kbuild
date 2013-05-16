@@ -1,0 +1,7 @@
+KEDR_INSTALL_PREFIX=/usr/local
+
+module_name=indicator_fsim_common_ca
+
+ccflags-y :=  -I$(KEDR_INSTALL_PREFIX)/include
+obj-m := $(module_name).o
+$(module_name)-y = indicator.o calculator.o control_file.o 
