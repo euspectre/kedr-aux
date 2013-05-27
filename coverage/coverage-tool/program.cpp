@@ -151,7 +151,7 @@ private:
 
 int main(int argc, char** argv)
 {
-    if(argc < 1)
+    if(argc < 2)
     {
         cerr << argv[0] << ": Command argument is required." << endl;
         usage();
