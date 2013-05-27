@@ -184,8 +184,8 @@ int main(int argc, char** argv)
 
     else if(isCommand("-h") || isCommand("--help"))
     {
-        cerr << "Invalid command: " << argv[1] << endl;
         usage();
+        return 0;
     }
     else
     {
