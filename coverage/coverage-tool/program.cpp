@@ -290,7 +290,7 @@ int DiffProcessor::parseParams(int argc, char** argv)
     {
         if(argc_rest == 0) cerr << "Trace file is missed." << endl;
         if(argc_rest == 1) cerr << "File with substracted trace is missed." << endl;
-        else cerr << "Exceeded command-line argument: " << optarg << endl;
+        else cerr << "Exceeded command-line argument: " << argv_rest[2] << endl;
         return -1;
     }
     
@@ -584,7 +584,7 @@ int NewCoverageProcessor::parseParams(int argc, char** argv)
     {
         if(argc_rest == 0) cerr << "Trace file is missed." << endl;
         if(argc_rest == 1) cerr << "File with substracted trace is missed." << endl;
-        else cerr << "Exceeded command-line argument: " << optarg << endl;
+        else cerr << "Exceeded command-line argument: " << argv_rest[2] << endl;
         return -1;
     }
     
@@ -709,7 +709,7 @@ int StatProcessor::parseParams(int argc, char** argv)
     if(argc_rest != 1)
     {
         if(argc_rest == 0) cerr << "Trace file is missed." << endl;
-        else cerr << "Exceeded command-line argument: " << optarg << endl;
+        else cerr << "Exceeded command-line argument: " << argv_rest[1] << endl;
         return -1;
     }
     
@@ -958,7 +958,7 @@ int OptimizeTestsProcessor::parseParams(int argc, char** argv)
     if(argc_rest != 1)
     {
         if(argc_rest == 0) cerr << "Tests file is missed." << endl;
-        else cerr << "Exceeded command-line argument: " << optarg << endl;
+        else cerr << "Exceeded command-line argument: " << argv_rest[1] << endl;
         return -1;
     }
     
