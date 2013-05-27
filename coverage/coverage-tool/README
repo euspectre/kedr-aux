@@ -1,7 +1,7 @@
 coverage_tool - utility for manipulation with coverage traces, produced
 by lcov.
 
-3 mods are implemented:
+5 mods are implemented:
 
 - add
     Sum corresponded counters from traces
@@ -16,6 +16,15 @@ by lcov.
     (branches, functions) remain covered in the first trace,
     which are not covered in the second one.
 
+- stat
+    Print information about trace. By default, percentage and absolute
+    data about lines, functions and branches coverage is printed.
+    User can override format for output data.
+
+- optimize-tests
+    Take traces with 'weights'.
+    Form set of that traces, which cover maximum number of lines, but has
+    minimum total weight.
 
                         BUILD
 Build is implemented using cmake utility:
@@ -34,25 +43,48 @@ After building, 'coverage_tool' utility appears under <build-dir>.
 
                         USING
 
-    coverage_tool add trace1 trace2 ... [options]
+All modes supports option
+
+    -o filename
+
+which, if given, redirect output to given file.
+
+
+    coverage_tool add [options] trace1 trace2 ... 
 
 sum all given traces,
     
 
-    coverage_tool diff trace trace_sub [options]
+    coverage_tool diff [options] trace trace_sub
 
 substract counters of 'trace_sub' from 'trace',
 
 
-    coverage_tool new-coverage trace trace_prev [options]
+    coverage_tool new-coverage [options] trace trace_prev
 
 perform corresponded operation on counters of 'trace' and 'trace_prev'.
 
 
-For all modes, resulted trace is written into STDOUT, or, if option
+    coverage_tool stat [options] trace
 
-    -o filename
+Print information about trace, such as coverage of lines, functions and branches.
+If option
 
-is present, to the file given in that option.
+    -f format
 
-Currently, '-o' is the only option for utility.
+if specified, 'format' is used as format of output. Format directives are
+described in help.
+
+
+    coverage_tool optimize-tests [options] <tests-file>
+
+Assume <tests-file> to contain lines in format
+
+    <weight> <trace-file>
+
+where weight is floating-point number, characterized trace in <trace-file>.
+
+Output is a list of trace files, which:
+1) contain only trace files described in <tests-file>.
+1) cover same lines as all trace files from <tests-file>.
+2) has minimum total weight.
