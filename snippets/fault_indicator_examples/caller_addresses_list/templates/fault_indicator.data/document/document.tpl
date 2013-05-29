@@ -281,8 +281,8 @@ indicator.file.get =>>
 <<
 indicator.file.set =>>
 	//read address as hex
-	long value;
-	int result = strict_strtol(str, 16, &value);
+	unsigned long value;
+	int result = strict_strtoul(str, 16, &value);
 	if(!result)
 		state(caller_address_state) = (void*)value;
 	return result ? -EINVAL : 0;
