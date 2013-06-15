@@ -12,7 +12,7 @@
 using namespace Mist;
 using namespace std;
 
-class Mist::Template::Builder
+class MistTemplateBuilder
 {
 public:
     Template::Impl* build(const MistAST& ast);
@@ -23,7 +23,7 @@ private:
     class InternalTemplateBuilder: public MistASTTemplate::Visitor
     {
     public:
-        InternalTemplateBuilder(Builder& builder): builder(builder) {}
+        InternalTemplateBuilder(MistTemplateBuilder& builder): builder(builder) {}
         
         Template::Impl* build(const MistASTTemplate& astTemplate);
     
@@ -34,17 +34,17 @@ private:
         void visitWith(const MistASTWith& astWith);
         void visitSequence(const MistASTTemplateSequence& astSequence);
     private:
-        Builder& builder;
+        MistTemplateBuilder& builder;
         Template::Impl* result;
     };
 };
 
-Template::Impl* Mist::Template::Builder::build(const MistAST& ast)
+Template::Impl* MistTemplateBuilder::build(const MistAST& ast)
 {
     return buildSequence(*ast.astSequence);
 }
 
-Template::Impl* Mist::Template::Builder::buildSequence(
+Template::Impl* MistTemplateBuilder::buildSequence(
     const MistASTTemplateSequence& astSequence)
 {
     MistTemplateSequence* templateSequence = new MistTemplateSequence();
@@ -59,7 +59,7 @@ Template::Impl* Mist::Template::Builder::buildSequence(
     return templateSequence;
 }
 
-Template::Impl* Mist::Template::Builder::buildTemplate(
+Template::Impl* MistTemplateBuilder::buildTemplate(
     const MistASTTemplate& astTemplate)
 {
     InternalTemplateBuilder templateBuilder(*this);
@@ -67,7 +67,7 @@ Template::Impl* Mist::Template::Builder::buildTemplate(
     return templateBuilder.build(astTemplate);
 }
 
-Template::Impl* Mist::Template::Builder::InternalTemplateBuilder::build(
+Template::Impl* MistTemplateBuilder::InternalTemplateBuilder::build(
     const MistASTTemplate& astTemplate)
 {
     result = NULL;
@@ -75,7 +75,7 @@ Template::Impl* Mist::Template::Builder::InternalTemplateBuilder::build(
     return result;
 }
 
-void Mist::Template::Builder::InternalTemplateBuilder::visitIf(
+void MistTemplateBuilder::InternalTemplateBuilder::visitIf(
     const MistASTIf& astIf)
 {
     assert(!astIf.conditionParts.empty());
@@ -110,20 +110,20 @@ void Mist::Template::Builder::InternalTemplateBuilder::visitIf(
 }
 
 
-void Mist::Template::Builder::InternalTemplateBuilder::visitRef(
+void MistTemplateBuilder::InternalTemplateBuilder::visitRef(
     const MistASTTemplateRef& astRef)
 {
     result = new MistTemplateRef(MistTemplateName(
         astRef.name->components, astRef.name->isRelative));
 }
 
-void Mist::Template::Builder::InternalTemplateBuilder::visitText(
+void MistTemplateBuilder::InternalTemplateBuilder::visitText(
     const MistASTText& astText)
 {
     result = new MistTemplateText(*astText.text);
 }
 
-void Mist::Template::Builder::InternalTemplateBuilder::visitFunc(
+void MistTemplateBuilder::InternalTemplateBuilder::visitFunc(
     const MistASTFunction& astFunction)
 {
     const string& name = *astFunction.name;
@@ -163,7 +163,7 @@ void Mist::Template::Builder::InternalTemplateBuilder::visitFunc(
     }
 }
 
-void Mist::Template::Builder::InternalTemplateBuilder::visitWith(
+void MistTemplateBuilder::InternalTemplateBuilder::visitWith(
     const MistASTWith& astWith)
 {
     result = new MistTemplateWith(
@@ -180,7 +180,7 @@ Template::Template(istream& s, const string& filename)
     
     parser.parse(s, ast, filename);
     
-    Builder builder;
+    MistTemplateBuilder builder;
     
     impl = builder.build(ast);
 }

@@ -14,98 +14,197 @@
 #include <vector>
 #include <memory> /* auto_ptr */
 
-/* Name of template or parameter */
-struct MistTemplateName
-{
-    std::vector<std::string> components;
-    bool isRelative;
-    
-    MistTemplateName(const std::vector<std::string>& components,
-        bool isRelative = false)
-        : components(components), isRelative(isRelative) {}
-};
-
-/* 
- * Name of the parameter.
- * 
- * Always absolute(as opposed to MistTemplateName).
- */
-struct MistParamNameAbs
-{
-    /* Names components. */
-    std::vector<std::string> components;
-    
-    MistParamNameAbs(const std::vector<std::string>& components)
-        : components(components) {}
-    /* Construct absolute name from base and relative name. */
-    MistParamNameAbs(const MistParamNameAbs& base,
-        const std::vector<std::string> relComponents)
-        : components(base.components)
-    {
-        components.insert(components.end(),
-            relComponents.begin(), relComponents.end());
-    }
-   
-    /* For using name as key of mapping */
-    bool operator<(const struct MistParamNameAbs& name) const;
-};
-
+#include "mist_template_name.hh"
 #include "mist_template_group.hh"
 
-using namespace std;
-using namespace Mist;
+class MistTemplateGroupBlock;
 
 /* Abstract template implementation class */
-class Template::Impl
+class Mist::Template::Impl
 {
 public:
     virtual ~Impl(){}
     
+    // Context for instantiate template into template group.
+    class Context;
+    
     /* Instantiate template into group */
     virtual MistTemplateGroupBlock* createGroup(
-        Mist::TemplateGroup::Builder& groupBuilder) const = 0;
+        Context& groupBuilder) const = 0;
 };
 
+
+/* 
+ * Builder of template group from templates.
+ */
+class Mist::Template::Impl::Context
+{
+public:
+    Context(TemplateCollection& templateCollection);
+    ~Context();
+    
+    MistTemplateGroupBlock* build(const string& mainTemplate);
+
+    /* Find template by name. Return NULL if not found. */
+    Template* findTemplate(const string& name);
+    
+    /*
+     * Build template group block for template or parameter with given
+     * name.
+     * 
+     * Detect circular dependences between templates,
+     * and throw exception in case of them.
+     * 
+     * Also cache blocks, created for templates and parameters.
+     */
+    MistTemplateGroupBlock* buildTemplateOrParamRef(const string& name);
+    
+    /* 
+     * Build template group block for parameter reference. 
+     * 
+     * Name of the parameter may be relative or absolute.
+     */
+    MistTemplateGroupBlock* buildParameterRef(const MistTemplateName& name);
+
+    /* 
+     * Return parameter name which should be used in join and concat
+     * statements.
+     * 
+     * NOTE: This method should be used only from template's createGroup()
+     * method and only when it is needed.
+     * 
+     * For template which doesn't use this method its group instantiation
+     * will used with any groupParam, otherwise for every groupParam
+     * different instantiation will be created.
+     */
+    const MistParamNameAbs& getGroupParamName(void);
+    /* 
+     * Set parameter name which should be used in join and concat
+     * statements.
+     */
+    void pushGroupParamName(const MistTemplateName& paramName);
+    /* 
+     * Restore parameter name which should be used in join and concat
+     * statements.
+     */
+    void popGroupParamName(void);
+private:
+    TemplateCollection& templateCollection;
+
+    /* Cache for parameter references */
+    map<MistParamNameAbs, MistTemplateGroupBlockRef> paramCache;
+    
+    /* Cache for name, corresponded to template or parameter. */
+    struct NamedBlockCached
+    {
+        /* 
+         * Context-independed block if exist. Name which correspond to
+         * parameter always has such block.
+         * 
+         * Template has such block only if it doesn't use context
+         * in which it processed.
+         */
+        MistTemplateGroupBlockRef refGlobal;
+        /* Block for every 'with' context */
+        map<MistParamNameAbs, MistTemplateGroupBlockRef> contexts;
+        /* 
+         * If given name corresponds to template, this is reference to it.
+         * Otherwise NULL.
+         */
+        Template* t;
+        /* 
+         * True if template is currently being instantiated.
+         * 
+         * Attempt to instantiate new instance while this flag is true
+         * means cyclic dependencies between templates.
+         */
+        bool inProgress;
+        
+        NamedBlockCached(void): t(NULL), inProgress(false) {}
+    };
+
+    /* Cached named blocks */
+    map<string, NamedBlockCached> namedCache;
+    
+    /* Stack of the 'with' contexts */
+    vector <MistParamNameAbs> contextStack;
+
+    /* Information about template which is currently instantiated */
+    struct TemplateContextInfo
+    {
+        /* 
+         * Whether currently instantiated template use outer context for
+         * join/concat statements.
+         * 
+         * If at the end of instantiating template this parameter is true,
+         * then resulted block will be stored in per-context map.
+         * Otherwise it will be stored globally.
+         */
+        bool useContext;
+        /* 
+         * Index of context (in stack) with which template begins
+         * instantiate.
+         * 
+         * The thing is that, template may itself setup context and use
+         * it.
+         * 
+         * Such usage doesn't affect on global status of block created.
+         */
+        size_t contextIndex;
+
+        TemplateContextInfo(size_t contextIndex): useContext(false),
+            contextIndex(contextIndex) {}
+    };
+    
+    /* Stack of the instantiated templates */
+    vector<TemplateContextInfo> templateStack;
+    /*
+     * Return named cache for given name. Cache will be created if needed.
+     */
+    NamedBlockCached& getNamedCache(const string& name);
+    
+    MistTemplateGroupBlock* buildParameterRef(const MistParamNameAbs& name);
+};
 
 
 /* Template contained sequence of zero or more subtemplates */
-class MistTemplateSequence: public Template::Impl
+class MistTemplateSequence: public Mist::Template::Impl
 {
 public:
-    vector<Template::Impl*> subtemplates;
+    std::vector<Mist::Template::Impl*> subtemplates;
     
     ~MistTemplateSequence();
     
-    void addTemplate(Template::Impl* subtemplate)
+    void addTemplate(Mist::Template::Impl* subtemplate)
         {subtemplates.push_back(subtemplate);}
     
     MistTemplateGroupBlock* createGroup(
-        Mist::TemplateGroup::Builder& groupBuilder) const;
+        Context& templateContext) const;
 };
 
 /* Empty template. */
-class MistTemplateEmpty: public Template::Impl
+class MistTemplateEmpty: public Mist::Template::Impl
 {
 public:
     MistTemplateGroupBlock* createGroup(
-        Mist::TemplateGroup::Builder& groupBuilder) const;
+        Context& templateContext) const;
 };
 
 
 /* Simple text string, without directives */
-class MistTemplateText: public Template::Impl
+class MistTemplateText: public Mist::Template::Impl
 {
 public:
-    string text;
+    std::string text;
     
-    MistTemplateText(const string& text) : text(text) {}
+    MistTemplateText(const std::string& text) : text(text) {}
     
     MistTemplateGroupBlock* createGroup(
-        Mist::TemplateGroup::Builder& groupBuilder) const;
+        Context& templateContext) const;
 };
 
 /* Reference(by name) to template or parameter */
-class MistTemplateRef: public Template::Impl
+class MistTemplateRef: public Mist::Template::Impl
 {
 public:
     MistTemplateName name;
@@ -114,16 +213,16 @@ public:
         name(name) {}
     
     MistTemplateGroupBlock* createGroup(
-        Mist::TemplateGroup::Builder& groupBuilder) const;
+        Context& templateContext) const;
 };
 
 /* 
  * If statement.
  * 
  * In general, this is switch between two templates according to
- * emptiness propertie of the third one.
+ * emptiness property of the third one.
  */
-class MistTemplateIf: public Template::Impl
+class MistTemplateIf: public Mist::Template::Impl
 {
 public:
     /* 
@@ -134,20 +233,20 @@ public:
      * emulated with cascading.
      */
 
-    auto_ptr<Template::Impl> conditionTemplate;
-    auto_ptr<Template::Impl> positiveTemplate;
+    std::auto_ptr<Mist::Template::Impl> conditionTemplate;
+    std::auto_ptr<Mist::Template::Impl> positiveTemplate;
     /* May not be NULL */
-    auto_ptr<Template::Impl> elseTemplate;
+    std::auto_ptr<Mist::Template::Impl> elseTemplate;
     
-    MistTemplateIf(Template::Impl* conditionTemplate,
-        Template::Impl* positiveTemplate,
-        Template::Impl* elseTemplate):
+    MistTemplateIf(Mist::Template::Impl* conditionTemplate,
+        Mist::Template::Impl* positiveTemplate,
+        Mist::Template::Impl* elseTemplate):
             conditionTemplate(conditionTemplate),
             positiveTemplate(positiveTemplate),
             elseTemplate(elseTemplate) {}
 
     MistTemplateGroupBlock* createGroup(
-        Mist::TemplateGroup::Builder& groupBuilder) const;
+        Context& templateContext) const;
 };
 
 /* 
@@ -156,18 +255,18 @@ public:
  * In general, repeat some template and insert some text between
  * repetitions.
  */
-class MistTemplateJoin: public Template::Impl
+class MistTemplateJoin: public Mist::Template::Impl
 {
 public:
-    auto_ptr<Template::Impl> templateInternal;
-    string textBetween;
+    std::auto_ptr<Mist::Template::Impl> templateInternal;
+    std::string textBetween;
     
-    MistTemplateJoin(Template::Impl* templateInternal,
-        const string& textBetween)
+    MistTemplateJoin(Mist::Template::Impl* templateInternal,
+        const std::string& textBetween)
         : templateInternal(templateInternal), textBetween(textBetween) {}
     
     MistTemplateGroupBlock* createGroup(
-        Mist::TemplateGroup::Builder& groupBuilder) const;
+        Context& templateContext) const;
 };
 
 /* 
@@ -176,18 +275,18 @@ public:
  * Inner template in some context, which should be used with join
  * routin and as base name for relative parameter names.
  */
-class MistTemplateWith: public Template::Impl
+class MistTemplateWith: public Mist::Template::Impl
 {
 public:
-    auto_ptr<Template::Impl> templateInternal;
+    std::auto_ptr<Mist::Template::Impl> templateInternal;
     MistTemplateName context;
     
-    MistTemplateWith(Template::Impl* templateInternal,
+    MistTemplateWith(Mist::Template::Impl* templateInternal,
         const MistTemplateName& context):
         templateInternal(templateInternal), context(context) {}
     
     MistTemplateGroupBlock* createGroup(
-        Mist::TemplateGroup::Builder& groupBuilder) const;
+        Context& templateContext) const;
 };
 
 
@@ -200,29 +299,29 @@ public:
 class MistTemplateRJoin: public MistTemplateJoin
 {
 public:
-    MistTemplateRJoin(Template::Impl* templateInternal,
-        const string& textBetween)
+    MistTemplateRJoin(Mist::Template::Impl* templateInternal,
+        const std::string& textBetween)
         : MistTemplateJoin(templateInternal, textBetween) {}
     
     MistTemplateGroupBlock* createGroup(
-        Mist::TemplateGroup::Builder& groupBuilder) const;
+        Context& templateContext) const;
 };
 
 /*
  * Indent functionality.
  */
-class MistTemplateIndent: public Template::Impl
+class MistTemplateIndent: public Mist::Template::Impl
 {
 public:
-    auto_ptr<Template::Impl> templateInternal;
-    string indent;
+    std::auto_ptr<Mist::Template::Impl> templateInternal;
+    std::string indent;
     
-    MistTemplateIndent(Template::Impl* templateInternal,
-        const string& indent)
+    MistTemplateIndent(Mist::Template::Impl* templateInternal,
+        const std::string& indent)
         : templateInternal(templateInternal), indent(indent) {}
     
     MistTemplateGroupBlock* createGroup(
-        Mist::TemplateGroup::Builder& groupBuilder) const;
+        Context& templateContext) const;
 };
 
 #endif /* MIST_TEMPLATE_HH */

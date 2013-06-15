@@ -109,20 +109,17 @@ namespace Mist
         ~Template();
 
         class Impl;
-        class Builder;
     private:
         Impl* impl;
 
         Template(const Template& t); /* not implemented */
         Template& operator=(const Template& t); /* not implemented */
-        
-        friend class TemplateGroup;
     };
 
     /* 
      * Abstract associative collection of templates.
      * 
-     * Should be derived by user for use in the constructor
+     * Should be derived by the user for use in the constructor
      * of TemplateGroup class(see below).
      */
     class TemplateCollection
@@ -176,11 +173,11 @@ namespace Mist
         std::string instantiate(const ParamSet& paramSet);
     
         class Impl;
-        class Builder;
     private:
+        TemplateGroup(const TemplateGroup& group); //not implemented
+        TemplateGroup& operator=(const TemplateGroup& group); //not implemented
+
         Impl* impl;
-        
-        friend class Template;
     };
 
 };

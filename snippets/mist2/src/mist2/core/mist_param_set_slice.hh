@@ -11,8 +11,8 @@
 #define MIST_PARAM_SET_SLICE_HH
 
 #include <mist2/mist.hh>
-class MistTemplateName;
-class MistParamNameAbs;
+
+#include "mist_template_name.hh"
 
 #include <vector>
 
@@ -40,8 +40,6 @@ public:
 
     /* 
      * Append mask to given one.
-     * 
-     * NOTE: This is the only function which may change current mask.
      */
     void append(const MistParamMask& mask);
 
@@ -155,7 +153,7 @@ public:
     /* Move to the next parameter set. */
     void nextSet(void);
     /* 
-     * Change mask in slice. Useful for join/concat implementation.
+     * Change mask in slice. Useful for join-like implementations.
      * 
      * NB: For reset submask in slice, apply this function on result of
      * getSubslice().

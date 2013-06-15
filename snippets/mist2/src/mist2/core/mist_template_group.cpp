@@ -6,6 +6,7 @@
 #include <cassert>
 
 #include "mist_template_group.hh"
+#include "mist_template.hh"
 #include "mist_param_set_slice.hh"
 
 using namespace std;
@@ -41,9 +42,9 @@ MistTemplateGroupBlockRef& MistTemplateGroupBlockRef::operator=(
 Mist::TemplateGroup::TemplateGroup(TemplateCollection& templateCollection,
     const std::string& mainTemplateName): impl(NULL)
 {
-    Builder groupBuilder(templateCollection);
+    Template::Impl::Context templateContext(templateCollection);
     
-    Template* mainTemplate = groupBuilder.findTemplate(mainTemplateName);
+    Template* mainTemplate = templateContext.findTemplate(mainTemplateName);
     if(mainTemplate == NULL)
     {
         cerr << "Template collection has no main template with name "
@@ -51,7 +52,7 @@ Mist::TemplateGroup::TemplateGroup(TemplateCollection& templateCollection,
         throw std::logic_error("Main template is absent");
     }
     
-    MistTemplateGroupBlock* block = groupBuilder.build(mainTemplateName);
+    MistTemplateGroupBlock* block = templateContext.build(mainTemplateName);
     
     impl = new Impl(block);
 }
@@ -88,209 +89,284 @@ TemplateGroup::Impl::Impl(MistTemplateGroupBlock* templateGroupBlock)
 {
 }
 
+/********************** Sequence **************************************/
+void MistTemplateSequenceGroup::addTemplate(
+    MistTemplateGroupBlock* subtemplate)
+{
+    subtemplates.push_back(subtemplate);
+}
 
-/**********************************************************************/
-class MistTemplateParamRefGroup: public MistTemplateGroupBlock
+
+ostream& MistTemplateSequenceGroup::evaluate(
+    const ParamSetSlice& slice, ostream& os) const
+{
+    for(int i = 0; i < (int)subtemplates.size(); i++)
+        subtemplates[i]->evaluate(slice, os);
+    return os;
+}
+
+bool MistTemplateSequenceGroup::isEmpty(const ParamSetSlice& slice) const
+{
+    for(int i = 0; i < (int)subtemplates.size(); i++)
+    {
+        if(!subtemplates[i]->isEmpty(slice)) return false;
+    }
+    
+    return true;
+}
+
+MistParamMask MistTemplateSequenceGroup::getParamMask() const
+{
+    MistParamMask mask;
+    
+    for(int i = 0; i < (int)subtemplates.size(); i++)
+        mask.append(subtemplates[i]->getParamMask());
+
+    return mask;
+}
+
+MistParamMask MistTemplateSequenceGroup::getParamMaskAll() const
+{
+    MistParamMask mask;
+    
+    for(int i = 0; i < (int)subtemplates.size(); i++)
+        mask.append(subtemplates[i]->getParamMaskAll());
+
+    return mask;
+}
+
+MistTemplateSequence::~MistTemplateSequence()
+{
+    for(int i = 0; i < (int)subtemplates.size(); i++)
+        delete subtemplates[i];
+}
+
+/******************** "If" sentence ***********************************/
+ostream& MistIfGroup::evaluate(const ParamSetSlice& slice, ostream& os) const
+{
+    if(!conditionBlock->isEmpty(slice))
+        return ifBlock->evaluate(slice, os);
+    else
+        return elseBlock->evaluate(slice, os);
+}
+
+bool MistIfGroup::isEmpty(const ParamSetSlice& slice) const
+{
+    if(!conditionBlock->isEmpty(slice))
+        return ifBlock->isEmpty(slice);
+    else
+        return elseBlock->isEmpty(slice);
+}
+
+MistParamMask MistIfGroup::getParamMask() const
+{
+    MistParamMask mask(conditionBlock->getParamMask());
+    mask.append(ifBlock->getParamMask());
+    mask.append(elseBlock->getParamMask());
+    
+    return mask;
+}
+
+MistParamMask MistIfGroup::getParamMaskAll() const
+{
+    MistParamMask mask(conditionBlock->getParamMaskAll());
+    mask.append(ifBlock->getParamMaskAll());
+    mask.append(elseBlock->getParamMaskAll());
+    
+    return mask;
+}
+
+/********************* "Join" sentence ********************************/
+MistJoinGroup::MistJoinGroup(MistTemplateGroupBlock* block,
+    const MistParamNameAbs& context,
+    const string& textBetween): block(block), context(context),
+    textBetween(textBetween), mask(context)
+{
+    mask.append(block->getParamMask());
+
+    /* 
+     * Now 'mask' equal to maskAll. Need to split it into real mask and
+     * submask(at 'context').
+     */
+    submask = mask.getSubmask(context);
+    mask.cut(context);
+}
+
+
+ostream& MistJoinGroup::evaluate(const ParamSetSlice& slice, ostream& os) const
+{
+    ParamSetSlice joinSlice(slice);
+    
+    ParamSetSlice& subslice = joinSlice.getSubslice(context);
+    subslice.resetMask(submask);
+    
+    block->evaluate(joinSlice, os);
+    
+    while(!subslice.isSetLast())
+    {
+        subslice.nextSet();
+        os << textBetween;
+        block->evaluate(joinSlice, os);
+    }
+    
+    return os;
+}
+
+bool MistJoinGroup::isEmpty(const ParamSetSlice& slice) const
+{
+    ParamSetSlice joinSlice(slice);
+    
+    ParamSetSlice& subslice = joinSlice.getSubslice(context);
+    subslice.resetMask(submask);
+    
+    if(!block->isEmpty(joinSlice)) return false;
+    if(subslice.isSetLast()) return true;
+    if(!textBetween.empty()) return false;
+    
+    for(subslice.nextSet(); !subslice.isSetLast(); subslice.nextSet())
+    {
+        if(!block->isEmpty(joinSlice)) return false;
+    }
+    
+    return true;
+}
+
+MistParamMask MistJoinGroup::getParamMask() const
+{
+    return mask;
+}
+
+MistParamMask MistJoinGroup::getParamMaskAll() const
+{
+    MistParamMask result(mask);
+    result.append(block->getParamMaskAll());
+    
+    return result;
+}
+
+/*********************** "RJoin" sentence *****************************/
+ostream& MistRJoinGroup::evaluate(const ParamSetSlice& slice, ostream& os) const
+{
+    ParamSetSlice joinSlice(slice);
+    
+    ParamSetSlice& subslice = joinSlice.getSubslice(context);
+    subslice.resetMask(submask);
+    
+    /* Store evaluation results in string array. */
+    vector<string> strings;
+    
+    ostringstream oss;
+    
+    block->evaluate(joinSlice, oss);
+    strings.push_back(oss.str());
+    
+    while(!subslice.isSetLast())
+    {
+        /* Before writing next string, clear string in temporary stream */
+        oss.str("");
+
+        subslice.nextSet();
+        /*os << textBetween;*/
+        block->evaluate(joinSlice, oss);
+        strings.push_back(oss.str());
+    }
+    
+    /* Output stored strings in reverse order. */
+    vector<string>::reverse_iterator iter = strings.rbegin(),
+        iterEnd = strings.rend();
+    
+    os << *iter;
+    for(++iter; iter != iterEnd; ++iter)
+    {
+        os << textBetween;
+        os << *iter;
+    }
+    
+    return os;
+}
+
+/*********** Stream wrapper used for 'indent' functionality*************/
+/* 
+ * Writes to the controlled stream some text each time when stream is
+ * created or '\n' is written into it.
+ */
+
+class IndentedStream: public ostream
 {
 public:
-    const MistParamNameAbs name;
-                    
-    MistTemplateParamRefGroup(const MistParamNameAbs& name): name(name) {}
-    
-    
-    ostream& evaluate(const ParamSetSlice& slice, ostream& os) const
+    IndentedStream(ostream& os, const string& indent);
+private:
+    class IndentedStreamBuffer: public streambuf
     {
-        const ParamSetSlice& paramSlice = slice.getSubslice(name);
-        
-        os << paramSlice.getValue();
-        return os;
-    }
+    public:
+        typedef streambuf::int_type int_type;
+        typedef streambuf::traits_type traits_type;
+    
+        IndentedStreamBuffer(ostream& os, const string& indent);
 
-    bool isEmpty(const ParamSetSlice& slice) const
-    {
-        const ParamSetSlice& paramSlice = slice.getSubslice(name);
-        
-        return paramSlice.getValue().empty();
-    }
+        ostream& os;
+        string indent;
+    protected:
+        /* No buffering here. */
+        int_type overflow(int_type c);
 
-    MistParamMask getParamMask() const {return MistParamMask(name);}
-    MistParamMask getParamMaskAll() const {return MistParamMask(name);}
+    };
+    IndentedStreamBuffer buffer;
 };
 
+IndentedStream::IndentedStream(ostream& os, const string& indent):
+    ostream(&buffer), buffer(os, indent) {}
 
-/****************** Builder of templates group ************************/
-TemplateGroup::Builder::Builder(TemplateCollection& collection)
-    : templateCollection(collection) {}
-
-TemplateGroup::Builder::~Builder()
+IndentedStream::IndentedStreamBuffer::IndentedStreamBuffer
+    (ostream& os, const string& indent): os(os), indent(indent)
 {
-    map<string, NamedBlockCached>::iterator iter = namedCache.begin(),
-        iter_end = namedCache.end();
-    for(;iter != iter_end; ++iter)
+    os.write(indent.data(), indent.size());
+}
+
+IndentedStream::IndentedStreamBuffer::int_type
+IndentedStream::IndentedStreamBuffer::IndentedStreamBuffer::overflow(
+    int_type c)
+{
+    os.put(c);
+    if(c == '\n')
     {
-        delete iter->second.t;
+        os.write(indent.data(), indent.size());
     }
-}
-
-MistTemplateGroupBlock*
-TemplateGroup::Builder::build(const string& mainTemplate)
-{
-    /* Default 'with' scope is a root parameter(empty name). */
-    contextStack.push_back(MistParamNameAbs(vector<string>()));
     
-    /* Build main template */
-    MistTemplateGroupBlock* block = buildTemplateOrParamRef(mainTemplate);
-    
-    /* Remove element from context stack which we pushed before. */
-    assert(contextStack.size() == 1);
-    contextStack.clear();
-    
-    return block;
-}
-
-MistTemplateGroupBlock*
-TemplateGroup::Builder::buildParameterRef(const MistTemplateName& name)
-{
-    if(!name.isRelative)
-        return buildParameterRef(MistParamNameAbs(name.components));
-    else
-        return buildParameterRef(MistParamNameAbs(getGroupParamName(),
-            name.components));
-}
-
-
-MistTemplateGroupBlock*
-TemplateGroup::Builder::buildTemplateOrParamRef(const string& name)
-{
-    NamedBlockCached& cache = getNamedCache(name);
-    
-    if(cache.refGlobal)
+    if(!os)
     {
-        /* Block is globally cached. Return it.*/
-        return cache.refGlobal->ref();
+        return traits_type::eof();
     }
-    else if(cache.t == NULL)
+    else if(traits_type::eq_int_type(c ,traits_type::eof()))
     {
-        /*
-         * Name refer to the parameter.
-         * 
-         * Extract block for it from paramCache, cache here and return.
-         */
-        MistTemplateGroupBlock* block = buildParameterRef(
-            MistParamNameAbs(vector<string>(1, name)));
-
-        cache.refGlobal = block->ref();
-
-        return block;
+        return traits_type::not_eof(c);
     }
     else
     {
-        /* 
-         * Name refers to the template.
-         * 
-         * Check whether per-context cached block exists.
-         */
-        map<MistParamNameAbs, MistTemplateGroupBlockRef>::iterator
-            contextIter = cache.contexts.find(contextStack.back());
-        if(contextIter != cache.contexts.end())
-        {
-            /* Cache for given context already exists. Use it. */
-            return contextIter->second->ref();
-        }
-    }
-    /* Need to build new block for template */
-    if(cache.inProgress)
-    {
-        /* Circular dependency detected! */
-        throw logic_error("Circular templates dependency detected!");
-    }
-    
-    templateStack.push_back(contextStack.size());
-    
-    cache.inProgress = true;
-    
-    MistTemplateGroupBlock* block = cache.t->impl->createGroup(*this);
-    /* Cache block created, cache place depends on 'useContext' flag */
-    if(templateStack.back().useContext)
-    {
-        /* Per-context cache */
-        cache.contexts.insert(make_pair(contextStack.back(),
-            MistTemplateGroupBlockRef(block->ref())));
-    }
-    else
-    {
-        /* Global cache */
-        cache.refGlobal = block->ref();
-    }
-    
-    cache.inProgress = false;
-    
-    templateStack.pop_back();
-    
-    return block;
-}
-
-Template* TemplateGroup::Builder::findTemplate(const string& name)
-{
-    NamedBlockCached& cache = getNamedCache(name);
-    return cache.t;
-}
-
-TemplateGroup::Builder::NamedBlockCached&
-    TemplateGroup::Builder::getNamedCache(const string& name)
-{
-    map<string, NamedBlockCached>::iterator iter = namedCache.find(name);
-    if(iter != namedCache.end())
-    {
-        return iter->second;
-    }
-    else
-    {
-        /* New name */
-        pair<map<string, NamedBlockCached>::iterator, bool> iterNew =
-            namedCache.insert(make_pair(name, NamedBlockCached()));
-        
-        NamedBlockCached& cache = iterNew.first->second;
-        
-        Template* t = templateCollection.findTemplate(name);
-        if(t)
-        {
-            /* Template with given name exists */
-            cache.t = t;
-        }
-        return cache;
+        return c;
     }
 }
 
-MistTemplateGroupBlock*
-TemplateGroup::Builder::buildParameterRef(const MistParamNameAbs& name)
+/********************* Indent functionality ***************************/
+ostream& MistIndentGroup::evaluate(const ParamSetSlice& slice, ostream& os) const
 {
-    map<MistParamNameAbs, MistTemplateGroupBlockRef>::iterator iter =
-        paramCache.find(name);
-    if(iter != paramCache.end()) return iter->second->ref();
-    /* Need to create cache entry. */
-    MistTemplateGroupBlock* paramRef = new MistTemplateParamRefGroup(name);
-    paramCache.insert(make_pair(name, paramRef->ref()));
+    IndentedStream indentedStream(os, indent);
+    block->evaluate(slice, indentedStream);
     
-    return paramRef;
+    return os;
 }
 
-const MistParamNameAbs& TemplateGroup::Builder::getGroupParamName(void)
+bool MistIndentGroup::isEmpty(const ParamSetSlice& slice) const
 {
-    TemplateContextInfo& templateInfo = templateStack.back();
-    templateInfo.useContext = templateInfo.useContext
-        || (templateInfo.contextIndex == contextStack.size());
-    return contextStack.back();
+    return !indent.empty() && block->isEmpty(slice);
 }
-void TemplateGroup::Builder::pushGroupParamName(const MistTemplateName& paramName)
+
+MistParamMask MistIndentGroup::getParamMask() const
 {
-    if(!paramName.isRelative)
-        contextStack.push_back(paramName.components);
-    else
-        contextStack.push_back(
-            MistParamNameAbs(getGroupParamName(), paramName.components));
+    return block->getParamMask();
 }
-void TemplateGroup::Builder::popGroupParamName(void)
+
+MistParamMask MistIndentGroup::getParamMaskAll() const
 {
-    contextStack.pop_back();
+    return block->getParamMaskAll();
 }

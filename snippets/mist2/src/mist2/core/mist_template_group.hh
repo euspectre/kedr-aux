@@ -14,15 +14,7 @@
 
 #include <vector>
 
-class MistTemplateGroupBlock;
-#include "mist_template.hh"
-
 #include "mist_param_set_slice.hh"
-
-using namespace std;
-using namespace Mist;
-
-
 
 /* 'Block' for build template group */
 class MistTemplateGroupBlock
@@ -39,7 +31,8 @@ public:
      * 
      * Result is written into the stream.
      */
-    virtual ostream& evaluate(const ParamSetSlice& slice, ostream& os) const = 0;
+    virtual std::ostream& evaluate(const ParamSetSlice& slice,
+        std::ostream& os) const = 0;
 
     /* Whether result of evaluation is empty. */
     virtual bool isEmpty(const ParamSetSlice& slice) const = 0;
@@ -86,7 +79,7 @@ private:
 };
 
 /* Implementation for the template group class. */
-class TemplateGroup::Impl
+class Mist::TemplateGroup::Impl
 {
 public:
     Impl(MistTemplateGroupBlock* templateGroupBlock);
@@ -95,137 +88,157 @@ public:
     MistParamMask paramMask;
 };
 
-/* 
- * Builder of template group from templates.
- */
-class Mist::TemplateGroup::Builder
+/**********************************************************************/
+// Real template group blocks
+
+/******************** Empty template  *********************************/
+class MistEmptyGroup: public MistTemplateGroupBlock
 {
-public:
-    Builder(TemplateCollection& templateCollection);
-    ~Builder();
-    
-    MistTemplateGroupBlock* build(const string& mainTemplate);
+    ostream& evaluate(const ParamSetSlice&, ostream& os) const
+    {return os;}
 
-    /* Find template by name. Return NULL if not found. */
-    Template* findTemplate(const string& name);
-    
-    /*
-     * Build template group block for template or parameter with given
-     * name.
-     * 
-     * Detect circular dependences between templates,
-     * and throw exception in case of them.
-     * 
-     * Also cache blocks, created for templates and parameters.
-     */
-    MistTemplateGroupBlock* buildTemplateOrParamRef(const string& name);
-    
-    /* 
-     * Build template group block for parameter reference. 
-     * 
-     * Name of the parameter may be relative or absolute.
-     */
-    MistTemplateGroupBlock* buildParameterRef(const MistTemplateName& name);
+    bool isEmpty(const ParamSetSlice&) const
+    {return true;}
 
-    /* 
-     * Return parameter name which should be used in join and concat
-     * statements.
-     * 
-     * NOTE: This method should be used only from template's createGroup()
-     * method and only when it is needed.
-     * 
-     * For template which doesn't use this method its group instantiation
-     * will used with any groupParam, otherwise for every groupParam
-     * different instantiation will be created.
-     */
-    const MistParamNameAbs& getGroupParamName(void);
-    /* 
-     * Set parameter name which should be used in join and concat
-     * statements.
-     */
-    void pushGroupParamName(const MistTemplateName& paramName);
-    /* 
-     * Restore parameter name which should be used in join and concat
-     * statements.
-     */
-    void popGroupParamName(void);
-private:
-    TemplateCollection& templateCollection;
-
-    /* Cache for parameter references */
-    map<MistParamNameAbs, MistTemplateGroupBlockRef> paramCache;
-    
-    /* Cache for name, corresponded to template or parameter. */
-    struct NamedBlockCached
-    {
-        /* 
-         * Context-independed block if exist. Name which correspond to
-         * parameter always has such block.
-         * 
-         * Template has such block only if it doesn't use context
-         * in which it processed.
-         */
-        MistTemplateGroupBlockRef refGlobal;
-        /* Block for every 'with' context */
-        map<MistParamNameAbs, MistTemplateGroupBlockRef> contexts;
-        /* 
-         * If given name corresponds to template, this is reference to it.
-         * Otherwise NULL.
-         */
-        Template* t;
-        /* 
-         * True if template is currently being instantiated.
-         * 
-         * Attempt to instantiate new instance while this flag is true
-         * means cyclic dependencies between templates.
-         */
-        bool inProgress;
-        
-        NamedBlockCached(void): t(NULL), inProgress(false) {}
-    };
-
-    /* Cached named blocks */
-    map<string, NamedBlockCached> namedCache;
-    
-    /* Stack of the 'with' contexts */
-    vector <MistParamNameAbs> contextStack;
-
-    /* Information about template which is currently instantiated */
-    struct TemplateContextInfo
-    {
-        /* 
-         * Whether currently instantiated template use outer context for
-         * join/concat statements.
-         * 
-         * If at the end of instantiating template this parameter is true,
-         * then resulted block will be stored in per-context map.
-         * Otherwise it will be stored globally.
-         */
-        bool useContext;
-        /* 
-         * Index of context (in stack) with which template begins
-         * instantiate.
-         * 
-         * The thing is that, template may itself setup context and use
-         * it.
-         * 
-         * Such usage doesn't affect on global status of block created.
-         */
-        size_t contextIndex;
-
-        TemplateContextInfo(size_t contextIndex): useContext(false),
-            contextIndex(contextIndex) {}
-    };
-    
-    /* Stack of the instantiated templates */
-    vector<TemplateContextInfo> templateStack;
-    /*
-     * Return named cache for given name. Cache will be created if needed.
-     */
-    NamedBlockCached& getNamedCache(const string& name);
-    
-    MistTemplateGroupBlock* buildParameterRef(const MistParamNameAbs& name);
+    MistParamMask getParamMask() const {return MistParamMask();}
+    MistParamMask getParamMaskAll() const {return MistParamMask();}
 };
 
+/********************** Sequence **************************************/
+class MistTemplateSequenceGroup: public MistTemplateGroupBlock
+{
+public:
+    vector<MistTemplateGroupBlockRef> subtemplates;
+    
+    void addTemplate(MistTemplateGroupBlock* subtemplate);
+    
+    ostream& evaluate(const ParamSetSlice& slice, ostream& os) const;
+
+    bool isEmpty(const ParamSetSlice& slice) const;
+
+    MistParamMask getParamMask() const;
+    MistParamMask getParamMaskAll() const;
+};
+
+/******************* Text *********************************************/
+class MistTextGroup: public MistTemplateGroupBlock
+{
+public:
+    const string text;
+    
+    MistTextGroup(const string& text): text(text) {}
+    
+    ostream& evaluate(const ParamSetSlice&, ostream& os) const
+    { return os << text; }
+
+    bool isEmpty(const ParamSetSlice&) const
+    {return text.empty();}
+
+    MistParamMask getParamMask() const {return MistParamMask();}
+    MistParamMask getParamMaskAll() const {return MistParamMask();}
+};
+
+/********************** Reference to parameter ************************/
+class MistTemplateParamRefGroup: public MistTemplateGroupBlock
+{
+public:
+    const MistParamNameAbs name;
+                    
+    MistTemplateParamRefGroup(const MistParamNameAbs& name): name(name) {}
+    
+    
+    ostream& evaluate(const ParamSetSlice& slice, ostream& os) const
+    {
+        const ParamSetSlice& paramSlice = slice.getSubslice(name);
+        
+        os << paramSlice.getValue();
+        return os;
+    }
+
+    bool isEmpty(const ParamSetSlice& slice) const
+    {
+        const ParamSetSlice& paramSlice = slice.getSubslice(name);
+        
+        return paramSlice.getValue().empty();
+    }
+
+    MistParamMask getParamMask() const {return MistParamMask(name);}
+    MistParamMask getParamMaskAll() const {return MistParamMask(name);}
+};
+
+/******************** "If" sentence ***********************************/
+class MistIfGroup: public MistTemplateGroupBlock
+{
+public:
+    MistTemplateGroupBlockRef conditionBlock;
+    MistTemplateGroupBlockRef ifBlock;
+    MistTemplateGroupBlockRef elseBlock;
+
+    
+    MistIfGroup(MistTemplateGroupBlock* conditionBlock,
+        MistTemplateGroupBlock* ifBlock,
+        MistTemplateGroupBlock* elseBlock):
+            conditionBlock(conditionBlock),
+            ifBlock(ifBlock), elseBlock(elseBlock) {}
+    
+    ostream& evaluate(const ParamSetSlice& slice, ostream& os) const;
+
+    bool isEmpty(const ParamSetSlice& slice) const;
+
+    MistParamMask getParamMask() const;
+    MistParamMask getParamMaskAll() const;
+};
+
+/********************* "Join" sentence ********************************/
+class MistJoinGroup: public MistTemplateGroupBlock
+{
+public:
+    MistTemplateGroupBlockRef block;
+    MistParamNameAbs context;
+    string textBetween;
+    MistParamMask mask;
+    MistParamMask submask;
+    
+    MistJoinGroup(MistTemplateGroupBlock* block,
+        const MistParamNameAbs& context,
+        const string& textBetween);
+    
+    ostream& evaluate(const ParamSetSlice& slice, ostream& os) const;
+
+    bool isEmpty(const ParamSetSlice& slice) const;
+
+    MistParamMask getParamMask() const;
+    MistParamMask getParamMaskAll() const;
+};
+
+/* Reverse join is very similar to normal join. */
+class MistRJoinGroup: public MistJoinGroup
+{
+public:
+    MistRJoinGroup(MistTemplateGroupBlock* block,
+        const MistParamNameAbs& context,
+        const string& textBetween):
+        MistJoinGroup(block, context, textBetween) {}
+    /* The only method differs from one in join. */
+    ostream& evaluate(const ParamSetSlice& slice, ostream& os) const;
+};
+
+/********************* Indent functionality ***************************/
+class MistIndentGroup: public MistTemplateGroupBlock
+{
+public:
+    MistTemplateGroupBlockRef block;
+    string indent;
+    
+    MistIndentGroup(MistTemplateGroupBlock* block,
+        const string& indent): block(block), indent(indent) {}
+    
+    ostream& evaluate(const ParamSetSlice& slice, ostream& os) const;
+
+    bool isEmpty(const ParamSetSlice& slice) const;
+
+    MistParamMask getParamMask() const;
+    MistParamMask getParamMaskAll() const;
+};
 
 #endif /* MIST_TEMPLATE_GROUP_HH */

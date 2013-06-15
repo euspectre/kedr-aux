@@ -74,7 +74,8 @@ else(MIST_GENERATE_PARSER)
 endif(MIST_GENERATE_PARSER)
 
 add_library(${mist_name} STATIC
-	"mist_param_set.cpp"
+	"mist_template_name.cpp"
+    "mist_param_set.cpp"
     "mist_template.cpp"
     "mist_template_builder.cpp"
     "mist_template_group.cpp"
