@@ -29,14 +29,28 @@ MistTemplateGroupBlock*
 Template::Impl::Context::build(const string& mainTemplate)
 {
     /* Default 'with' scope is a root parameter(empty name). */
-    contextStack.push_back(MistParamNameAbs(vector<string>()));
+    baseParamStack.push_back(MistParamNameAbs(vector<string>()));
+    baseParamStackSize = 1;
     
+    /* 
+     * Virtual root join context.
+     * 
+     * It is never iterated, and all subtemplates which are not iterated
+     * with inner joins get index 0.
+     */
+    joinBaseStack.push_back(MistParamNameAbs(vector<string>()));
+    joinBaseStackSize = 1;
+
+
     /* Build main template */
     MistTemplateGroupBlock* block = buildTemplateOrParamRef(mainTemplate);
+    /* Remove element from stacks which we pushed at the start. */
+    baseParamStack.pop_back();
+    assert(baseParamStack.empty());
     
-    /* Remove element from context stack which we pushed before. */
-    assert(contextStack.size() == 1);
-    contextStack.clear();
+    joinBaseStack.pop_back();
+    assert(joinBaseStack.empty());
+
     
     return block;
 }
@@ -47,7 +61,7 @@ Template::Impl::Context::buildParameterRef(const MistTemplateName& name)
     if(!name.isRelative)
         return buildParameterRef(MistParamNameAbs(name.components));
     else
-        return buildParameterRef(MistParamNameAbs(getGroupParamName(),
+        return buildParameterRef(MistParamNameAbs(baseParamName(),
             name.components));
 }
 
@@ -84,7 +98,7 @@ Template::Impl::Context::buildTemplateOrParamRef(const string& name)
          * Check whether per-context cached block exists.
          */
         map<MistParamNameAbs, MistTemplateGroupBlockRef>::iterator
-            contextIter = cache.contexts.find(contextStack.back());
+            contextIter = cache.contexts.find(baseParamStack.back());
         if(contextIter != cache.contexts.end())
         {
             /* Cache for given context already exists. Use it. */
@@ -98,7 +112,7 @@ Template::Impl::Context::buildTemplateOrParamRef(const string& name)
         throw logic_error("Circular templates dependency detected!");
     }
     
-    templateStack.push_back(contextStack.size());
+    templateStack.push_back(baseParamStackSize);
     
     cache.inProgress = true;
     
@@ -107,7 +121,7 @@ Template::Impl::Context::buildTemplateOrParamRef(const string& name)
     if(templateStack.back().useContext)
     {
         /* Per-context cache */
-        cache.contexts.insert(make_pair(contextStack.back(),
+        cache.contexts.insert(make_pair(baseParamStack.back(),
             MistTemplateGroupBlockRef(block->ref())));
     }
     else
@@ -168,25 +182,131 @@ Template::Impl::Context::buildParameterRef(const MistParamNameAbs& name)
     return paramRef;
 }
 
-const MistParamNameAbs& Template::Impl::Context::getGroupParamName(void)
+const MistParamNameAbs& Template::Impl::Context::baseParamName(void)
 {
     TemplateContextInfo& templateInfo = templateStack.back();
     templateInfo.useContext = templateInfo.useContext
-        || (templateInfo.contextIndex == contextStack.size());
-    return contextStack.back();
+        || (templateInfo.contextIndex == baseParamStackSize);
+    return baseParamStack.back();
 }
-void Template::Impl::Context::pushGroupParamName(const MistTemplateName& paramName)
+void Template::Impl::Context::pushBaseParam(const MistTemplateName& paramName)
 {
     if(!paramName.isRelative)
-        contextStack.push_back(paramName.components);
+        baseParamStack.push_back(paramName.components);
     else
-        contextStack.push_back(
-            MistParamNameAbs(getGroupParamName(), paramName.components));
+        baseParamStack.push_back(
+            MistParamNameAbs(baseParamName(), paramName.components));
+    baseParamStackSize++;
 }
-void Template::Impl::Context::popGroupParamName(void)
+void Template::Impl::Context::popBaseParam(void)
 {
-    contextStack.pop_back();
+    baseParamStackSize--;
+    baseParamStack.pop_back();
 }
+
+void Template::Impl::Context::beginJoinScope(void)
+{
+    joinBaseStack.push_back(baseParamName());
+    joinBaseStackSize++;
+}
+
+void Template::Impl::Context::endJoinScope(void)
+{
+    joinBaseStackSize--;
+    joinBaseStack.pop_back();
+}
+
+
+/*
+ * Whether join with 'joinParamName' as base iterates 'paramName' parameter.
+ * 
+ * Auxiliary function for the next method implementation.
+ */
+bool joinUses(const MistParamNameAbs& joinParamName,
+    const MistParamNameAbs& paramName)
+{
+    return (joinParamName.components.size() < paramName.components.size())
+        && equal(joinParamName.components.begin(), joinParamName.components.end(),
+            paramName.components.begin());
+}
+
+int Template::Impl::Context::iterationDepth(
+    const MistParamNameAbs& paramName, int depth_upper) const
+{
+    int depth = 0;
+
+    assert(depth_upper < (int)joinBaseStackSize);
+
+    list<MistParamNameAbs>::const_reverse_iterator iter = joinBaseStack.rbegin();
+    for(; depth < depth_upper; depth++, iter++)
+    {
+        if(joinUses(*iter, paramName)) return depth;
+    }
+
+    return depth_upper;
+}
+
+/*
+ * Whether join with 'joinParamName' as base iterates at least one
+ * parameter from given mask.
+ * 
+ * Auxiliary function for the next method implementation.
+ */
+bool joinUses(const MistParamNameAbs& joinParamName, const MistParamMask& mask)
+{
+    const MistParamMask* currentMask = &mask;
+    
+    for(vector<string>::const_iterator iter = joinParamName.components.begin();
+        iter != joinParamName.components.end();
+        ++iter)
+    {
+        MistParamMask::iterator maskIter = currentMask->begin();
+        for(;maskIter != currentMask->end(); maskIter++)
+        {
+            if(maskIter->first == *iter) break;
+        }
+        
+        if(maskIter == currentMask->end()) return false;
+        currentMask = &maskIter->second;
+    }
+    
+    // Check that mask contain at least one parameter inside join scope
+    
+    return currentMask->begin() != currentMask->end();
+}
+
+int Template::Impl::Context::iterationDepth(
+    const MistParamMask& mask, int depth_upper) const
+{
+    int depth = 0;
+    
+    assert(depth_upper < (int)joinBaseStackSize);
+
+    list<MistParamNameAbs>::const_reverse_iterator iter = joinBaseStack.rbegin();
+    for(; depth < depth_upper; depth++, iter++)
+    {
+        if(joinUses(*iter, mask)) return depth;
+    }
+    
+    return depth_upper;
+}
+
+int Template::Impl::Context::iterationDepthMax(void) const
+{
+    return joinBaseStackSize - 1;
+}
+
+/******************* Base template implementation**********************/
+int Mist::Template::Impl::iterationDepth(Context& templateContext,
+    int depth_upper) const
+{
+    MistTemplateGroupBlock* blockTmp = createGroup(templateContext);
+    MistParamMask mask = blockTmp->getParamMask();
+    blockTmp->unref();
+    
+    return templateContext.iterationDepth(mask, depth_upper);
+}
+
 
 /******************** Empty template  *********************************/
 MistTemplateGroupBlock* MistTemplateEmpty::createGroup(
@@ -249,10 +369,12 @@ MistTemplateGroupBlock* MistTemplateIf::createGroup(
 MistTemplateGroupBlock* MistTemplateJoin::createGroup(
     Mist::Template::Impl::Context& templateContext) const
 {
+    templateContext.beginJoinScope();
     MistTemplateGroupBlock* blockInternal =
         templateInternal->createGroup(templateContext);
+    templateContext.endJoinScope();
     return new MistJoinGroup(blockInternal,
-        templateContext.getGroupParamName(),
+        templateContext.baseParamName(),
         textBetween);
 }
 
@@ -260,9 +382,9 @@ MistTemplateGroupBlock* MistTemplateJoin::createGroup(
 MistTemplateGroupBlock* MistTemplateWith::createGroup(
     Mist::Template::Impl::Context& templateContext) const
 {
-    templateContext.pushGroupParamName(context);
+    templateContext.pushBaseParam(context);
     MistTemplateGroupBlock* block = templateInternal->createGroup(templateContext);
-    templateContext.popGroupParamName();
+    templateContext.popBaseParam();
     
     return block;
 }
@@ -271,12 +393,51 @@ MistTemplateGroupBlock* MistTemplateWith::createGroup(
 MistTemplateGroupBlock* MistTemplateRJoin::createGroup(
     Mist::Template::Impl::Context& templateContext) const
 {
+    templateContext.beginJoinScope();
     MistTemplateGroupBlock* blockInternal =
         templateInternal->createGroup(templateContext);
+    templateContext.endJoinScope();
     return new MistRJoinGroup(blockInternal,
-        templateContext.getGroupParamName(),
+        templateContext.baseParamName(),
         textBetween);
 }
+
+/************************** Index of iteration ************************/
+class MistIndexGroup0: public MistIndexGroup
+{
+public:
+    MistIndexGroup0(int depth ): MistIndexGroup(depth) {}
+    
+    ostream& printFormatted(int index, ostream& os) const {return os << index;}
+};
+
+MistTemplateGroupBlock* MistTemplateIndex0::createGroup(
+    Mist::Template::Impl::Context& templateContext) const
+{
+    int depth = templateInternal->iterationDepth(templateContext,
+        templateContext.iterationDepthMax());
+    
+    return new MistIndexGroup0(depth);
+}
+
+class MistIndexGroup1: public MistIndexGroup
+{
+public:
+    MistIndexGroup1(int depth ): MistIndexGroup(depth) {}
+    
+    ostream& printFormatted(int index, ostream& os) const {return os << (index + 1);}
+};
+
+
+MistTemplateGroupBlock* MistTemplateIndex1::createGroup(
+    Mist::Template::Impl::Context& templateContext) const
+{
+    int depth = templateInternal->iterationDepth(templateContext,
+        templateContext.iterationDepthMax());
+    
+    return new MistIndexGroup1(depth);
+}
+
 
 /********************* Indent functionality ***************************/
 MistTemplateGroupBlock* MistTemplateIndent::createGroup(

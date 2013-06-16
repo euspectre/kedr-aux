@@ -123,42 +123,110 @@ void MistTemplateBuilder::InternalTemplateBuilder::visitText(
     result = new MistTemplateText(*astText.text);
 }
 
+/* 
+ * Generic function implementation. Implemented as static class.
+ * (one instance for every function).
+ */
+class MistFunction
+{
+public:
+    MistFunction(const string& name);
+    
+    virtual Template::Impl* createTemplate(Template::Impl* templateInternal,
+        const string& text) const = 0;
+};
+
+static map<string, MistFunction*> functions;
+
+MistFunction::MistFunction(const string& name)
+{
+    pair<map<string, MistFunction*>::iterator, bool> iter =
+        functions.insert(make_pair(name, this));
+    assert(iter.second);
+}
+
+// Concrete functions
+class MistFunctionJoin: public MistFunction
+{
+public:
+    MistFunctionJoin(): MistFunction("join") {}
+    
+    Template::Impl* createTemplate(Template::Impl* templateInternal,
+        const string& text) const
+    {
+        return new MistTemplateJoin(templateInternal, text);
+    }
+} functionJoin;
+
+class MistFunctionRJoin: public MistFunction
+{
+public:
+    MistFunctionRJoin(): MistFunction("rjoin") {}
+    
+    Template::Impl* createTemplate(Template::Impl* templateInternal,
+        const string& text) const
+    {
+        return new MistTemplateRJoin(templateInternal, text);
+    }
+} functionRJoin;
+
+class MistFunctionIndent: public MistFunction
+{
+public:
+    MistFunctionIndent(): MistFunction("indent") {}
+    
+    Template::Impl* createTemplate(Template::Impl* templateInternal,
+        const string& text) const
+    {
+        return new MistTemplateIndent(templateInternal, text);
+    }
+} functionIndent;
+
+class MistFunctionIndex: public MistFunction
+{
+public:
+    MistFunctionIndex(): MistFunction("i") {}
+    
+    Template::Impl* createTemplate(Template::Impl* templateInternal,
+        const string&) const
+    {
+        return new MistTemplateIndex1(templateInternal);
+    }
+} functionIndex;
+
+class MistFunctionIndex0: public MistFunction
+{
+public:
+    MistFunctionIndex0(): MistFunction("i0") {}
+    
+    Template::Impl* createTemplate(Template::Impl* templateInternal,
+        const string&) const
+    {
+        return new MistTemplateIndex0(templateInternal);
+    }
+} functionIndex0;
+
+
 void MistTemplateBuilder::InternalTemplateBuilder::visitFunc(
     const MistASTFunction& astFunction)
 {
     const string& name = *astFunction.name;
-    
-    if(name == "join")
+    map<string, MistFunction*>::const_iterator iter = functions.find(name);
+
+    if(iter != functions.end())
     {
-        string textBetween;
+        string text;
         if(astFunction.param.get())
-            textBetween = *astFunction.param;
+            text = *astFunction.param;
 
-        result = new MistTemplateJoin(
-            builder.buildTemplate(*astFunction.templateInternal), textBetween);
+        Template::Impl* templateInternal = 
+            builder.buildTemplate(*astFunction.templateInternal);
+
+        result = iter->second->createTemplate(templateInternal, text);
     }
-    else if(name == "rjoin")
-    {
-        string textBetween;
-        if(astFunction.param.get())
-            textBetween = *astFunction.param;
-
-        result = new MistTemplateRJoin(
-            builder.buildTemplate(*astFunction.templateInternal), textBetween);
-    }
-    else if(name == "indent")
-    {
-        string indent;
-        if(astFunction.param.get())
-            indent = *astFunction.param;
-
-        result = new MistTemplateIndent(
-            builder.buildTemplate(*astFunction.templateInternal), indent);
-    }
-
     else
     {
-        cerr << "Unknown function: " << *astFunction.name << endl;
+        cerr << "Unknown function: " << name << endl;
         throw logic_error("Unknown function");
     }
 }

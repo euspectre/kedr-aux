@@ -4,6 +4,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <cassert>
+#include <algorithm>
 
 #include "mist_template_group.hh"
 #include "mist_template.hh"
@@ -12,6 +13,15 @@
 using namespace std;
 using namespace Mist;
 
+
+bool MistTemplateGroupBlock::isEmpty(Context& groupContext) const
+{
+    stringstream ss;
+    
+    evaluate(groupContext, ss);
+    
+    return ss.str().empty();
+}
 
 /**********************************************************************/
 MistTemplateGroupBlockRef::MistTemplateGroupBlockRef(
@@ -64,14 +74,9 @@ Mist::TemplateGroup::~TemplateGroup()
 
 std::ostream& Mist::TemplateGroup::instantiate(std::ostream& os, const ParamSet& paramSet)
 {
-    ParamSetSlice mainSlice(paramSet, impl->paramMask);
-    if(!mainSlice.isSetLast())
-    {
-        cerr << "Main template is multivalued." << endl;
-        throw std::logic_error("Main template is multivalued");
-    }
+    MistTemplateGroupBlock::Context groupContext(paramSet, impl->paramMask);
     
-    return impl->templateGroupBlockRef->evaluate(mainSlice, os);
+    return impl->templateGroupBlockRef->evaluate(groupContext, os);
 }
 
 std::string Mist::TemplateGroup::instantiate(const ParamSet& paramSet)
@@ -89,6 +94,119 @@ TemplateGroup::Impl::Impl(MistTemplateGroupBlock* templateGroupBlock)
 {
 }
 
+
+/******************** Context for joining *****************************/
+MistTemplateGroupBlock::Context::JoinContext::JoinContext(
+    const ParamSet& paramSet, const MistParamMask& maskAll):
+        slice(paramSet, maskAll),
+        paramName(),
+        subslice_p(&slice),
+        index(0)
+{
+}
+
+MistTemplateGroupBlock::Context::JoinContext::JoinContext(
+    const JoinContext& prev, const MistParamNameAbs& paramName,
+    const MistParamMask& submask):
+        slice(prev.slice),
+        paramName(paramName),
+        //Note: recalculate subslice_p because slice is deed copied.
+        subslice_p(&slice.getSubslice(paramName)),
+        index(0)
+{
+    subslice_p->resetMask(submask);
+}
+
+MistTemplateGroupBlock::Context::JoinContext::JoinContext(
+    const JoinContext& context):
+        slice(context.slice),
+        paramName(context.paramName),
+        //Note: recalculate subslice_p because slice is deed copied.
+        subslice_p(&slice.getSubslice(paramName)),
+        index(context.index)
+{
+    
+}
+    
+MistTemplateGroupBlock::Context::JoinContext&
+MistTemplateGroupBlock::Context::JoinContext::operator=(
+    const JoinContext& context)
+{
+    slice = context.slice;
+    paramName = context.paramName;
+    subslice_p = &slice.getSubslice(paramName);
+    index = context.index;
+    
+    return *this;
+}
+
+bool MistTemplateGroupBlock::Context::JoinContext::advance(void)
+{
+    if(subslice_p->isSetLast()) return false;
+    
+    subslice_p->nextSet();
+    index++;
+    return true;
+}
+
+/*********** Context for instantiate template group into stream. ******/
+MistTemplateGroupBlock::Context::Context(const ParamSet& paramSet,
+    const MistParamMask& maskAll)
+{
+    joinContextStack.push_back(JoinContext(paramSet, maskAll));
+    
+    if(!joinContextStack.back().subslice_p->isSetLast())
+    {
+        cerr << "Main template is multivalued." << endl;
+        throw logic_error("Main template is multivalued");
+    }
+}
+
+MistTemplateGroupBlock::Context::~Context()
+{
+    assert(joinContextStack.size() == 1);
+}
+
+const ParamSetSlice& MistTemplateGroupBlock::Context::currentSlice(void) const
+{
+    assert(!joinContextStack.empty());
+    return joinContextStack.back().slice;
+}
+
+void MistTemplateGroupBlock::Context::beginJoinScope(
+    const MistParamNameAbs& paramName, const MistParamMask& submask)
+{
+    assert(!joinContextStack.empty());
+    joinContextStack.push_back(JoinContext(joinContextStack.back(),
+        paramName, submask));
+}
+
+void MistTemplateGroupBlock::Context::endJoinScope(void)
+{
+    joinContextStack.pop_back();
+    //First slice should never been popped.
+    assert(!joinContextStack.empty());
+}
+
+bool MistTemplateGroupBlock::Context::advanceScope(void)
+{
+    assert(!joinContextStack.empty());
+    return joinContextStack.back().advance();
+}
+
+int MistTemplateGroupBlock::Context::iterationIndex(int depth) const
+{
+    //Navigate to selected join context.
+    list<JoinContext>::const_reverse_iterator iter = joinContextStack.rbegin();
+    for(; depth != 0; depth--, iter++)
+    {
+        assert(iter != joinContextStack.rend());
+    }
+    
+    assert(iter != joinContextStack.rend());
+    
+    return iter->index;
+}
 /********************** Sequence **************************************/
 void MistTemplateSequenceGroup::addTemplate(
     MistTemplateGroupBlock* subtemplate)
@@ -98,18 +216,18 @@ void MistTemplateSequenceGroup::addTemplate(
 
 
 ostream& MistTemplateSequenceGroup::evaluate(
-    const ParamSetSlice& slice, ostream& os) const
+    Context& groupContext, ostream& os) const
 {
     for(int i = 0; i < (int)subtemplates.size(); i++)
-        subtemplates[i]->evaluate(slice, os);
+        subtemplates[i]->evaluate(groupContext, os);
     return os;
 }
 
-bool MistTemplateSequenceGroup::isEmpty(const ParamSetSlice& slice) const
+bool MistTemplateSequenceGroup::isEmpty(Context& groupContext) const
 {
     for(int i = 0; i < (int)subtemplates.size(); i++)
     {
-        if(!subtemplates[i]->isEmpty(slice)) return false;
+        if(!subtemplates[i]->isEmpty(groupContext)) return false;
     }
     
     return true;
@@ -125,16 +243,6 @@ MistParamMask MistTemplateSequenceGroup::getParamMask() const
     return mask;
 }
 
-MistParamMask MistTemplateSequenceGroup::getParamMaskAll() const
-{
-    MistParamMask mask;
-    
-    for(int i = 0; i < (int)subtemplates.size(); i++)
-        mask.append(subtemplates[i]->getParamMaskAll());
-
-    return mask;
-}
-
 MistTemplateSequence::~MistTemplateSequence()
 {
     for(int i = 0; i < (int)subtemplates.size(); i++)
@@ -142,20 +250,20 @@ MistTemplateSequence::~MistTemplateSequence()
 }
 
 /******************** "If" sentence ***********************************/
-ostream& MistIfGroup::evaluate(const ParamSetSlice& slice, ostream& os) const
+ostream& MistIfGroup::evaluate(Context& groupContext, ostream& os) const
 {
-    if(!conditionBlock->isEmpty(slice))
-        return ifBlock->evaluate(slice, os);
+    if(!conditionBlock->isEmpty(groupContext))
+        return ifBlock->evaluate(groupContext, os);
     else
-        return elseBlock->evaluate(slice, os);
+        return elseBlock->evaluate(groupContext, os);
 }
 
-bool MistIfGroup::isEmpty(const ParamSetSlice& slice) const
+bool MistIfGroup::isEmpty(Context& groupContext) const
 {
-    if(!conditionBlock->isEmpty(slice))
-        return ifBlock->isEmpty(slice);
+    if(!conditionBlock->isEmpty(groupContext))
+        return ifBlock->isEmpty(groupContext);
     else
-        return elseBlock->isEmpty(slice);
+        return elseBlock->isEmpty(groupContext);
 }
 
 MistParamMask MistIfGroup::getParamMask() const
@@ -163,15 +271,6 @@ MistParamMask MistIfGroup::getParamMask() const
     MistParamMask mask(conditionBlock->getParamMask());
     mask.append(ifBlock->getParamMask());
     mask.append(elseBlock->getParamMask());
-    
-    return mask;
-}
-
-MistParamMask MistIfGroup::getParamMaskAll() const
-{
-    MistParamMask mask(conditionBlock->getParamMaskAll());
-    mask.append(ifBlock->getParamMaskAll());
-    mask.append(elseBlock->getParamMaskAll());
     
     return mask;
 }
@@ -193,42 +292,53 @@ MistJoinGroup::MistJoinGroup(MistTemplateGroupBlock* block,
 }
 
 
-ostream& MistJoinGroup::evaluate(const ParamSetSlice& slice, ostream& os) const
+ostream& MistJoinGroup::evaluate(Context& groupContext, ostream& os) const
 {
-    ParamSetSlice joinSlice(slice);
+    groupContext.beginJoinScope(context, submask);
     
-    ParamSetSlice& subslice = joinSlice.getSubslice(context);
-    subslice.resetMask(submask);
+    block->evaluate(groupContext, os);
     
-    block->evaluate(joinSlice, os);
-    
-    while(!subslice.isSetLast())
+    while(groupContext.advanceScope())
     {
-        subslice.nextSet();
         os << textBetween;
-        block->evaluate(joinSlice, os);
-    }
+        block->evaluate(groupContext, os);
+    };
+    
+    groupContext.endJoinScope();
     
     return os;
 }
 
-bool MistJoinGroup::isEmpty(const ParamSetSlice& slice) const
+bool MistJoinGroup::isEmpty(Context& groupContext) const
 {
-    ParamSetSlice joinSlice(slice);
+    bool result = true;
+    groupContext.beginJoinScope(context, submask);
     
-    ParamSetSlice& subslice = joinSlice.getSubslice(context);
-    subslice.resetMask(submask);
-    
-    if(!block->isEmpty(joinSlice)) return false;
-    if(subslice.isSetLast()) return true;
-    if(!textBetween.empty()) return false;
-    
-    for(subslice.nextSet(); !subslice.isSetLast(); subslice.nextSet())
+    if(!block->isEmpty(groupContext))
     {
-        if(!block->isEmpty(joinSlice)) return false;
+        result = false;
     }
+    else if(!groupContext.advanceScope())
+    {
+        result = true;
+    }
+    else if(!textBetween.empty())
+    {
+        result = false;
+    }
+    else do
+    {
+        if(!block->isEmpty(groupContext))
+        {
+            result = false;
+            break;
+        }
+        
+    }while(groupContext.advanceScope());
     
-    return true;
+    groupContext.endJoinScope();
+    
+    return result;
 }
 
 MistParamMask MistJoinGroup::getParamMask() const
@@ -236,38 +346,25 @@ MistParamMask MistJoinGroup::getParamMask() const
     return mask;
 }
 
-MistParamMask MistJoinGroup::getParamMaskAll() const
-{
-    MistParamMask result(mask);
-    result.append(block->getParamMaskAll());
-    
-    return result;
-}
-
 /*********************** "RJoin" sentence *****************************/
-ostream& MistRJoinGroup::evaluate(const ParamSetSlice& slice, ostream& os) const
+ostream& MistRJoinGroup::evaluate(Context& groupContext, ostream& os) const
 {
-    ParamSetSlice joinSlice(slice);
-    
-    ParamSetSlice& subslice = joinSlice.getSubslice(context);
-    subslice.resetMask(submask);
-    
+    groupContext.beginJoinScope(context, submask);
+
     /* Store evaluation results in string array. */
     vector<string> strings;
     
     ostringstream oss;
     
-    block->evaluate(joinSlice, oss);
+    block->evaluate(groupContext, oss);
     strings.push_back(oss.str());
     
-    while(!subslice.isSetLast())
+    while(groupContext.advanceScope())
     {
         /* Before writing next string, clear string in temporary stream */
         oss.str("");
 
-        subslice.nextSet();
-        /*os << textBetween;*/
-        block->evaluate(joinSlice, oss);
+        block->evaluate(groupContext, oss);
         strings.push_back(oss.str());
     }
     
@@ -282,9 +379,19 @@ ostream& MistRJoinGroup::evaluate(const ParamSetSlice& slice, ostream& os) const
         os << *iter;
     }
     
+    groupContext.endJoinScope();
+    
     return os;
 }
 
+/************************ Index of join iteration *********************/
+ostream& MistIndexGroup::evaluate(Context& groupContext, ostream& os) const
+{
+    int index = groupContext.iterationIndex(depth);
+    
+    return printFormatted(index, os);
+}
+    
 /*********** Stream wrapper used for 'indent' functionality*************/
 /* 
  * Writes to the controlled stream some text each time when stream is
@@ -348,25 +455,20 @@ IndentedStream::IndentedStreamBuffer::IndentedStreamBuffer::overflow(
 }
 
 /********************* Indent functionality ***************************/
-ostream& MistIndentGroup::evaluate(const ParamSetSlice& slice, ostream& os) const
+ostream& MistIndentGroup::evaluate(Context& groupContext, ostream& os) const
 {
     IndentedStream indentedStream(os, indent);
-    block->evaluate(slice, indentedStream);
+    block->evaluate(groupContext, indentedStream);
     
     return os;
 }
 
-bool MistIndentGroup::isEmpty(const ParamSetSlice& slice) const
+bool MistIndentGroup::isEmpty(Context& groupContext) const
 {
-    return !indent.empty() && block->isEmpty(slice);
+    return !indent.empty() && block->isEmpty(groupContext);
 }
 
 MistParamMask MistIndentGroup::getParamMask() const
 {
     return block->getParamMask();
-}
-
-MistParamMask MistIndentGroup::getParamMaskAll() const
-{
-    return block->getParamMaskAll();
 }

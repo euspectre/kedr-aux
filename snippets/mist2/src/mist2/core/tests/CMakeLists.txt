@@ -15,6 +15,11 @@ add_subdirectory(join_external_param)
 add_subdirectory(relative_names)
 add_subdirectory(with_relative_name)
 
+
+add_subdirectory(join_index)
+add_subdirectory(join_inner_index)
+add_subdirectory(join_outer_index)
+add_subdirectory(join_text_index)
 # Extensions 
 add_subdirectory(with_join)
 add_subdirectory(if_join)

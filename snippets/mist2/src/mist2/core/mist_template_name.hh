@@ -29,6 +29,7 @@ struct MistParamNameAbs
     /* Names components. */
     std::vector<std::string> components;
     
+    MistParamNameAbs() {}
     MistParamNameAbs(const std::vector<std::string>& components)
         : components(components) {}
     /* Construct absolute name from base and relative name. */

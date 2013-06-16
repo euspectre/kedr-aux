@@ -16,9 +16,6 @@
 
 #include <vector>
 
-using namespace std;
-using namespace Mist;
-
 /* 
  * 'Mask' of parameters.
  * 
@@ -61,13 +58,13 @@ public:
     const MistParamMask& getSubmask(const MistParamNameAbs& name) const;
     
     /* Iterator through submasks. */
-    typedef vector<pair<string, MistParamMask> >::const_iterator iterator;
+    typedef std::vector<std::pair<std::string, MistParamMask> >::const_iterator iterator;
 
     iterator begin(void) const;
     iterator end(void) const;
 
     //For debug
-    void print(const string& tab = "") const;
+    void print(const std::string& tab = "") const;
 
     /* Auxiliary class for modify mask */
     class Modifier
@@ -89,7 +86,7 @@ public:
          * 
          * NOTE: All iterators for current mask become invalid.
          */
-         void addSubmask(const string& name, const MistParamMask& submask);
+         void addSubmask(const std::string& name, const MistParamMask& submask);
         /* 
          * Remove all submasks for given position.
          * 
@@ -100,13 +97,13 @@ public:
     private:
         Modifier(const Modifier& modifier);/* not implemented */
         /* Masks stack up to the current one. Not empty(!). */
-        vector<MistParamMask*> maskStack;
+        std::vector<MistParamMask*> maskStack;
         /* 
          * Stack of indicies of submasks.
          * 
          * NB: indiciesStack.size() === maskStack.size() - 1
          */
-        vector<int> indiciesStack;
+        std::vector<int> indiciesStack;
         /* Prepare current mask for modify*/
         void prepareForModify(void);
     };
@@ -130,22 +127,22 @@ class ParamSetSlice
 {
 public:
     /* First slice in the parameter set. */
-    ParamSetSlice(const ParamSet& paramSet, const MistParamMask& mask);
+    ParamSetSlice(const Mist::ParamSet& paramSet, const MistParamMask& mask);
     /* Deep copy of slice. */
     ParamSetSlice(const ParamSetSlice& slice);
     ~ParamSetSlice();
 
     /* Return string value of the slice */
-    const string& getValue(void) const;
+    const std::string& getValue(void) const;
     /* 
      * Get sub-slice with given name.
      * 
      * NOTE: It is an error to call this function with name which is
      * absent in slice.
      */
-    ParamSetSlice& getSubslice(const string& name);
+    ParamSetSlice& getSubslice(const std::string& name);
     ParamSetSlice& getSubslice(const MistParamNameAbs& name);
-    const ParamSetSlice& getSubslice(const string& name) const;
+    const ParamSetSlice& getSubslice(const std::string& name) const;
     const ParamSetSlice& getSubslice(const MistParamNameAbs& name) const;
     /* Whether parameter set of this slice is the last one. */
     bool isSetLast(void) const;
@@ -160,27 +157,27 @@ public:
      */
     void resetMask(const MistParamMask& mask);
 private:
-    const ParamSet* value;
+    const Mist::ParamSet* value;
     struct Subslice
     {
-        string name;
-        const vector<ParamSet*>* values;/* Array non empty(!)*/
+        std::string name;
+        const std::vector<Mist::ParamSet*>* values;/* Array non empty(!)*/
         int index;
         ParamSetSlice* slice;
         /* Create empty subslice */
-        Subslice(const string& name, const vector<ParamSet*>* values);
+        Subslice(const std::string& name, const std::vector<Mist::ParamSet*>* values);
     };
-    vector<Subslice> subslices;
+    std::vector<Subslice> subslices;
     bool isSetLastFlag;
     
     /* Set mask. May be called only when current mask is empty */
     void setMask(const MistParamMask& mask);
     /* Change value and adjust all subslices to the first values */
-    void reset(const ParamSet* value);
+    void reset(const Mist::ParamSet* value);
     /* Update value of isSetLastFlag, taken into account given subslice*/
     void updateSetLast(const Subslice& subslice);
     /* Slice with empty mask */
-    ParamSetSlice(const ParamSet& paramSet);
+    ParamSetSlice(const Mist::ParamSet& paramSet);
 };
 
 #endif /* MIST_PARAM_SET_SLICE_HH */

@@ -504,7 +504,7 @@ void ParamSetSlice::nextSet(void)
         if(iter->slice->isSetLast())
         {
             /* Set of subslice is the last one.*/
-            if((iter->index + 1) < iter->values->size())
+            if((iter->index + 1) < (int)iter->values->size())
             {
                 /* But subslice is not last in array. Advance it. */
                 ++iter->index;
@@ -586,7 +586,7 @@ void ParamSetSlice::reset(const ParamSet* value)
 void ParamSetSlice::updateSetLast(const Subslice& subslice)
 {
     isSetLastFlag = isSetLastFlag
-        && ((subslice.index + 1) == subslice.values->size())
+        && ((subslice.index + 1) == (int)subslice.values->size())
         && subslice.slice->isSetLast();
 }
 

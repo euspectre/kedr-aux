@@ -30,7 +30,20 @@ public:
     
     /* Instantiate template into group */
     virtual MistTemplateGroupBlock* createGroup(
-        Context& groupBuilder) const = 0;
+        Context& templateContext) const = 0;
+    /* 
+     * Return minimum depth of join iteration which iterate parameters
+     * used by template.
+     * 
+     * 'depth_upper' denote maximum depth to return. So, if none of
+     * (depth_upper - 1) iterations use template parameters, depth_upper
+     * should be return.
+     * 
+     * Default implementation uses getParamsMask() method of temporary
+     * created group.
+     */
+     virtual int iterationDepth(Context& templateContext,
+        int depth_upper) const;
 };
 
 
@@ -43,10 +56,10 @@ public:
     Context(TemplateCollection& templateCollection);
     ~Context();
     
-    MistTemplateGroupBlock* build(const string& mainTemplate);
+    MistTemplateGroupBlock* build(const std::string& mainTemplate);
 
     /* Find template by name. Return NULL if not found. */
-    Template* findTemplate(const string& name);
+    Template* findTemplate(const std::string& name);
     
     /*
      * Build template group block for template or parameter with given
@@ -57,7 +70,7 @@ public:
      * 
      * Also cache blocks, created for templates and parameters.
      */
-    MistTemplateGroupBlock* buildTemplateOrParamRef(const string& name);
+    MistTemplateGroupBlock* buildTemplateOrParamRef(const std::string& name);
     
     /* 
      * Build template group block for parameter reference. 
@@ -67,8 +80,8 @@ public:
     MistTemplateGroupBlock* buildParameterRef(const MistTemplateName& name);
 
     /* 
-     * Return parameter name which should be used in join and concat
-     * statements.
+     * Return parameter name which should be used as based for relative
+     * names.
      * 
      * NOTE: This method should be used only from template's createGroup()
      * method and only when it is needed.
@@ -77,22 +90,49 @@ public:
      * will used with any groupParam, otherwise for every groupParam
      * different instantiation will be created.
      */
-    const MistParamNameAbs& getGroupParamName(void);
+    const MistParamNameAbs& baseParamName(void);
     /* 
-     * Set parameter name which should be used in join and concat
-     * statements.
+     * Set parameter name which should be used as based for relative
+     * parameters.
      */
-    void pushGroupParamName(const MistTemplateName& paramName);
+    void pushBaseParam(const MistTemplateName& paramName);
     /* 
-     * Restore parameter name which should be used in join and concat
-     * statements.
+     * Restore parameter name which should be used as based for relative
+     * parameters statements.
      */
-    void popGroupParamName(void);
+    void popBaseParam(void);
+    
+    /* Begin scope for joined template. */
+    void beginJoinScope(void);
+    /* End scope for joined template. */
+    void endJoinScope(void);
+    
+    /*
+     * Return minimum depth of iteration which uses given parameter.
+     * 
+     * 'depth_upper' bounds value returned.
+     */
+    int iterationDepth(const MistParamNameAbs& paramName, int depth_upper) const;
+    /*
+     * Return minimum depth of iteration which uses one of given parameters.
+     * 
+     * 'depth_upper' bounds value returned.
+     */
+    int iterationDepth(const MistParamMask& mask, int depth_upper) const;
+
+    /*
+     * Return maximum depth of current iterations.
+     * 
+     * Normally returned value is used as first 'guess' for call
+     * iterationDepth().
+     */
+     int iterationDepthMax(void) const;
+
 private:
     TemplateCollection& templateCollection;
 
     /* Cache for parameter references */
-    map<MistParamNameAbs, MistTemplateGroupBlockRef> paramCache;
+    std::map<MistParamNameAbs, MistTemplateGroupBlockRef> paramCache;
     
     /* Cache for name, corresponded to template or parameter. */
     struct NamedBlockCached
@@ -106,7 +146,7 @@ private:
          */
         MistTemplateGroupBlockRef refGlobal;
         /* Block for every 'with' context */
-        map<MistParamNameAbs, MistTemplateGroupBlockRef> contexts;
+        std::map<MistParamNameAbs, MistTemplateGroupBlockRef> contexts;
         /* 
          * If given name corresponds to template, this is reference to it.
          * Otherwise NULL.
@@ -124,10 +164,16 @@ private:
     };
 
     /* Cached named blocks */
-    map<string, NamedBlockCached> namedCache;
+    std::map<std::string, NamedBlockCached> namedCache;
     
-    /* Stack of the 'with' contexts */
-    vector <MistParamNameAbs> contextStack;
+    /* Stack of the base parameter names (for 'with' context) */
+    std::list<MistParamNameAbs> baseParamStack;
+    /* Size of baseParamStack. */
+    size_t baseParamStackSize;
+    /* Stack of the bases for join */
+    std::list<MistParamNameAbs> joinBaseStack;
+    /* Size of joinBaseStack, used for iterationDepthMax(). */
+    size_t joinBaseStackSize;
 
     /* Information about template which is currently instantiated */
     struct TemplateContextInfo
@@ -157,11 +203,11 @@ private:
     };
     
     /* Stack of the instantiated templates */
-    vector<TemplateContextInfo> templateStack;
+    std::vector<TemplateContextInfo> templateStack;
     /*
      * Return named cache for given name. Cache will be created if needed.
      */
-    NamedBlockCached& getNamedCache(const string& name);
+    NamedBlockCached& getNamedCache(const std::string& name);
     
     MistTemplateGroupBlock* buildParameterRef(const MistParamNameAbs& name);
 };
@@ -303,6 +349,34 @@ public:
         const std::string& textBetween)
         : MistTemplateJoin(templateInternal, textBetween) {}
     
+    MistTemplateGroupBlock* createGroup(
+        Context& templateContext) const;
+};
+
+/*
+ * Index of join iteration.
+ */
+
+class MistTemplateIndex0: public Mist::Template::Impl
+{
+public:
+    std::auto_ptr<Mist::Template::Impl> templateInternal;
+
+    MistTemplateIndex0(Mist::Template::Impl* templateInternal):
+        templateInternal(templateInternal) {}
+
+    MistTemplateGroupBlock* createGroup(
+        Context& templateContext) const;
+};
+
+class MistTemplateIndex1: public Mist::Template::Impl
+{
+public:
+    std::auto_ptr<Mist::Template::Impl> templateInternal;
+
+    MistTemplateIndex1(Mist::Template::Impl* templateInternal):
+        templateInternal(templateInternal) {}
+
     MistTemplateGroupBlock* createGroup(
         Context& templateContext) const;
 };
