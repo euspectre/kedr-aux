@@ -1,0 +1,84 @@
+# This module processes the calls to kstrdup function.
+module:
+    name = kstrdup
+    author = Tsyvarev
+    license = GPL
+
+headers:
+  - |
+    /* ========================================================================
+     * Copyright (C) 2012, KEDR development team
+     * Copyright (C) 2010-2012, Institute for System Programming 
+     *                          of the Russian Academy of Sciences (ISPRAS)
+     * Authors: 
+     *      Eugene A. Shatokhin <spectre@ispras.ru>
+     *      Andrey V. Tsyvarev  <tsyvarev@ispras.ru>
+     *
+     * This program is free software; you can redistribute it and/or modify it
+     * under the terms of the GNU General Public License version 2 as published
+     * by the Free Software Foundation.
+     ======================================================================== */
+
+    #include <linux/string.h>
+
+functions:
+# Name and return type of the target function
+  - name: kstrdup
+    returnType: char*
+# Names and types of the arguments of the target function
+    args:
+      - {type: const char*, name: str}
+      - {type: gfp_t, name: flags}
+# End of the group of definitions for kstrdup().
+#######################################################################
+---
+functions:
+  - name: func_with_no_args
+    returnType: bool
+# End of the group of definitions for func_with_no_args().
+#######################################################################
+  - name: func_with_no_ret
+    args:
+      - {type: int, name: flags}
+# End of the group of definitions for func_with_no_ret().
+#######################################################################
+---
+headers:
+  - |
+    #include <stdarg.h>
+    #include <linux/kernel.h>
+
+functions:
+  - name: kasprintf
+    returnType: char*
+    
+    args:
+      - {type: gfp_t, name: gfp}
+      - {type: const char*, name: fmt}
+    
+    ellipsis: true
+    last_arg: fmt
+    original_code: |
+        //Use kvasprintf function
+        ret_val = kvasprintf(gfp, fmt, args);
+# End of the group of definitions for kasprintf().
+#######################################################################
+    # Name and return type of the target function
+  - name: kvasprintf
+    returnType: char *
+
+    # Names and types of the arguments of the target function
+    args:
+      - {type: gfp_t, name: gfp}
+      - {type: const char*, name: fmt}
+      - {type: va_list, name: ap}
+
+    # Copiing process of the parameter of 'va_list' type
+    args_copy_declare_and_init: |
+        gfp_t gfp_copy = gfp;
+        const char* fmt_copy = fmt;
+        va_list ap_copy;
+        va_copy(ap_copy, ap);
+    args_copy_destroy: va_end(ap_copy);
+# End of the group of definitions for kvasprintf().
+#######################################################################

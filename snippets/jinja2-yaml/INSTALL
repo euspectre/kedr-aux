@@ -1,0 +1,12 @@
+Пререквизиты:
+
+1. Python 2.6+
+2. Jinja2 (способы установки: http://jinja.pocoo.org/docs/intro/#installation;
+    в некоторых дистрибутивах есть пакет с именем типа python-Jinja2)
+3. PyYAML(спсобы установки: http://pyyaml.org/wiki/PyYAMLDocumentation#Installation;
+    в некоторых дистрибутивах есть пакет с именем типа python-PyYAML)
+
+Установка:
+
+Установка самой программы не требуется, программа запускается как
+python-скрипт bin/jinja2-yaml.py
