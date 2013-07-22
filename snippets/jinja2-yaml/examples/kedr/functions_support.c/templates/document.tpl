@@ -8,6 +8,11 @@
 <$for header in headers$>
 {{header}}
 <$endfor$>
+<$for function in functions if function.ellipsis$>
+<$if loop.first$>
+#include <stdarg.h>
+<$endif$>
+<$endfor$>
 
 <$if functions$><$for function in functions$>
 <$include 'block'$>

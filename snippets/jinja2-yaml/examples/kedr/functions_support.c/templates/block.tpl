@@ -2,7 +2,6 @@
 static struct kedr_intermediate_info kedr_intermediate_info_{{function.name}};
 
 <$if function.ellipsis$><$if function.original_code$>
-#include <stdarg.h>
 // Original variant of the function which takes 'va_list' argument.
 static <$if function.returnType$>{{function.returnType}}<$else$>void<$endif$> kedr_orig_{{function.name}}(<$include 'argumentSpec_effective'$>)
 {
