@@ -1,6 +1,6 @@
-# This module processes the calls to kstrdup function.
+# This module processes the calls to kmalloc-like functions.
 module:
-    name: kstrdup
+    name: kmalloc
     author: Tsyvarev
     license: GPL
 
@@ -19,29 +19,51 @@ headers:
      * by the Free Software Foundation.
      ======================================================================== */
 
-    #include <linux/string.h>
+    #include <linux/slab.h>
+    #include <linux/gfp.h>
 
 functions:
-# Name and return type of the target function
-  - name: kstrdup
-    returnType: char*
-# Names and types of the arguments of the target function
+  - name: __kmalloc
+    returnType: void*
+
     args:
-      - {type: const char*, name: str}
+      - {type: size_t, name: size}
       - {type: gfp_t, name: flags}
-# End of the group of definitions for kstrdup().
+
+    # Fault Simulation
+    fpoint:
+        params:
+          - {type: size_t, name: size}
+          - {type: gfp_t, name: flags}
+
+        rename: kmalloc
+
+        fault_code: ret_val = NULL;
+# End of the group of definitions for __kmalloc().
 #######################################################################
----
-functions:
-  - name: func_with_no_args
-    returnType: bool
-# End of the group of definitions for func_with_no_args().
-#######################################################################
-  - name: func_with_no_ret
+  - name: kmem_cache_alloc
+    returnType: void *
+
     args:
-      - {type: int, name: flags}
-# End of the group of definitions for func_with_no_ret().
+      - {type: struct kmem_cache *, name: mc}
+      - {type: gfp_t, name: flags}
+
+    prologue: |
+        size_t size = kmem_cache_size(mc);
+
+    # Fault Simulation
+    fpoint:
+        reuse_point: kmalloc
+
+        # Duplicate parameters for kmalloc simulation point
+        params:
+          - {type: size_t, name: size}
+          - {type: gfp_t, name: flags}
+
+        fault_code:    ret_val = NULL;
+# End of the group of definitions for __kmalloc().
 #######################################################################
+
 ---
 headers:
   - |
@@ -61,6 +83,15 @@ functions:
     original_code: |
         //Use kvasprintf function
         ret_val = kvasprintf(gfp, fmt, args);
+    
+    # Fault Simulation
+    fpoint:
+        params:
+          - {type: gfp_t, name: flags}
+
+        fault_code: ret_val = NULL;
+
+        
 # End of the group of definitions for kasprintf().
 #######################################################################
     # Name and return type of the target function
@@ -80,5 +111,12 @@ functions:
         va_list ap_copy;
         va_copy(ap_copy, ap);
     args_copy_destroy: va_end(ap_copy);
+
+    # Fault Simulation
+    fpoint:
+        params:
+          - {type: gfp_t, name: flags}
+
+        fault_code: ret_val = NULL;
 # End of the group of definitions for kvasprintf().
 #######################################################################
