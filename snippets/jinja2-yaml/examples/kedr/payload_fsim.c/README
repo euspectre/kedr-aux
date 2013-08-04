@@ -21,7 +21,7 @@ jinja2-yaml payload.yaml templates/
     unregister(point_{{name}});
 label_{{name}}:
 
-которая вместе со схемой кода (прямой) итерациии при регистрации точек
+которая вместе со схемой кода (прямой) итерации при регистрации точек
 
     if(register(init(point_{{name}})))
     {
