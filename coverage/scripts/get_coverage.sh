@@ -71,6 +71,18 @@ In all cases 'options' may be:
      directory.
       
        'dir' should be relative directory, such as "fs/xfs".
+
+
+When collecting coverage information, environment variable 'LCOV_ARGS' may
+be set to contain additional arguments for lcov utility.
+E.g.,
+
+LCOV_ARGS=--gcov-tool=<path-to-gcov> get_coverage.sh trace_file
+
+may be used for collect coverage information for module, which is built
+using non-native 'gcc'. In that case <path-to-gcov> should point to 'gcov'
+utility, which is match to 'gcc' utility with which module has built).
+
 EOF
 }
 
@@ -214,7 +226,7 @@ default)
         exit 1
     fi
     
-    if ! lcov -q -c -d "$tmp_counters_dir" -b "$BUILD_DIR" -o "$trace_file"; then
+    if ! lcov ${LCOV_ARGS} -q -c -d "$tmp_counters_dir" -b "$BUILD_DIR" -o "$trace_file"; then
         printf_error "Lcov failed to collect coverage statistics.\n"
         exit 1
     fi
