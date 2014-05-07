@@ -1,0 +1,186 @@
+          Converter of data-file for kedr_gen into YAML file
+
+
+                    Usage
+
+    convert-kedr-yaml.py <def-file> <data-file>
+
+where <def-file> - ini-like file with conversion definitions (see README
+in the parent directory),
+<data-file> - kedr_gen data-file for convert.
+
+Resulted YAML file is printed into stdout.
+
+
+    make_values_invariant.py
+
+Accept kedr_gen data-file in STDIN. STDOUT will contain same data-file
+definitions, but with sligthly changed values. Resulted data-file can
+be converted using convert-kedr-yaml.py without values changed
+(see also section "Multiline parameters conversion" below).
+
+This script is useful when check correctness of templates conversion
+from kedr_gen to jinja2-yaml formats:
+
+    make_values_invariant.py < file.data > file.data.invariant
+    
+    kedr_gen templates file.data.invariant > result
+    
+    convert-kedr-yaml.py <def-file> file.data.invariant > file.yaml
+    jinja2-yaml.py file.yaml templates_converted > result_converted
+    
+    diff result result_converted
+    
+
+
+                Main conversion principle
+                
+All lines of original data-file are converted and output without changing
+in order. This is useful for preserve meaning of the comments(them are 
+converted too).
+
+This principle applies restriction on source data-file: semantically
+grouped parameters should come together, without messing them with other
+parameters.
+In the most cases this restriction is enforced by the converter, that is
+parameters' messing will be detected and interpreted as error. In that
+case user should edit data-file before conversion.
+
+
+               Multiline parameters conversion
+
+Multiline parameters, which given as
+
+param_name =>>
+line1
+line2
+<<
+
+are converted using YAML block notation
+
+param_name:|
+    line1
+    line2
+
+Parameter value's meaning is changed after such conversion due to
+YAML syntax restriction:
+
+1) First line become unconditionally unindented.
+   That is, all leading spaces are stripped.
+2) For each other line, if its indentation m >= n, then it becomes (m-n).
+    Here 'n' is an indentation of the first line.
+3) Value content become ended with newline symbol.
+
+Normally, that changes are insignificant.
+
+                Conversion rules
+
+Everything described in that section applies after parameters renamining,
+described in conversion definition file, takes a place.
+
+Original parameter's name is splitted on components by dot('.').
+In output YAML file every component means name of container attribute:
+
+    foo.bar = abc
+
+is converted into(remember, in YAML indentation force a structure)
+
+    foo:
+        bar: abc
+
+If several parameter definitions with same prefix come together,
+in output YAML they will belong to the same container:
+
+    foo.bar = abc
+    foo.baz = cde
+
+is converted into
+
+    foo:
+        bar: abc
+        baz: cde
+
+
+
+When several parameter definitions with same names come together,
+in output YAML they will converted into sequence's elements:
+
+    foo.bars = abc
+    foo.bars = cde
+
+is converted into 
+
+    foo:
+        bars:
+            - abc
+            - cde
+
+This is occures only when "foo.bars" parameter is marked as sequence
+(see "Conversion definitions" section). Such mark also affects on
+conversion of single parameter:
+
+    foo.bars = abc
+
+is converted into
+
+    foo:
+        bars:
+            - abc
+
+Usually, 'sequence' parameters are assigned with plural names.
+
+'Sequence' mark may be applied not only to full parameter name, but
+also to the prefix. In that case sequence of maps is created:
+
+    foos.bar = abc
+    foos.bar = cde
+
+is converted (assuming "foos" is marked as sequence) into
+
+    foos:
+        - bar: abc
+        - bar: cde
+
+
+More complex (and real) example:
+
+    args.name = n1
+    args.type = t1
+    args.name = n2
+    args.type = t2
+
+is converted into
+
+    args:
+        - name: n1
+          type: t1
+        - name: n2
+          type: t2
+
+Moreover, even if assignments to values 'n2' and 't2' will be swapped in
+source data-file, resulted YAML file remains correct.
+
+But when swap assignments for parameters which belong to different
+sequence's elements, resulted YAML file semantic becomes incorrect.
+
+
+Each [group] directive in source data-file is converted into
+definition of top-level attribute with user-defined name
+(see "Conversion definitions" section). Content of that attribute
+is output as sequence's element:
+
+    [group]
+    functions.name = f1
+    functions.returnType = int
+
+is converted (assuming "functions" is user-defined name for group) into
+
+    functions:
+      - name: f1
+        returnType = int
+
+Because jinja2-yaml generator joins all top-level sequences with same name,
+all [group] definitions will be interpreted as elements of one sequence.
+
+
+            

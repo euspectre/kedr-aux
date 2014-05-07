@@ -1,0 +1,152 @@
+        Converter of kedr_gen templates into jinja2 ones.
+
+                    Usage
+
+convert-kedr-jinja2.py <def-file> <kedr-gen-templates> <jinja2-templates>
+
+where <def-file> - ini-like file with conversion definitions (see README
+in the parent directory),
+<kedr-gen-templates> - directory with kedr_gen templates, with
+'document' and 'block' subdirectories.
+<jinja2-templates> - directory for save resulted jinja2-templates.
+
+                Main conversion principle.
+
+All kedr_gen templates which already written should be converted
+automatically or with a little user editing after conversion.
+
+In the latter case, all places require editing are marked with 'STAB'
+(so template generation process would fail), and warning is issued every
+time such places are generating.
+
+
+            Conversion rules.
+
+Everything described in that section applies after parameters renamining,
+described in conversion definition file, takes a place.
+
+
+More literally, main conversion principle means following:
+
+If input templates
+
+1) are semantically correct (and this semantic is reflected by
+    the conversion definitions file)
+2) contain joining only for parameters from the same sequence
+3) use predefined subset of standard kedr_gen idioms
+
+then conversion will be performed without errors and resulted templates
+will be identical to input ones from the sence of template generation process.
+
+
+Violation of principle 1 is usually detected in the conversion process,
+and terminates that process immediately.
+E.g., reference of multivalue parameter without joining is semantically
+incorrect.
+From the other side, joining of single-valued parameter is resulted
+only in warning, and resulted templates interpret this construction
+as simple reference (to single-valued parameter).
+
+You would unable to write conversion definition file, if templates
+violates principle 2.
+
+As for principle 3, in theory all kedr_gen idioms can be converted into
+jinja2 ones, but some of those conversions would be too complex.
+E.g., in jinja2 you cannot build 'if' construction with condition based
+on other template content. So converting of <$if template_name$>
+requires to build expression correponded to non-emptines of given template.
+For all kedr_gen idioms, for which conversion is not implemented,
+warnings are issued, and 'STAB' constructions is emitted into resulted
+template. After automaticall conversion user should manually edit such
+constructions.
+
+
+Every template
+
+    <kedr-gen-templates>/document/<template-name>.tpl
+
+will be converted to
+
+    <jinja2-templates>/<template-name>.tpl
+
+and every template
+
+    <kedr-gen-templates>/block/<template-name>.tpl
+
+will be converted to
+
+    <jinja2-templates>/block_<template-name>.tpl
+
+Prefix for block-originated templates is used for prevent collisions on
+template names.
+References to templates will be corrected according to resulted filenames.
+Note, that only those templates will be converted, which are reachable
+from document/document.tpl via references.
+
+Every reference to singular parameter is converted as is.
+
+Every reference to multivalued parameter
+
+    obj.seq.attr
+
+where 'obj.seq' is a sequence (according to convertion definition file)
+is converted to 
+
+    iter.attr
+
+where 'iter' is an iterator name for that sequence.
+
+
+Construction
+
+    <$param_name$>
+
+is converted into
+
+    {{ resulted_param_name }}
+
+where 'resulted_param_name' is a corresponded parameter's reference.
+
+
+Construction
+
+    <$template_name$>
+
+is converted into
+
+    <$include 'resulted_template_name'$>
+
+Construction
+
+    <$param_name: join(str)$>
+
+is normally converted into
+
+    {{sequence: join(d="str", attribute="attr"}}
+
+where 'sequence' is a sequence to which given parameter belongs.
+
+In case of nested sequences nested loops are generated(all-in-one-line):
+
+    <$for iter1 in sequence1$>
+        <$set loop0 = loop$>
+        <$for iter2 in iter1.attr1$>
+            <$if not (loop0.first and loop.first)$>str<$endif$>{{iter2.attr}}
+        <$endfor$>
+    <$endfor$>
+
+(<$set$> and <$if$> blocks are generated only when really needed).
+
+When joining templates
+
+    <$template_name: join(str)$>
+
+always loops are generated, similar to ones for parameter's joining above.
+
+
+As for <$if$> conditions, they are automatically converted only when
+conditonal refers to parameter without 'concat', or with 'concat' required
+iteration only on one sequence (and which is convertable to jinja2
+'join' filter).
+Other <$if$> conditions are converted to 'STAB', so user should manually edit
+them after conversion.
