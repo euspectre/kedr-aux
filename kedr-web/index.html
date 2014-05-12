@@ -27,17 +27,15 @@
     <tbody><tr>
     <td id="mainsidebar">
         
-        <p class="sb_head"><a href="http://developer.berlios.de/news/?group_id=11780">News</a></p>
-        <p class="sb_head">KEDR v.0.4.1</p>
+        <p class="sb_head">KEDR v.0.5</p>
         <ul>
-            <li><a href="http://kedr.googlecode.com/files/kedr-0.4.1.tar.bz2">Download KEDR 0.4.1</a></li>
-            <li><a href="http://kedr.berlios.de/relnotes/ReleaseNotes.txt">Release Notes</a></li>
-            <li><a href="http://kedr.berlios.de/kedr-doc/index.html">Online Documentation</a></li>
+            <li><a href="https://www.dropbox.com/s/1q8b4gjchq3mdz3/kedr-0.5.tar.bz2">Download KEDR 0.5</a></li>
+            <li><a href="http://kedr.googlecode.com/hg/sources/NEWS">Release Notes</a></li>
+            <li><a href="http://code.google.com/p/kedr/wiki/kedr_manual">Online Documentation</a></li>
         </ul>
         <p class="sb_head">Quick Links</p>
         <ul>
-        	<li><a href="http://developer.berlios.de/projects/kedr/">KEDR at BerliOS</a></li>
-        	<li><a href="http://code.google.com/p/kedr/">KEDR at Google Code</a></li>
+            <li><a href="http://code.google.com/p/kedr/">KEDR at Google Code</a></li>
             <li><a href="http://code.google.com/p/kedr/w/list">Wiki</a></li>
             <li><a href="http://code.google.com/p/kedr/issues/">Submit Bug Reports</a></li>
             <li><a href="http://groups.google.com/group/kedr-discuss">Mailing List</a></li>
@@ -52,32 +50,31 @@
     <h2>About KEDR</h2>
     <p>
 <strong>KEDR framework</strong> is an extensible system for dynamic analysis of kernel modules (device drivers, file system modules, etc.) in Linux on x86 systems. KEDR tools operate on the modules chosen by the user and can detect memory leaks, perform fault simulation and more. The framework is intended for the developers of kernel modules and, in particular, it may be useful for building automated driver verification systems.
-	</p>
+    </p>
 
-	<p>
+    <p>
 KEDR-based tools have already proven their effectiveness by finding <a href="http://code.google.com/p/kedr/wiki/Problems_Found">errors</a> in several widely used kernel modules.
-	</p>
-	
-	<p>
+    </p>
+    
+    <p>
 KEDR framework is free software and is distributed under the terms of <a href="http://www.gnu.org/licenses/old-licenses/gpl-2.0.html">GNU General Public License Version 2</a>.
-	</p>
-	
+    </p>
+    
     <h2>Features</h2>
     <p>
 Like the dynamic analysis frameworks, such as <a href="http://valgrind.org/">Valgrind</a>, oriented towards user-space applications and libraries, KEDR uses plugin-based architecture. Each analysis system based on KEDR relies at least on the following components: 
     </p>
     <ul>
-    	<li><em>KEDR Core</em> which is responsible for instrumentation of the module being analyzed;</li>
-    	<li>One or more <em>tool plugins</em> (&quot;payload modules&quot;) that actually collect and analyze the data.</li>
+        <li><em>KEDR Core</em> which is responsible for instrumentation of the module being analyzed;</li>
+        <li>One or more <em>tool plugins</em> (&quot;payload modules&quot;) that actually collect and analyze the data.</li>
     </ul>
     
     <p>
 Out-of-the-box, KEDR provides the tools to do the following:
     </p>
     <ul>
-    	<li><p><em><a href="http://kedr.berlios.de/kedr-doc/kedr_manual_using_kedr.html#call_mon">Call monitoring (call tracing)</a></em> During the operation of the module under analysis, the information is collected about the function calls it makes: arguments, return values, etc. The data can be saved to a file (trace) for future analysis. This is similar to what <a href="http://sourceforge.net/projects/strace/">strace</a> utility does for user-space applications.</p></li>
-    	<li><p><em><a href="http://kedr.berlios.de/kedr-doc/kedr_manual_using_kedr.html#fault_sim">Fault simulation</a></em> KEDR forces some of the calls made by the target module to fail. In fact, KEDR simulates a failure without actually calling the respective function. The scenarios (the calls to which functions must fail in what conditions) can be controlled and customized by the user.</p></li>
-    	<li><p><em><a href="http://kedr.berlios.de/kedr-doc/kedr_manual_using_kedr.html#leak_check">Detecting memory leaks</a></em> KEDR keeps track of memory allocation and deallocation operations made by the target module. After the target module has unloaded, KEDR generates a report listing the memory blocks that have been allocated but not freed by that module along with a call stack for each of these blocks.</p></li>
+        <li><p><em><a href="http://code.google.com/p/kedr/wiki/kedr_manual_using_kedr#Detecting_Memory_Leaks">Detecting memory leaks</a></em> KEDR keeps track of memory allocation and deallocation operations made by the target module. After the target module has unloaded, KEDR generates a report listing the memory blocks that have been allocated but not freed by that module along with a call stack for each of these blocks.</p></li>
+    <li><p><em><a href="http://code.google.com/p/kedr/wiki/kedr_manual_using_kedr#Fault_Simulation">Fault simulation</a></em> KEDR forces some of the calls made by the target module to fail. In fact, KEDR simulates a failure without actually calling the respective function. The scenarios (the calls to which functions must fail in what conditions) can be controlled and customized by the user.</p></li>
     </ul>
     
     <p>
@@ -86,24 +83,23 @@ Other types of data collection and analysis operations can also be implemented.
     
     <h2>More Info</h2>
     <p>
-Detailed description of KEDR can be found in the <a href="http://kedr.berlios.de/kedr-doc/index.html">online documentation</a>. In addition, <a href="http://code.google.com/p/kedr/wiki/">Wiki</a> provides other useful information concerning the framework.
+Detailed description of KEDR can be found in the <a href="http://code.google.com/p/kedr/wiki/kedr_manual">online documentation</a>. In addition, <a href="http://code.google.com/p/kedr/wiki/">Wiki</a> provides other useful information concerning the framework.
     </p>
     
     <p>
-To start working with KEDR, you can take a look at <a href="http://kedr.berlios.de/kedr-doc/kedr_manual_getting_started.html"><i>Getting Started</i></a> section in the manual. It describes how to install the framework and use it to analyze kernel modules, step by step.
+To start working with KEDR, you can take a look at <a href="http://code.google.com/p/kedr/wiki/kedr_manual_getting_started"><i>Getting Started</i></a> section in the manual. It describes how to install the framework and use it to analyze kernel modules, step by step.
     </p>
     
     <h2>Downloads</h2>
     <p>
-KEDR framework is distributed in the source form. The current stable version is <strong>0.4.1</strong> (<a href="http://kedr.berlios.de/relnotes/ReleaseNotes.txt">Release Notes</a>).
-	</p>
+KEDR framework is distributed in the source form. The current stable version is <strong>0.5</strong> (<a href="http://kedr.googlecode.com/hg/sources/NEWS">Release Notes</a>).
+    </p>
 
-	<p>
+    <p>
 Get KEDR framework:
-	</p>
-	<ul>
-    	<li><a href="http://prdownload.berlios.de/kedr/kedr-0.4.1.tar.bz2">download</a> from BerliOS Developer</li>
-    	<li><a href="http://kedr.googlecode.com/files/kedr-0.4.1.tar.bz2">download</a> from Google Code</li>
+    </p>
+    <ul>
+        <li><a href="https://www.dropbox.com/s/1q8b4gjchq3mdz3/kedr-0.5.tar.bz2">download</a> (SHA1 checksum: dbc25b5719cb3967e647d70a3272075bacfe05d5)</li>
     </ul>
     <p>
 The source archive also includes the documentation (in DocBook and HTML formats) and the examples.
