@@ -280,7 +280,7 @@ def print_attribute_value(value, indent):
     if strings[len(strings) - 1] == "":
         # Last newline symbol will be added in any case
         strings.pop()
-    output_file.write("|\n")
+    output_file.write(" |\n")
     for s in strings:
         output_file.write(indent + s + "\n")
 
@@ -328,17 +328,17 @@ def process_attribute(name, parent_prefix, indent):
         #if token.tokenType == tokenTypeParam:
         #    debug ("param name os " + token.param_name)
         dataScanner.ungetToken()
-    # Otherwise print newline symbol and iterate tokens(including already parsed one)    
-    output_file.write("\n")
+        # Otherwise print newline symbol and iterate tokens(including already parsed one)    
+
+    if name is not None:
+        output_file.write("\n")
         
-    # Set of attributes founded.
+    # Set of attributes found.
     #
     # Attribute may repeat previous one only when section is a sequence.
     # In that case, attributes set is reset and new sequence element is started.
     attributes = set()
 
-    #debug ("Iteration")
-    
     for token in dataScanner:
         if token.tokenType == tokenTypeEmpty:
             output_file.write("\n")
@@ -369,7 +369,7 @@ def process_attribute(name, parent_prefix, indent):
             elif not token.param_name.startswith(prefix):
                 # Parameter for another section is found
                 if is_group:
-                    parse_error("Once entered, group section cannot be exited")
+                    parse_error("Once entered, group section should not be exited")
                 dataScanner.ungetToken()
                 return
             else:
