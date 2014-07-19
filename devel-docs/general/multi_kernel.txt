@@ -74,7 +74,6 @@ KERNEL_PART=on
 Все остальные параметры конфигурации per-kernel части должны быть "совместимы" с параметрами конфигурации common части.
 Т.е. параметры, влияющие на обе части, должны быть одинаковыми:
 - префикс установки (CMAKE_INSTALL_PREFIX)
-- тип установки (CMAKE_INSTALL_TYPE)
 - наличие подсистем (KEDR_TRACE, KEDR_LEAK_CHECK)
 - наличие payload'ов того или иного типа (KEDR_STANDARD_CALLM_PAYLOADS, KEDR_STANDARD_FSIM_PAYLOADS)
 - настройки payload'ов (KEDR_ENABLE_CALLER_ADDRESS)
