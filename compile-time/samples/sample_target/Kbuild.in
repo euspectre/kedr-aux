@@ -1,0 +1,19 @@
+module_name=kedr_sample_target
+
+ccflags-y := -g -I$(src)
+
+obj-m := ${module_name}.o
+${module_name}-y := cfake.o my_funcs.o
+
+# To analyze the kernel code, one should set "-fplugin=..." for the relevant
+# files only. In this example, cfake.c and the files it #includes will be
+# instrumented. my_funcs.o will not be affected.
+#
+# -fdump-* options are only useful to debug the plugin and can be removed.
+# The instrumentation takes place somewhere after "ssa" pass but before 
+# "einline" pass, so these GIMPLE dumps will show what the code looked like
+# (approximately) before and after our plugin transformed it.
+CFLAGS_cfake.o := \
+    -fplugin=@PLUGIN_PATH@ \
+    -fdump-tree-ssa-raw \
+    -fdump-tree-einline-raw
