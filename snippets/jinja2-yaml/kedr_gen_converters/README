@@ -1,0 +1,122 @@
+Converters of kedr_gen templates and data-files into ones for use by jinja2-yaml.
+
+                        Common principles
+
+YAML file is more 'structured', than kedr_gen data-file. E.g., while all
+parameters in kedr_gen which has same names are automatically grouped
+together, YAML has special type for grouping parameters: sequences.
+
+The same is true for kedr_gen and jinja2 templates: the last ones need
+to know which parameters are really sequence for iterate over then in
+join-like constructions.
+
+Both converters accept conversion definitions file, which provides
+semantic information about parameters.
+
+
+                    Conversion definitions
+
+Conversion definition file is very similar to classic ini-file.
+Each line of definition file may be:
+
+- empty line(only whitespace characters)
+- comment (starts with '#'), e.g.
+
+    # This is a comment
+
+- section header in form "[<section_name>];
+    it starts section with name <section_name>. E.g.
+
+    [param_map_global]
+
+- attribute definition and its value, delimited with '='. E.g.
+
+    param = value
+
+
+Possible section names are:
+ - param_map_global
+ - param_map_group
+ - group_param
+ - sequences
+
+        [param_map_global]
+
+Defines parameters renaming for global scope (before any [group]
+statement in the data-file) in form
+
+    <old_name> = <new_name>
+
+The main purpose of parameters renaming is to provide common object's prefix
+only for parameters, which should be grouped at that level.
+
+E.g., if parameters "type" and "arg_value" are really belongs to "arg"
+object, them may be renamed like
+
+    type = arg.type
+    arg_value = arg.type
+
+Also renaming may add plural form for parameters, which are really a
+sequences:
+
+    operation = operations
+
+(see also description of 'sequences' section below).
+
+Note, that renaming is applied to full parameters names, not to their
+prefixes.
+
+        [param_map_group]
+
+Section is very similar to 'param_map_global' one but define parameters
+renaming for group scope (after [group] statement in the data-file).
+
+Note, that all parameters in group section should finally be prefixed
+with the name of the group(see description of 'group_param' section below).
+If 'new_name' is started with '.', group prefix will be appended
+automatically.
+
+
+        [sequences]
+
+Lists names of data-file's parameters, which are really sequences
+(contrary to single-valued parameters). Each sequence is described by
+
+    <sequence_param_name> = <iterator>
+
+where 'iterator' is a variable name, used for iterate sequence in jinja2
+template. Note, that all iterators names should be unique and differ from
+name components of parameters. Otherwise iterator variable in inner loop
+will hide iterator in outer loop, so all references to the attributes
+in outer object will be incorrectly interpreted.
+
+Sequences may be not only full parameter names in the initial kedr_gen
+data-file, but also their prefixes.
+E.g., if "function.arg.name" and "function.arg.type" are really name and 
+type of one function's argument, and function may has several arguments
+described in the same manner, then "function.arg" should be declared as
+a sequence:
+
+    function.arg = arg_iter
+
+It is better however to rename sequences parameters to plural form in
+param_map_* section, and use singular form for iterator:
+
+    function.args = arg
+
+
+        [group_param]
+
+This section should have only one paramter definition in form
+
+    <group_param_name> = <iterator>
+
+Here <group_param_name> is a parameter name corresponded to [group]
+section in kedr_gen data-file.
+Normally [group] section is used for distinguish repeated definitions,
+so its corresponded parameter is automatically interpreted as a sequence.
+<iterator> is used as a name of iterator over that sequence
+(see also description of 'sequences' section above).
+
+If [group] semantic is not used in the kedr_gen data-file(and 'block'
+template is not references by other templates), this section may be omitted.
