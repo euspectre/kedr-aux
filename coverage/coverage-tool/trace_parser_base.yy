@@ -31,6 +31,7 @@
 %code requires{
 #include "trace_parser.hh"
 class TraceScanner;
+typedef Trace::counter_t counter_t;
 }
 
 %code {
@@ -200,7 +201,7 @@ TraceParser::~TraceParser()
 
 
 void TraceParser::parse(std::istream& is,
-    TraceEventProcessor& eventProcessor, const char* filename)
+    TraceEventProcessor& eventProcessor, const char* /* filename*/)
 {
     impl->scanner.setStream(is);
     impl->eventProcessor = &eventProcessor;

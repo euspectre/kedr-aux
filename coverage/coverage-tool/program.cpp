@@ -24,9 +24,8 @@
 
 #include "trace.hh"
 
-#include "trace_modifier.hh"
-
 #include "test_set_optimizer.hh"
+#include "do_trace_operation.hh"
 
 #include <iostream>
 #include <fstream>
@@ -44,6 +43,7 @@
 #include <unistd.h> /* FILE, getline() */
 #include <stdlib.h> /* strtod */
 
+typedef Trace::counter_t counter_t;
 
 /*
  * Usage: See 'usage' file.
@@ -86,38 +86,34 @@ private:
     void resetOutStream(void);
 };
 
-/* Program execution for 'diff' command. */
-struct DiffProcessor: public CommandProcessor
+struct OperationProcessor: public CommandProcessor
 {
-    const char* traceFile;
-    const char* subTraceFile;
-
-    DiffProcessor(void);
+    OperationProcessor(void);
+    OperationProcessor(const char* opName);
+    
+    ~OperationProcessor();
     
     int parseParams(int argc, char** argv);
     int exec();
-};
 
-/* Program execution for 'add' command. */
-struct AddProcessor: public CommandProcessor
-{
+    class TraceOperationFactory
+    {
+    public:
+        virtual ~TraceOperationFactory() {}
+        
+        virtual TraceOperation* getOperation(int n, const map<string, string>& params) = 0;
+        virtual void putOperation(TraceOperation* op) = 0;
+    };
+
+private:    
+    TraceOperationFactory* opFactory;
+    TraceOperation* operation;
+    
     vector<const char*> traceFiles;
     
-    int parseParams(int argc, char** argv);
-    int exec();
-};
-
-
-/* Program execution for 'new-coverage' command. */
-struct NewCoverageProcessor: public CommandProcessor
-{
-    const char* traceFile;
-    const char* prevTraceFile;
-
-    NewCoverageProcessor(void);
-
-    int parseParams(int argc, char** argv);
-    int exec();
+    void reset();
+    
+    static TraceOperationFactory* getOperationFactory(const char* opName);
 };
 
 /* Program execution for 'stat' command */
@@ -161,17 +157,21 @@ int main(int argc, char** argv)
 
     auto_ptr<CommandProcessor> commandProcessor;
 #define isCommand(command) (strcmp(argv[1], command) == 0)
-    if(isCommand("diff"))
+    if(isCommand("op"))
     {
-        commandProcessor.reset(new DiffProcessor());
+        commandProcessor.reset(new OperationProcessor());
+    }
+    else if(isCommand("diff"))
+    {
+        commandProcessor.reset(new OperationProcessor("diff"));
     }
     else if(isCommand("add"))
     {
-        commandProcessor.reset(new AddProcessor());
+        commandProcessor.reset(new OperationProcessor("add"));
     }
     else if(isCommand("new-coverage"))
     {
-        commandProcessor.reset(new NewCoverageProcessor());
+        commandProcessor.reset(new OperationProcessor("new-coverage"));
     }
     else if(isCommand("stat"))
     {
@@ -257,417 +257,264 @@ ostream& CommandProcessor::getOutStream(void)
     return *outStream;
 }
 
+/******************* OperationProcessor implementation ****************/
+void OperationProcessor::reset(void)
+{
+    if(operation)
+    {
+        opFactory->putOperation(operation);
+        operation = NULL;
+    }
+    
+    if(opFactory)
+    {
+        delete opFactory;
+        opFactory = NULL;
+    }
+    
+    traceFiles.clear();
+}
 
+OperationProcessor::~OperationProcessor()
+{
+    reset();
+}
+
+OperationProcessor::OperationProcessor(void)
+{
+}
+
+OperationProcessor::OperationProcessor(const char* opName)
+{
+    opFactory = getOperationFactory(opName);
+}
+
+int OperationProcessor::parseParams(int argc, char** argv)
+{
+    if(!opFactory)
+    {
+        if(argc < 2)
+        {
+            cerr << "Error: operation name is required" << endl;
+            return 1;
+        }
+        
+        try
+        {
+            opFactory = getOperationFactory(argv[1]);
+        }
+        catch(exception& ex)
+        {
+            cerr << "Error: " << ex.what() << endl;
+            return 1;
+        }
+        
+        --argc;
+        ++argv;
+    }
+    
+    static const char options[] = "+o:";
+    
+    // TODO: currently, params are not parsed.
+    map<string,string> params;
+    
+    for(int opt = getopt(argc, argv, options);
+        opt != -1;
+        opt = getopt(argc, argv, options))
+    {
+        switch(opt)
+        {
+        case '?':
+            //error in options
+            return -1;
+        case 'o':
+            setOutFile(optarg);
+            break;
+        default:
+            return 1;
+        }
+    }
+    
+    argc -= optind;
+    argv += optind;
+    
+    if(argc == 0)
+    {
+        cerr << "Error: At least one trace should be given for operation." << endl;
+        return 1;
+    }
+    
+    int n = argc;
+    
+    traceFiles.resize(n);
+
+    for(int i = 0; i < n; i++)
+    {
+        traceFiles[i] = argv[i];
+    }
+    
+    try
+    {
+        operation = opFactory->getOperation(n, params);
+    }
+    catch(exception& ex)
+    {
+        cerr << "Error: " << ex.what() << endl;
+        return 1;
+    }
+    if(!operation) return 1;
+    
+    return 0;
+}
+
+int OperationProcessor::exec(void)
+{
+    int n = traceFiles.size();
+    
+    vector<Trace> operands(n);
+    
+    for(int i = 0; i < n; i++)
+        operands[i].read(traceFiles[i]);
+    
+    Trace trace;
+    
+    doTraceOperation(*operation, operands, trace);
+    
+    ostream& outStream = getOutStream();
+    trace.write(outStream);
+    if(!outStream)
+    {
+        cerr << "Errors occure while write trace." << endl;
+        return 1;
+    }
+    
+    return 0;
+}
+/*******************Container for internal trace operation ************/
+class TraceOperationFactoryInternal:
+    public OperationProcessor::TraceOperationFactory
+{
+protected:
+    void putOperation(TraceOperation* op) {delete op;}
+};
 /********************* Difference implementation **********************/
-/* Params */
-DiffProcessor::DiffProcessor(): traceFile(NULL), subTraceFile(NULL) {}
-
-int DiffProcessor::parseParams(int argc, char** argv)
-{
-    static const char options[] = "+o:";
-    
-    for(int opt = getopt(argc, argv, options);
-        opt != -1;
-        opt = getopt(argc, argv, options))
-    {
-        switch(opt)
-        {
-        case '?':
-            //error in options
-            return -1;
-        case 'o':
-            setOutFile(optarg);
-            break;
-        default:
-            return -1;
-        }
-    }
-    
-    char** argv_rest = argv + optind;
-    int argc_rest = argc - optind;
-    
-    if(argc_rest != 2)
-    {
-        if(argc_rest == 0) cerr << "Trace file is missed." << endl;
-        if(argc_rest == 1) cerr << "File with substracted trace is missed." << endl;
-        else cerr << "Exceeded command-line argument: " << argv_rest[2] << endl;
-        return -1;
-    }
-    
-    traceFile = argv_rest[0];
-    subTraceFile = argv_rest[1];
-    
-    return 0;
-}
-
-/* Trace modifier */
-class TraceModifierDiff: public Trace::Modifier
+/* Trace operation*/
+class TraceOperationDiff: public TraceOperationUnified
 {
 public:
-    Trace::FileInfo::Modifier* onSourceStart(
-        const std::map<std::string, Trace::FileInfo>::value_type& source)
+    counter_t counterOperation(const vector<counter_t>& operands)
     {
-        return &fileModifier;
-    }
-
-private:
-    class FileModifier: public Trace::FileInfo::Modifier
-    {
-    public:
-        bool onFunction(const map<string, Trace::FuncInfo>::value_type& func)
+        counter_t op1 = operands[0], op2 = operands[1];
+        if(op1 > 0)
         {
-            /* Needn't process function if its counter non-positive */
-            return func.second.counter <= 0;
-        }
-        void modifyFuncCounter(counter_t counter,
-            counter_t& counterModified)
-        {
-            diffCounter(counter, counterModified);
-        }
-
-        bool onBranch(const map<Trace::BranchID, counter_t>::value_type& branch)
-        {
-            return branch.second <= 0;
-        }
-
-        void modifyBranchCounter(counter_t counter, counter_t& counterModified)
-        {
-            diffCounter(counter, counterModified);
-        }
-
-        bool onLine(const map<int, counter_t>::value_type& line)
-        {
-            return line.second <= 0;
-        }
-
-        void modifyLineCounter(counter_t counter, counter_t& counterModified)
-        {
-            diffCounter(counter, counterModified);
-        }
-    private:
-        void diffCounter(counter_t counter, counter_t& counterModified)
-        {
-            if(counterModified > 0)
+            if(op2 >= op1)
             {
-                if(counter >= counterModified)
-                {
-                    counterModified = 0;
-                }
-                else
-                {
-                    counterModified -= counter;
-                }
+                return 0;
+            }
+            else
+            {
+                return op1 - op2;
             }
         }
-
-    }fileModifier;
+        else
+        {
+            return op1;
+        }
+    }
 };
 
-int DiffProcessor::exec()
+/* Trace operation factory. */
+class TraceOperationFactoryDiff: public TraceOperationFactoryInternal
 {
-    Trace trace;
-    trace.read(traceFile);
-    
-    Trace traceSub;
-    traceSub.read(subTraceFile);
-    
-    TraceModifierDiff modifier;
-    modifyTrace(traceSub, modifier, trace);
-
-    ostream& outStream = getOutStream();
-    trace.write(outStream);
-    if(!outStream)
+protected:
+    TraceOperation* getOperation(int n, const map<string,string>&)
     {
-        cerr << "Errors occure while write trace." << endl;
-        return 1;
+        if(n != 2)
+        {
+            throw logic_error("Diff operation accepts precisely 2 trace arguments");
+        }
+        
+        return new TraceOperationDiff();
     }
-    
-    return 0;
-}
+};
+
 /************************* Add implementation *************************/
-/* Params */
-int AddProcessor::parseParams(int argc, char** argv)
-{
-    static const char options[] = "+o:";
-    
-    for(int opt = getopt(argc, argv, options);
-        opt != -1;
-        opt = getopt(argc, argv, options))
-    {
-        switch(opt)
-        {
-        case '?':
-            //error in options
-            return -1;
-        case 'o':
-            setOutFile(optarg);
-            break;
-        default:
-            return -1;
-        }
-    }
-    
-    char** argv_rest = argv + optind;
-    int argc_rest = argc - optind;
-    
-    if(argc_rest < 1)
-    {
-        cerr << "At least one trace file should be specified for 'add' command." << endl;
-        return -1;
-    }
-    
-    traceFiles.insert(traceFiles.end(), argv_rest, argv_rest + argc_rest);
-    
-    return 0;
-}
-
-/* Trace modifier */
-class TraceModifierAdd: public Trace::Modifier
+/* Trace operation*/
+class TraceOperationAdd: public TraceOperationUnified
 {
 public:
-    bool onFileGroupStart(
-        const map<Trace::FileGroupID, Trace::FileGroupInfo*>::value_type& group)
-    {
-        currentGroup = &group;
-        return false;
-    }
-    void onFileGroupEndNew(Trace& traceModified)
-    {
-        pair<map<Trace::FileGroupID, Trace::FileGroupInfo*>::iterator, bool>
-            iterNew = traceModified.fileGroups.insert(*currentGroup);
-        iterNew.first->second =
-            new Trace::FileGroupInfo(*iterNew.first->second);
-    }
+    TraceOperationAdd(int n): n(n) {}
 
-    Trace::FileInfo::Modifier* onSourceStart(
-        const std::map<std::string, Trace::FileInfo>::value_type& source)
+    counter_t counterOperation(const vector<counter_t>& operands)
     {
-        currentFile = &source;
-        return &fileModifier;
-    }
-    
-    void onSourceEndNew(Trace::FileGroupInfo& groupModified)
-    {
-        groupModified.files.insert(*currentFile);
-    }
-private:
-    class FileModifier: public Trace::FileInfo::Modifier
-    {
-    public:
-        bool onFunction(const map<string, Trace::FuncInfo>::value_type& func)
-        {
-            current.func = &func;
-            return false;
-        }
-        void modifyFuncCounter(counter_t counter,
-            counter_t& counterModified)
-        {
-            addCounter(counter, counterModified);
-        }
-        void newFunc(Trace::FileInfo& fileModified)
-        {
-            fileModified.functions.insert(*current.func);
-        }
+        counter_t result = operands[0];
         
-        bool onBranch(const map<Trace::BranchID, counter_t>::value_type& branch)
+        for(int i = 1; i < n; i++)
         {
-            current.branch = &branch;
-            return false;
-        }
-        void modifyBranchCounter(counter_t counter, counter_t& counterModified)
-        {
-            addCounter(counter, counterModified);
-        }
-        void newBranch(Trace::FileInfo& fileModified)
-        {
-            fileModified.branches.insert(*current.branch);
-        }
-
-        bool onLine(const map<int, counter_t>::value_type& line)
-        {
-            current.line = &line;
-            return false;
-        }
-        void modifyLineCounter(counter_t counter, counter_t& counterModified)
-        {
-            addCounter(counter, counterModified);
-        }
-        void newLine(Trace::FileInfo& fileModified)
-        {
-            fileModified.lines.insert(*current.line);
-        }
-    private:
-        void addCounter(const counter_t counter, counter_t& counterModified)
-        {
-            if(counter > 0)
+            counter_t op = operands[i];
+            if(op >= 0)
             {
-                if(counterModified > 0)
-                {
-                    counterModified += counter;
-                }
-                else
-                {
-                    counterModified = counter;
-                }
+                if(result < 0) result = 0;
+                result += op;
             }
         }
         
-        union currentType
-        {
-            const map<string, Trace::FuncInfo>::value_type* func;
-            const map<Trace::BranchID, counter_t>::value_type* branch;
-            const map<int, counter_t>::value_type* line;
-        }current;
-    } fileModifier;
-    
-    const map<Trace::FileGroupID, Trace::FileGroupInfo*>::value_type*
-        currentGroup;
-    const map<std::string, Trace::FileInfo>::value_type* currentFile;
+        return result;
+    }
+private:
+    int n;
 };
 
-int AddProcessor::exec()
+/* Trace operation factory. */
+class TraceOperationFactoryAdd: public TraceOperationFactoryInternal
 {
-    Trace trace;
-    trace.read(traceFiles[0]);
-
-    TraceModifierAdd modifier;
-    
-    for(int i = 1; i < (int)traceFiles.size(); i++)
+protected:
+    TraceOperation* getOperation(int n, const map<string,string>&)
     {
-        Trace traceAdded;
-        traceAdded.read(traceFiles[i]);
-
-        modifyTrace(traceAdded, modifier, trace);
+        return new TraceOperationAdd(n);
     }
-
-    ostream& outStream = getOutStream();
-    trace.write(outStream);
-    if(!outStream)
-    {
-        cerr << "Errors occure while write trace." << endl;
-        return 1;
-    }
-    
-    return 0;
-}
+};
 
 /************************ New coverage implementation *****************/
-/* Params */
-NewCoverageProcessor::NewCoverageProcessor()
-    : traceFile(NULL), prevTraceFile(NULL) {}
-
-int NewCoverageProcessor::parseParams(int argc, char** argv)
-{
-    static const char options[] = "+o:";
-    
-    for(int opt = getopt(argc, argv, options);
-        opt != -1;
-        opt = getopt(argc, argv, options))
-    {
-        switch(opt)
-        {
-        case '?':
-            //error in options
-            return -1;
-        case 'o':
-            setOutFile(optarg);
-            break;
-        default:
-            return -1;
-        }
-    }
-    
-    char** argv_rest = argv + optind;
-    int argc_rest = argc - optind;
-    
-    if(argc_rest != 2)
-    {
-        if(argc_rest == 0) cerr << "Trace file is missed." << endl;
-        if(argc_rest == 1) cerr << "File with substracted trace is missed." << endl;
-        else cerr << "Exceeded command-line argument: " << argv_rest[2] << endl;
-        return -1;
-    }
-    
-    traceFile = argv_rest[0];
-    prevTraceFile = argv_rest[1];
-    
-    return 0;
-}
-
-
-/* Trace modifier */
-class TraceModifierNewCoverage: public Trace::Modifier
+/* Trace operation*/
+class TraceOperationNewCoverage: public TraceOperationUnified
 {
 public:
-    Trace::FileInfo::Modifier* onSourceStart(
-        const map<std::string, Trace::FileInfo>::value_type& source)
+    counter_t counterOperation(const vector<counter_t>& operands)
     {
-        return &fileModifier;
+        if(operands[1] > 0) return 0;
+        else return operands[0];
     }
-private:
-    class FileModifier: public Trace::FileInfo::Modifier
-    {
-        bool onFunction(const map<string, Trace::FuncInfo>::value_type& func)
-        {
-            /* Needn't process function if its counter non-positive */
-            return func.second.counter <= 0;
-        }
-        void modifyFuncCounter(counter_t counter,
-            counter_t& counterModified)
-        {
-            newCounter(counter, counterModified);
-        }
-
-        bool onBranch(const map<Trace::BranchID, counter_t>::value_type& branch)
-        {
-            return branch.second <= 0;
-        }
-
-        void modifyBranchCounter(counter_t counter, counter_t& counterModified)
-        {
-            newCounter(counter, counterModified);
-        }
-
-        bool onLine(const map<int, counter_t>::value_type& line)
-        {
-            return line.second <= 0;
-        }
-
-        void modifyLineCounter(counter_t counter, counter_t& counterModified)
-        {
-            newCounter(counter, counterModified);
-        }
-    private:
-        void newCounter(counter_t counter, counter_t& counterModified)
-        {
-            if(counter > 0)
-            {
-                counterModified = 0;
-            }
-        }
-    }fileModifier;
 };
 
-int NewCoverageProcessor::exec()
+/* Trace operation container. */
+class TraceOperationFactoryrNewCoverage: public TraceOperationFactoryInternal
 {
-    Trace trace;
-    trace.read(traceFile);
-
-    Trace tracePrev;
-    tracePrev.read(prevTraceFile);
-
-    TraceModifierNewCoverage modifier;
-    modifyTrace(tracePrev, modifier, trace);
-
-    ostream& outStream = getOutStream();
-    trace.write(outStream);
-    if(!outStream)
+protected:
+    TraceOperation* getOperation(int n, const map<string,string>&)
     {
-        cerr << "Errors occure while write trace." << endl;
-        return 1;
+        if(n != 2)
+        {
+            throw logic_error("New coverage operation accepts precisely 2 trace arguments");
+        }
+
+        return new TraceOperationNewCoverage();
     }
-    
-    return 0;
+};
+
+/************************* Trace operation selector *******************/
+OperationProcessor::TraceOperationFactory*
+    OperationProcessor::getOperationFactory(const char* opName)
+{
+#define isOperation(op) (!strcmp(opName, op))
+    if(isOperation("add"))
+        return new TraceOperationFactoryAdd();
+    else if(isOperation("diff"))
+        return new TraceOperationFactoryDiff();
+    else if(isOperation("new-coverage"))
+        return new TraceOperationFactoryrNewCoverage();
+    else
+        throw logic_error(string("Unknown trace operation: ") + opName);
 }
 
 /***************************** Stat implementation ********************/

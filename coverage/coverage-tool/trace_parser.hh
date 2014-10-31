@@ -9,13 +9,12 @@
 #define TRACE_PARSER_H
 
 #include <string>
-
-/* Type used for counters. */
-typedef long counter_t;
+#include <trace.hh>
 
 class TraceEventProcessor
 {
 public:
+    typedef Trace::counter_t counter_t;
     /* TN: <testName> */
     virtual void onTestStart(const std::string& /*testName*/, int /*traceLine*/) {}
     /* No directive, just there is no other directives for current test */

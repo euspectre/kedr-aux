@@ -23,8 +23,6 @@
 
 #include "test_set_optimizer.hh"
 
-#include "trace_modifier.hh"
-
 #include <algorithm>
 #include <functional>
 #include <iterator>
@@ -35,6 +33,7 @@
 
 using namespace std;
 
+typedef Trace::counter_t counter_t;
 
 /* 
  * Information about test trace with which we will operate during

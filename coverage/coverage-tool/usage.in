@@ -1,24 +1,36 @@
 Usage:
-    @PROGRAM_NAME@ diff [-o <out-file>] <trace> <trace-sub>
-    @PROGRAM_NAME@ add [-o <out-file>] <trace> ... 
-    @PROGRAM_NAME@ new-coverage [-o <out-file>] <trace> <trace-prev> 
+    @PROGRAM_NAME@ op <op-name> [-o <out-file>] <trace> ...
     @PROGRAM_NAME@ stat [-o <out-file>] [-f format] <trace> 
     @PROGRAM_NAME@ optimize-tests [-v] [-o <out-file>] <tests-file>
 
+    @PROGRAM_NAME@ diff
+    @PROGRAM_NAME@ add
+    @PROGRAM_NAME@ new-coverage
+        Shortcat for '@PROGRAM_NAME@ op <op-name>'
+
+
     @PROGRAM_NAME@ -h|--help
-        print given usage information and exit.    
+        Print given usage information and exit.    
 
+'op' command performs per-counter operation <op-name> with given traces.
+    Resulted trace is printed into stdout or, if '-o' option is given,
+    into file specified by that option.
+    
+    Valid operation names (<op-name>) are:
 
-'diff' command compute per-counter difference between <trace> and
-    <trace-sub>. That is, set every counter in <trace>, which is
-    positive and for which correspondent counter is positive to the
-    difference between these counters. If resulter counter become
-    negative, it is set to 0.
+    - diff
+      
+      Compute per-counter difference between first and second trace
+      arguments. If resulted counter becomes negative, it is set to 0.
 
-'add' command compute per-counter sum for all given traces.
+    - add
+    
+      Compute per-counter sum for all given traces.
 
-'new-coverage' command reset(set to 0) all positive counters in <trace>
-    for which corresponded counters in <trace-prev> are also positive.
+    - new-coverage
+    
+      Reset(set to 0) all positive counters in the first trace,
+      for which corresponded counters in the second trace are also positive.
 
 'stat' command output statistic information about trace according to
     format.

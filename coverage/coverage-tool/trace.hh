@@ -3,18 +3,22 @@
 #ifndef TRACE_H_INCLUDED
 #define TRACE_H_INCLUDED
 
-#include "trace_parser.hh"
 #include <iostream>
 
 #include <string>
 #include <map>
 
+class TraceParser;
+
 struct Trace
 {
+	/* Type used for counters. */
+	typedef long counter_t;
+	
 	Trace();
 	
-	Trace(const Trace& trace);//TODO
-	Trace& operator=(const Trace& trace);//TODO
+	Trace(const Trace& trace);
+	Trace& operator=(const Trace& trace);
 
 	~Trace();
 

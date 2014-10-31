@@ -34,6 +34,7 @@
 #include <algorithm>
 
 using namespace std;
+typedef Trace::counter_t counter_t;
 
 /* 
  * Report about error in trace and throw exception.
@@ -573,7 +574,7 @@ public:
 
 
     /* TN: <testName> */
-    void onTestStart(const std::string& testName, int traceLine)
+    void onTestStart(const std::string& testName, int /*traceLine*/)
     {
         currentGroupInfo = new FileGroupInfo();
         currentGroupID.testName = testName;
@@ -649,7 +650,7 @@ public:
     
     /* FNDA: <counter>, <funcName> */
     void onFunctionCounter(const std::string& funcName,
-        counter_t counter, int traceLine)
+        counter_t counter, int /*traceLine*/)
     {
         map<string, FuncInfo>::iterator iter = currentFile->functions.find(funcName);
         if(iter == currentFile->functions.end())
