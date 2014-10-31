@@ -1,0 +1,17 @@
+For implement user-defined trace operation one should create module(shared library), which:
+
+1) include trace_operation.hh
+
+2) implement class derived TraceOperation one.
+
+3) define method
+    extern "C" TraceOperation* getOperation(int n, const map<string,string>& params)
+   
+   which return TraceOperation object for given 'n' and 'params'.
+   Usually object is created using 'new' operator.
+   
+4) define method
+    extern "C" void getOperation(TraceOperation* op)
+
+   which release object, created by getOperation.
+   Usually object is released using 'delete' operator.

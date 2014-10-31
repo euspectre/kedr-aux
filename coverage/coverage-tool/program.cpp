@@ -43,6 +43,8 @@
 #include <unistd.h> /* FILE, getline() */
 #include <stdlib.h> /* strtod */
 
+#include <dlfcn.h> /* dlopen() and others */
+
 typedef Trace::counter_t counter_t;
 
 /*
@@ -280,13 +282,16 @@ OperationProcessor::~OperationProcessor()
     reset();
 }
 
-OperationProcessor::OperationProcessor(void)
+OperationProcessor::OperationProcessor(void):
+    opFactory(NULL),
+    operation(NULL)
 {
 }
 
-OperationProcessor::OperationProcessor(const char* opName)
+OperationProcessor::OperationProcessor(const char* opName):
+    opFactory(getOperationFactory(opName)),
+    operation(NULL)
 {
-    opFactory = getOperationFactory(opName);
 }
 
 int OperationProcessor::parseParams(int argc, char** argv)
@@ -501,11 +506,75 @@ protected:
         return new TraceOperationNewCoverage();
     }
 };
+/*************** User-defined operation, loaded from file *************/
+class TraceOperationFactoryUser: public OperationProcessor::TraceOperationFactory
+{
+public:
+    TraceOperationFactoryUser(const char* filename): filename(filename)
+    {
+        module = dlopen(filename, RTLD_NOW);
+        if(!module)
+        {
+            cerr << dlerror() << endl;
+            throw runtime_error("Failed to load module with user-defined operation");
+        }
+    }
+    
+    ~TraceOperationFactoryUser(void)
+    {
+        dlclose(module);
+    }
+
+    TraceOperation* getOperation(int n, const map<string,string>& params)
+    {
+        TraceOperation* (*getOperationF)(int n, const map<string,string>& params) =
+            (typeof(getOperationF))dlsym(module, "getOperation");
+        if(!getOperationF)
+        {
+            const char* err = dlerror();
+            if(err)
+                cerr << err << endl;
+            else
+                cerr << "In module " << filename << "getOperation symbol is NULL" << endl;
+            
+            throw runtime_error("Failed to create use-defined operation");
+        }
+        
+        return getOperationF(n, params);
+    }
+    
+    void putOperation(TraceOperation* op)
+    {
+        void (*putOperationF)(TraceOperation*) =
+            (typeof(putOperationF))dlsym(module, "putOperation");
+        if(!putOperationF)
+        {
+            const char* err = dlerror();
+            if(err)
+                cerr << err << endl;
+        }
+        else
+        {
+            putOperationF(op);
+        }
+    }
+
+private:
+    void* module;
+    /* For error-reporting only */
+    const char* filename;
+};
+
 
 /************************* Trace operation selector *******************/
 OperationProcessor::TraceOperationFactory*
     OperationProcessor::getOperationFactory(const char* opName)
 {
+    if(strchr(opName, '/'))
+    {
+        return new TraceOperationFactoryUser(opName);
+    }
+
 #define isOperation(op) (!strcmp(opName, op))
     if(isOperation("add"))
         return new TraceOperationFactoryAdd();
@@ -515,6 +584,7 @@ OperationProcessor::TraceOperationFactory*
         return new TraceOperationFactoryrNewCoverage();
     else
         throw logic_error(string("Unknown trace operation: ") + opName);
+#undef isOperation
 }
 
 /***************************** Stat implementation ********************/

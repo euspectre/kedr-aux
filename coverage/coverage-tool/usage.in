@@ -31,6 +31,10 @@ Usage:
     
       Reset(set to 0) all positive counters in the first trace,
       for which corresponded counters in the second trace are also positive.
+    
+    - filename (contains '/') of module (shared library) with
+      user-defined trace operation.
+      See trace_operation_include/README for create such module.
 
 'stat' command output statistic information about trace according to
     format.

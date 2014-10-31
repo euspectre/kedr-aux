@@ -19,7 +19,8 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/usage.in"
 add_custom_command(OUTPUT "usage.o"
 	COMMAND ld -o "usage.o" "--format=binary"
 		"usage" "-r"
-	DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/usage")
+	DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/usage"
+)
 
 add_executable(${tool_name}
 	"program.cpp"
@@ -32,7 +33,12 @@ add_executable(${tool_name}
 	"test_set_optimizer.cpp"
 	
 	"${CMAKE_CURRENT_BINARY_DIR}/trace_parser_base.tab.hh"
-	"${CMAKE_CURRENT_BINARY_DIR}/location.hh")
+	"${CMAKE_CURRENT_BINARY_DIR}/location.hh"
+)
+
+target_link_libraries(${tool_name}
+	dl # Need for dlopen() and others
+)
 
 add_custom_command(
 	OUTPUT "trace_parser_base.tab.cc" "trace_parser_base.tab.hh" "location.hh"
