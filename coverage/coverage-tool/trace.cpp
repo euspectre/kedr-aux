@@ -553,6 +553,102 @@ void Trace::groupFiles(void)
     FilesGrouper grouper;
     grouper.group(*this);
 }
+
+struct CommonPrefixFinder
+{
+    CommonPrefixFinder(string &prefix, bool &isPrefixSet):
+        prefix(prefix), isPrefixSet(isPrefixSet)
+    {
+    }
+    
+    void search(const Trace& trace)
+    {
+        for_each(trace.fileGroups.begin(), trace.fileGroups.end(), *this);
+    }
+    
+    void operator()(const map<Trace::FileGroupID, Trace::FileGroupInfo*>::value_type& group)
+    {
+        for_each(group.second->files.begin(), group.second->files.end(), *this);
+    }
+    
+    void operator()(const map<std::string, Trace::FileInfo>::value_type& source)
+    {
+        if(isPrefixSet)
+        {
+            int n = (int)std::min(prefix.size(), source.first.size());
+            for(int i = 0; i < n; i++)
+            {
+                if(prefix[i] != source.first[i])
+                {
+                    prefix = prefix.substr(0, i);
+                    break;
+                }
+            }
+        }
+        else
+        {
+            prefix = source.first;
+            isPrefixSet = true;
+        }
+    }
+    
+    string& prefix;
+    /* Prefix is set when first source file found. */
+    bool& isPrefixSet;
+};
+
+string Trace::commonSourcePrefix(void) const
+{
+    string prefix;
+    bool isPrefixSet = false;
+    
+    CommonPrefixFinder cpf(prefix, isPrefixSet);
+    cpf.search(*this);
+    
+    return prefix;
+}
+
+struct PrefixFilter
+{
+    PrefixFilter(const string& prefix): prefix(prefix) {}
+    void filter(Trace& trace)
+    {
+        for_each(trace.fileGroups.begin(), trace.fileGroups.end(), *this);
+    }
+    
+    void operator()(map<Trace::FileGroupID, Trace::FileGroupInfo*>::value_type& group)
+    {
+        map<string, Trace::FileInfo>& files = group.second->files;
+        
+        /* 
+         * All strings lexicographically lower than 'prefix' have not
+         * prefixed with it, so should be removed.
+         */
+        map<std::string, Trace::FileInfo>::iterator
+            iter = files.lower_bound(prefix),
+
+        files.erase(files.begin(), iter);
+        
+        for(; iter != files.end(); ++iter)
+        {
+            if(iter->first.compare(0, prefix.size(), prefix)) break;
+        }
+        /* 'iter' points to source file, which has not given prefix and
+         * lexicographically bigger than it.
+         * This file and all after it should be removed.
+         */
+        files.erase(iter, files.end());
+    }
+
+    string prefix;
+};
+
+void Trace::filterSources(const string& prefix)
+{
+    PrefixFilter pf(prefix);
+    pf.filter(*this);
+}
+
 /********************** Builder of the trace **************************/
 class Trace::TraceBuilder: private TraceEventProcessor
 {

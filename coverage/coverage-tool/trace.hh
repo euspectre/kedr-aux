@@ -136,6 +136,16 @@ struct Trace
 	int functionsTotal(void) const;
 	int functionsTotalHit(void) const;
 	
+	/* 
+	 * Return common prefix for all sources.
+	 * 
+	 * For empty trace return "".
+	 */
+	std::string commonSourcePrefix(void) const;
+	
+	/* Keep only sources with given prefix, other sources are removed. */
+	void filterSources(const std::string& prefix);
+	
 	class Modifier;
 private:
 	class TraceBuilder;

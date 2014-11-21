@@ -123,6 +123,7 @@ struct StatProcessor: public CommandProcessor
 {
     const char* traceFile;
     const char* format;
+    const char* prefix;
     
     StatProcessor(void);
 
@@ -594,11 +595,14 @@ const char* StatProcessor::defaultFormat =
     "Functions: %pf%% (%f of %F)\n"
     "Branches: %pb%% (%b of %B)\n";
 
-StatProcessor::StatProcessor(): traceFile(NULL), format(defaultFormat) {}
+StatProcessor::StatProcessor():
+    traceFile(NULL), format(defaultFormat), prefix(NULL)
+{
+}
 
 int StatProcessor::parseParams(int argc, char** argv)
 {
-    static const char options[] = "+o:f:";
+    static const char options[] = "+o:f:p:";
     
     for(int opt = getopt(argc, argv, options);
         opt != -1;
@@ -614,6 +618,9 @@ int StatProcessor::parseParams(int argc, char** argv)
             break;
         case 'f':
             format = optarg;
+            break;
+        case 'p':
+            prefix = optarg;
             break;
         default:
             return -1;
@@ -803,6 +810,7 @@ void StatPrinter::printPercent(int a, int A)
     if(A == 0)
     {
         os << '*';
+        return;
     }
     int whole = (a * 100) / A;
     int frac = (a * 10000 / A - whole * 100);
@@ -826,6 +834,14 @@ int StatProcessor::exec()
     trace.read(traceFile);
 
     trace.groupFiles();
+    
+    if(prefix)
+    {
+        string prefixStr = prefix;
+        if(*prefix != '/')
+            prefixStr = trace.commonSourcePrefix() + prefix;
+        trace.filterSources(prefixStr);
+    }
     
     ostream& outStream = getOutStream();
     StatPrinter printer(trace, outStream);

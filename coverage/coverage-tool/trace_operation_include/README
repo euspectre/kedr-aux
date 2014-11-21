@@ -11,7 +11,7 @@ For implement user-defined trace operation one should create module(shared libra
    Usually object is created using 'new' operator.
    
 4) define method
-    extern "C" void getOperation(TraceOperation* op)
+    extern "C" void putOperation(TraceOperation* op)
 
    which release object, created by getOperation.
    Usually object is released using 'delete' operator.

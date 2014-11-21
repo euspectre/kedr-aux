@@ -1,6 +1,6 @@
 Usage:
     @PROGRAM_NAME@ op <op-name> [-o <out-file>] <trace> ...
-    @PROGRAM_NAME@ stat [-o <out-file>] [-f format] <trace> 
+    @PROGRAM_NAME@ stat [-o <out-file>] [-p prefix] [-f format] <trace> 
     @PROGRAM_NAME@ optimize-tests [-v] [-o <out-file>] <tests-file>
 
     @PROGRAM_NAME@ diff
@@ -73,6 +73,10 @@ Options:
         %pb - output percents of branches which are hit
         
         %% - output '%' character
+    -p prefix
+        Only source files prefixed by given prefix counted in statistics.
+        If prefix is not started with '/', it counted from common prefix
+        of all sources in the trace.
     
     -v
         Output additional information into stderr.
