@@ -12,19 +12,37 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 set(CMAKE_CXX_FLAGS_DEBUG "-Wall -g")
 
-# Create 'shipped' file with usage
+# Create 'shipped' file <filename>.o from <filename>.
+function(add_shipped filename)
+	add_custom_command(OUTPUT "${filename}.o"
+		COMMAND ld -o "${filename}.o" "--format=binary"
+			"${filename}" "-r"
+		DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${filename}"
+	)
+endfunction(add_shipped outfile infile)
+
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/usage.in"
 	"${CMAKE_CURRENT_BINARY_DIR}/usage")
+add_shipped(usage)
 
-add_custom_command(OUTPUT "usage.o"
-	COMMAND ld -o "usage.o" "--format=binary"
-		"usage" "-r"
-	DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/usage"
-)
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/usage_operation.in"
+	"${CMAKE_CURRENT_BINARY_DIR}/usage_operation")
+add_shipped(usage_operation)
+
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/usage_optimize_tests.in"
+	"${CMAKE_CURRENT_BINARY_DIR}/usage_optimize_tests")
+add_shipped(usage_optimize_tests)
+
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/usage_stat.in"
+	"${CMAKE_CURRENT_BINARY_DIR}/usage_stat")
+add_shipped(usage_stat)
 
 add_executable(${tool_name}
 	"program.cpp"
 	"usage.o"
+	"usage_operation.o"
+	"usage_optimize_tests.o"
+	"usage_stat.o"
 	
 	"${CMAKE_CURRENT_BINARY_DIR}/trace_parser_base.tab.cc"
 	"${CMAKE_CURRENT_BINARY_DIR}/trace_scanner.cc"

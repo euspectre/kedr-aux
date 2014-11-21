@@ -1,84 +1,20 @@
-Usage:
-    @PROGRAM_NAME@ op <op-name> [-o <out-file>] <trace> ...
-    @PROGRAM_NAME@ stat [-o <out-file>] [-p prefix] [-f format] <trace> 
-    @PROGRAM_NAME@ optimize-tests [-v] [-o <out-file>] <tests-file>
+@tool_name@ - set of tools for source code coverage data, produced by lcov.
 
-    @PROGRAM_NAME@ diff
-    @PROGRAM_NAME@ add
-    @PROGRAM_NAME@ new-coverage
-        Shortcat for '@PROGRAM_NAME@ op <op-name>'
+    @tool_name@ stat
+Output statistic about coverage trace.
 
+    @tool_name@ optimize-tests
+Optimize set of tests for achive minimum total weight without coverage losses.
 
-    @PROGRAM_NAME@ -h|--help
-        Print given usage information and exit.    
+    @tool_name@ operation <op-name>
+Perform per-counter operations with coverage trace(s)
 
-'op' command performs per-counter operation <op-name> with given traces.
-    Resulted trace is printed into stdout or, if '-o' option is given,
-    into file specified by that option.
-    
-    Valid operation names (<op-name>) are:
+    @tool_name@ diff
+    @tool_name@ add
+    @tool_name@ new-coverage
+        Shortcat version of predefined per-counter trace operation <op-name>.
+        Synonim for '@tool_name@ operation <op-name>'.
 
-    - diff
-      
-      Compute per-counter difference between first and second trace
-      arguments. If resulted counter becomes negative, it is set to 0.
-
-    - add
-    
-      Compute per-counter sum for all given traces.
-
-    - new-coverage
-    
-      Reset(set to 0) all positive counters in the first trace,
-      for which corresponded counters in the second trace are also positive.
-    
-    - filename (contains '/') of module (shared library) with
-      user-defined trace operation.
-      See trace_operation_include/README for create such module.
-
-'stat' command output statistic information about trace according to
-    format.
-
-'optimize-tests' command accept <tests-file> described set of the tests.
-    Each line of that file describe one test in format
-    
-        <weight> <trace-file>
-
-    where 'trace-file' is a file contained coverage information for test
-    and 'weight' is floating-point characteristic of the test,
-    which  allow to arrange tests subsets: the less sum of the weights,
-    the more preferrable test subset.
-    
-    Command find tests subset with minimal total weight which has same
-    lines coverage as whole set.
-    
-    Command output list of coverage trace files in minimal tests subset.
-
-Options:
-    -o <out-file>
-        Instead of output result into STDOUT, save it in the given file.
-    -f format
-        Use given format instead of default for output statistic about
-        trace. Aside from text, which is output 'as is', next
-        specificators are accepted:
-        
-        %L - output total number of lines,
-        %l - output number of lines which are hit,
-        %pl - output percents of lines which are hit,
-        %F - output total number of functions,
-        %f - output number of functions which are hit,
-        %pf - output percents of functions which are hit,
-        %B - output total number of branches,
-        %b - output number of branches which are hit,
-        %pb - output percents of branches which are hit
-        
-        %% - output '%' character
-    -p prefix
-        Only source files prefixed by given prefix counted in statistics.
-        If prefix is not started with '/', it counted from common prefix
-        of all sources in the trace.
-    
-    -v
-        Output additional information into stderr.
-
-    
+    @tool_name@ -h|--help [<command>]
+        Print given usage information and exit.
+        If <command> is given, usage information about this command is printed.

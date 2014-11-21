@@ -625,7 +625,7 @@ struct PrefixFilter
          * prefixed with it, so should be removed.
          */
         map<std::string, Trace::FileInfo>::iterator
-            iter = files.lower_bound(prefix),
+            iter = files.lower_bound(prefix);
 
         files.erase(files.begin(), iter);
         

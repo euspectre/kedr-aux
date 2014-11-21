@@ -1,0 +1,47 @@
+@tool_name@ operation - performs per-counter operation with trace(s)
+
+    @tool_name@ [operation] <op-name> [OPTIONS] <trace> ...
+    @tool_name@ operation <op-file> [OPTIONS] <trace> ...
+
+Performs per-counter operation with given traces. Resulted trace is
+printed into STDOUT.
+
+Predefined operation is given using its name(the first synopsis case). In that
+case, 'operation' keyword may be omitted.
+
+List of predefined operations:
+
+    - diff
+      
+      Compute per-counter difference between first and second trace
+      arguments. If resulted counter becomes negative, it is set to 0.
+
+    - add
+    
+      Compute per-counter sum for all given traces.
+
+    - new-coverage
+    
+      Reset(set to 0) all positive counters in the first trace,
+      for which corresponded counters in the second trace are also positive.
+
+
+Alternatively, user-defined operation may be used(the second synopsis case).
+In that case, <op-file> should be filename of the module (shared library).
+That module should defined operation in a way, described in
+trace_operation_include/README.
+Note, that filename should include '/' character, otherwise it will be
+interpreted as name of predefined operation.
+
+Possible OPTIONS are:
+
+    -p <param>[=<value>][,...]
+        Comma-separated list of parameter definitions, which may modify
+        operation's semantic.
+        Different operations accepts different parameters.
+        
+        None of predefined operations uses parameters.
+
+    -o <out-file>
+        Save resulted trace in the given file instead of output it to
+        STDOUT.

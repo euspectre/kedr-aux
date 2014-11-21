@@ -1,0 +1,48 @@
+@tool_name@ stat - print statistic about source code coverage
+
+    @tool_name@ stat [OPTIONS] <trace>
+
+Prints statistic information about <trace> file, contained source code
+coverage.
+By default, next format is used for statistic:
+
+Lines: %pl%% (%l of %L)
+Functions: %pf%% (%f of %F)
+Branches: %pb%% (%b of %B)
+
+Meaning of '%' specificators is given below in the description of '-f'
+option.
+
+Possible OPTIONS are:
+
+    -o <out-file>
+        Output to the given file instead of STDOUT.
+    
+    -p <prefix>
+        Collect statistic only for source files, which starts with given
+        prefix.
+        If <prefix> is not started with '/', it is prepended with common
+        prefix for all source files in the trace file.
+
+    -f <format>
+        Use given format for statistics instead of default one.
+        Aside from text, which is output 'as is', next specificators may
+        be used:
+        
+        %L - output total number of lines,
+        %l - output number of lines which are hit,
+        %pl - output percents of lines which are hit,
+        %F - output total number of functions,
+        %f - output number of functions which are hit,
+        %pf - output percents of functions which are hit,
+        %B - output total number of branches,
+        %b - output number of branches which are hit,
+        %pb - output percents of branches which are hit
+        
+        %% - output '%' character
+
+        Percentage data is output using '%.2f' printf-specifier. Note,
+        that 0.0% is output only when number in question is 0,
+        100.0% is output only when number in question is equal to total
+        number. If total number is 0, '*' is output.
+

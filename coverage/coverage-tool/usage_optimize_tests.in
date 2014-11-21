@@ -1,0 +1,28 @@
+@tool_name@ optimize-tests - optimize set of tests according to their coverage
+
+    @tool_name@ optimize-tests [OPTIONS] <tests-file>
+
+Accept <tests-file> described set of the tests.
+Each line of that file describe one test in format
+
+    <weight> <trace-file>
+
+where 'trace-file' is a file contained coverage information for test
+and 'weight' is floating-point characteristic of the test,
+which  allow to arrange tests subsets: the less sum of the weights,
+the more preferrable test subset.
+
+Command find tests subset with minimal total weight which has same
+lines coverage as whole set.
+
+Command output list of coverage trace files in minimal tests subset.
+
+
+Possible OPTIONS are:
+
+    -o <out-file>
+        Save list of traces in the given file instead of output it into
+        STDOUT.
+    
+    -v
+        Output additional operation into stderr.

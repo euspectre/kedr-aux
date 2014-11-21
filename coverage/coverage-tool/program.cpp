@@ -48,18 +48,26 @@
 typedef Trace::counter_t counter_t;
 
 /*
- * Usage: See 'usage' file.
+ * Usage: See 'usage*' files.
  */
 
 using namespace std;
 
-extern char _binary_usage_start[];
-extern char _binary_usage_end[];
+// Declare print_<filename>() function, which prints content of shipped file.
+#define DEFINE_FILE_PRINTER(filename) \
+extern char _binary_##filename##_start[]; \
+extern char _binary_##filename##_end[]; \
+static void print_##filename(void) \
+{ \
+    cout.write(_binary_##filename##_start, _binary_##filename##_end - _binary_##filename##_start); \
+}
 
+DEFINE_FILE_PRINTER(usage)
 static void usage(void)
 {
-    cout.write(_binary_usage_start, _binary_usage_end - _binary_usage_start);
+    print_usage();
 }
+
 
 /* Base class for processor of the command. */
 class CommandProcessor
@@ -70,6 +78,7 @@ public:
     
     virtual int parseParams(int argc, char** argv) = 0;
     virtual int exec() = 0;
+    virtual void usage(void) = 0;
 
 protected:
     void setOutFile(const char* filename);
@@ -97,6 +106,8 @@ struct OperationProcessor: public CommandProcessor
     
     int parseParams(int argc, char** argv);
     int exec();
+    
+    void usage(void);
 
     class TraceOperationFactory
     {
@@ -129,6 +140,8 @@ struct StatProcessor: public CommandProcessor
 
     int parseParams(int argc, char** argv);
     int exec();
+    
+    void usage(void);
 private:
     static const char* defaultFormat;
 };
@@ -143,10 +156,43 @@ struct OptimizeTestsProcessor: public CommandProcessor
 
     int parseParams(int argc, char** argv);
     int exec();
+    
+    void usage(void);
 private:
     /* Load tests from file. */
     void loadTests(vector<TestCoverageDesc>& tests);
 };
+
+static CommandProcessor* selectCommand(const char* cmd)
+{
+#define isCommand(command) (strcmp(cmd, command) == 0)
+    if(isCommand("op"))
+    {
+         return new OperationProcessor();
+    }
+    else if(isCommand("diff"))
+    {
+        return new OperationProcessor("diff");
+    }
+    else if(isCommand("add"))
+    {
+        return new OperationProcessor("add");
+    }
+    else if(isCommand("new-coverage"))
+    {
+        return new OperationProcessor("new-coverage");
+    }
+    else if(isCommand("stat"))
+    {
+        return new StatProcessor();
+    }
+    else if(isCommand("optimize-tests"))
+    {
+        return new OptimizeTestsProcessor();
+    }
+#undef isCommand
+    else return NULL;
+}
 
 int main(int argc, char** argv)
 {
@@ -158,35 +204,24 @@ int main(int argc, char** argv)
     }
 
 
-    auto_ptr<CommandProcessor> commandProcessor;
-#define isCommand(command) (strcmp(argv[1], command) == 0)
-    if(isCommand("op"))
-    {
-        commandProcessor.reset(new OperationProcessor());
-    }
-    else if(isCommand("diff"))
-    {
-        commandProcessor.reset(new OperationProcessor("diff"));
-    }
-    else if(isCommand("add"))
-    {
-        commandProcessor.reset(new OperationProcessor("add"));
-    }
-    else if(isCommand("new-coverage"))
-    {
-        commandProcessor.reset(new OperationProcessor("new-coverage"));
-    }
-    else if(isCommand("stat"))
-    {
-        commandProcessor.reset(new StatProcessor());
-    }
-    else if(isCommand("optimize-tests"))
-    {
-        commandProcessor.reset(new OptimizeTestsProcessor());
-    }
+    auto_ptr<CommandProcessor> commandProcessor(selectCommand(argv[1]));
 
-    else if(isCommand("-h") || isCommand("--help"))
+    if(commandProcessor.get())
     {
+        if(commandProcessor->parseParams(argc - 1, argv + 1)) return 1;
+        return commandProcessor->exec();
+    }
+    else if(strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") != 0)
+    {
+        if(argc > 2)
+        {
+            commandProcessor.reset(selectCommand(argv[2]));
+            if(commandProcessor.get())
+            {
+                commandProcessor->usage();
+                return 0;
+            }
+        }
         usage();
         return 0;
     }
@@ -196,11 +231,6 @@ int main(int argc, char** argv)
         cerr << "Use " << argv[0] << " -h for help" << endl;
         return 1;
     }
-#undef isCommand
-
-    if(commandProcessor->parseParams(argc - 1, argv + 1)) return 1;
-    
-    return commandProcessor->exec();
 }
 
 /************************* Helpers ************************************/
@@ -295,6 +325,44 @@ OperationProcessor::OperationProcessor(const char* opName):
 {
 }
 
+static void readParameters(const char* arg, map<string, string>& params)
+{
+    string paramName, paramValue;
+    const char* paramEnd;
+    
+    for(; *arg; arg = *paramEnd ? paramEnd + 1 : paramEnd)
+    {
+        paramEnd = strchrnul(arg, ',');
+        
+        const char* equalPos = strchrnul(arg, '=');
+        if(equalPos < paramEnd)
+        {
+            paramName = string(arg, equalPos - arg);
+            paramValue = string(equalPos + 1, paramEnd - equalPos - 1);
+        }
+        else
+        {
+            paramName = string(arg, paramEnd - arg);
+            paramValue = "";
+        }
+        
+        params[paramName] = paramValue;
+    }
+}
+
+//debug
+//#include <algorithm>
+//static void printParam(const map<string,string>::value_type& value)
+//{
+    //cerr << value.first;
+    //if(value.second.size() > 0)
+    //{
+        //cerr << ":" << value.second;
+    //}
+    
+    //cerr << endl;
+//}
+
 int OperationProcessor::parseParams(int argc, char** argv)
 {
     if(!opFactory)
@@ -319,9 +387,8 @@ int OperationProcessor::parseParams(int argc, char** argv)
         ++argv;
     }
     
-    static const char options[] = "+o:";
+    static const char options[] = "+o:p:";
     
-    // TODO: currently, params are not parsed.
     map<string,string> params;
     
     for(int opt = getopt(argc, argv, options);
@@ -336,10 +403,17 @@ int OperationProcessor::parseParams(int argc, char** argv)
         case 'o':
             setOutFile(optarg);
             break;
+        case 'p':
+            readParameters(optarg, params);
+            break;
         default:
             return 1;
         }
     }
+    
+    //debug
+    //cerr << "Params are:" << endl;
+    //for_each(params.begin(), params.end(), printParam);
     
     argc -= optind;
     argv += optind;
@@ -396,6 +470,15 @@ int OperationProcessor::exec(void)
     
     return 0;
 }
+
+DEFINE_FILE_PRINTER(usage_operation)
+
+void OperationProcessor::usage(void)
+{
+    //TODO: If operation is given, print its own usage.
+    print_usage_operation();
+}
+
 /*******************Container for internal trace operation ************/
 class TraceOperationFactoryInternal:
     public OperationProcessor::TraceOperationFactory
@@ -856,6 +939,13 @@ int StatProcessor::exec()
     return 0;
 }
 
+DEFINE_FILE_PRINTER(usage_stat)
+
+void StatProcessor::usage(void)
+{
+    print_usage_stat();
+}
+
 /****************** Optimize-tests implementation *********************/
 /* Params */
 OptimizeTestsProcessor::OptimizeTestsProcessor()
@@ -916,6 +1006,13 @@ int OptimizeTestsProcessor::exec()
     }
     return 0;
 }
+
+DEFINE_FILE_PRINTER(usage_optimize_tests)
+void OptimizeTestsProcessor::usage(void)
+{
+    print_usage_optimize_tests();
+}
+
 
 void OptimizeTestsProcessor::loadTests(vector<TestCoverageDesc>& tests)
 {
