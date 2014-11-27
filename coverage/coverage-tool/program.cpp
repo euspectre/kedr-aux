@@ -166,7 +166,7 @@ private:
 static CommandProcessor* selectCommand(const char* cmd)
 {
 #define isCommand(command) (strcmp(cmd, command) == 0)
-    if(isCommand("op"))
+    if(isCommand("operation"))
     {
          return new OperationProcessor();
     }
@@ -211,7 +211,7 @@ int main(int argc, char** argv)
         if(commandProcessor->parseParams(argc - 1, argv + 1)) return 1;
         return commandProcessor->exec();
     }
-    else if(strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") != 0)
+    else if(strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)
     {
         if(argc > 2)
         {

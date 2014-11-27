@@ -126,6 +126,7 @@ check_coverage_support()
         coverage_dir="${gcov_dir}/${BUILD_DIR}/$1"
         if ! test -d "${coverage_dir}"; then
             printf_error "There is no coverage information for directory '%s'\n" $1
+            return 1
         fi
     fi
     

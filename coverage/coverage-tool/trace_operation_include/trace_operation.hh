@@ -9,7 +9,9 @@
  * and produce one counter.
  */
 
+#include <string>
 #include <vector>
+#include <map>
 
 class TraceOperation
 {
