@@ -79,7 +79,7 @@ static TraceEventProcessor* getEventProcessor(TraceParser::Impl* parserImpl);
 %start trace
 
 %%
-trace               : /* empty */
+trace               : %empty
                     | trace test
                     
 test                : test_noend
