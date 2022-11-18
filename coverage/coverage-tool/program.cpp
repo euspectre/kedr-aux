@@ -203,8 +203,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-
-    auto_ptr<CommandProcessor> commandProcessor(selectCommand(argv[1]));
+    unique_ptr<CommandProcessor> commandProcessor(selectCommand(argv[1]));
 
     if(commandProcessor.get())
     {
