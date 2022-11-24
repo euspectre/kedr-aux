@@ -145,8 +145,6 @@ struct Trace
 	
 	/* Keep only sources with given prefix, other sources are removed. */
 	void filterSources(const std::string& prefix);
-	
-	class Modifier;
 private:
 	class TraceBuilder;
 };
@@ -216,8 +214,6 @@ struct Trace::FileInfo
 
 	int functionsTotal(void) const;
 	int functionsTotalHit(void) const;
-
-	class Modifier;
 };
 
 
