@@ -1,21 +1,21 @@
 // trace_simple.cpp - implementation of 'TraceSimple' class methods.
 
-//      
+//
 //      Copyright (C) 2022, Institute for System Programming
 //                          of the Russian Academy of Sciences (ISPRAS)
 //      Author:
 //          Andrey Tsyvarev <tsyvarev@ispras.ru>
-//      
+//
 //      This program is free software; you can redistribute it and/or modify
 //      it under the terms of the GNU General Public License as published by
 //      the Free Software Foundation; either version 2 of the License, or
 //      (at your option) any later version.
-//      
+//
 //      This program is distributed in the hope that it will be useful,
 //      but WITHOUT ANY WARRANTY; without even the implied warranty of
 //      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 //      GNU General Public License for more details.
-//      
+//
 //      You should have received a copy of the GNU General Public License
 //      along with this program; if not, write to the Free Software
 //      Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
@@ -36,15 +36,34 @@
 using namespace std;
 typedef TraceSimple::counter_t counter_t;
 
-/* 
+/*
  * Report about error in trace and throw exception.
- * 
+ *
  * 'msg' is used only for insert into stream.
  * (That is, it may contain '<<' operators).
  */
 #define trace_error(msg) \
 cerr << traceLine << ": " << msg << endl; \
 throw runtime_error("Incorrect trace file");
+
+/*
+ * Update counter with the new value.
+ * Counters are added only if both are non-negative.
+ */
+static inline void updateCounter(counter_t& currentValue, counter_t newValue)
+{
+    if (newValue >= 0)
+    {
+        if (currentValue < 0)
+        {
+            currentValue = newValue;
+        }
+        else
+        {
+            currentValue += newValue;
+        }
+    }
+}
 
 /********************* BranchID methods ****************************/
 bool TraceSimple::BranchID::operator<(const BranchID& branchID) const
@@ -72,9 +91,9 @@ class LinesTotalCollectorSimple
 {
 public:
     LinesTotalCollectorSimple(void): linesTotal(0) {}
-    
+
     int linesTotal;
-    
+
     void operator()(const map<string, TraceSimple::FileInfo>::value_type& file)
     {
         *this = for_each(file.second.lines.begin(), file.second.lines.end(), *this);
@@ -84,7 +103,7 @@ public:
     {
         linesTotal++;
     }
-    
+
     void addTrace(const TraceSimple& trace)
     {
         *this = for_each(trace.files.begin(), trace.files.end(), *this);
@@ -104,7 +123,7 @@ public:
     LinesTotalHitCollectorSimple(): linesTotalHit(0) {}
 
     int linesTotalHit;
-    
+
     void operator()(const map<string, TraceSimple::FileInfo>::value_type& file)
     {
         *this = for_each(file.second.lines.begin(), file.second.lines.end(), *this);
@@ -114,7 +133,7 @@ public:
     {
         if(line.second > 0) linesTotalHit++;
     }
-    
+
     void addTrace(const TraceSimple& trace)
     {
         *this = for_each(trace.files.begin(), trace.files.end(), *this);
@@ -134,7 +153,7 @@ public:
     BranchesTotalCollectorSimple(): branchesTotal(0) {}
 
     int branchesTotal;
-    
+
     void operator()(const map<string, TraceSimple::FileInfo>::value_type& file)
     {
         *this = for_each(file.second.branches.begin(), file.second.branches.end(), *this);
@@ -144,7 +163,7 @@ public:
     {
         branchesTotal++;
     }
-    
+
     void addTrace(const TraceSimple& trace)
     {
         *this = for_each(trace.files.begin(), trace.files.end(), *this);
@@ -164,7 +183,7 @@ public:
     BranchesTotalHitCollectorSimple(): branchesTotalHit(0) {}
 
     int branchesTotalHit;
-    
+
     void operator()(const map<string, TraceSimple::FileInfo>::value_type& file)
     {
         *this = for_each(file.second.branches.begin(), file.second.branches.end(), *this);
@@ -174,7 +193,7 @@ public:
     {
         if(branch.second > 0) branchesTotalHit++;
     }
-    
+
     void addTrace(const TraceSimple& trace)
     {
         *this = for_each(trace.files.begin(), trace.files.end(), *this);
@@ -195,7 +214,7 @@ public:
     FunctionsTotalCollectorSimple(): functionsTotal(0) {}
 
     int functionsTotal;
-    
+
     void operator()(const map<string, TraceSimple::FileInfo>::value_type& file)
     {
         *this = for_each(file.second.functions.begin(), file.second.functions.end(), *this);
@@ -205,7 +224,7 @@ public:
     {
         functionsTotal++;
     }
-    
+
     void addTrace(const TraceSimple& trace)
     {
         *this = for_each(trace.files.begin(), trace.files.end(), *this);
@@ -225,7 +244,7 @@ public:
     FunctionsTotalHitCollectorSimple(): functionsTotalHit(0) {}
 
     int functionsTotalHit;
-    
+
     void operator()(const map<string, TraceSimple::FileInfo>::value_type& file)
     {
         *this = for_each(file.second.functions.begin(), file.second.functions.end(), *this);
@@ -235,7 +254,7 @@ public:
     {
         if(function.second.counter > 0) functionsTotalHit++;
     }
-    
+
     void addTrace(const TraceSimple& trace)
     {
         *this = for_each(trace.files.begin(), trace.files.end(), *this);
@@ -249,9 +268,9 @@ int TraceSimple::functionsTotalHit(void) const
     return collector.functionsTotalHit;
 }
 
-/* 
+/*
  * Group files.
- * 
+ *
  * NOTE: Files are grouped only within test (usually there is only one
  * test with empty name).
  */
@@ -268,9 +287,9 @@ public:
     void operator()(map<TraceSimple::FileGroupID, TraceSimple::FileGroupInfo*>::value_type& group)
     {
         currentGroup = &group;
-        
+
         map<string, TraceSimple::FileInfo>& files = group.second->files;
-        /* 
+        /*
          * First, move content of all non-source files into
          * another groups.
          */
@@ -297,12 +316,12 @@ public:
     void operator()(map<string, TraceSimple::FileInfo>::value_type& file)
     {
         if(file.first == currentGroup->first.filename) return;/* Already grouped */
-        
+
         /* It is needed to move file into another group. */
         TraceSimple::FileGroupID newGroupID;
         newGroupID.testName = currentGroup->first.testName;
         newGroupID.filename = file.first;
-        
+
         groupIter iter = trace->fileGroups.find(newGroupID);
         if(iter != trace->fileGroups.end())
         {
@@ -311,7 +330,7 @@ public:
                 iter->second->files.find(file.first);
             /* Group always have file with name which coincide with group's one. */
             assert(fileIter != iter->second->files.end());
-            
+
             CombineFile combineFile(fileIter->second);
             combineFile.addFile(file.second);
         }
@@ -319,21 +338,21 @@ public:
         {
             /* Need to create group to which file will be moved. */
             TraceSimple::FileGroupInfo* newGroup = new TraceSimple::FileGroupInfo();
-            
+
             trace->fileGroups.insert(make_pair(newGroupID, newGroup));
             pair<map<string, TraceSimple::FileInfo>::iterator, bool> newFileIter =
                 newGroup->files.insert(make_pair(newGroupID.filename, TraceSimple::FileInfo()));
             swapFiles(newFileIter.first->second, file.second);
         }
     }
-    
+
 private:
     TraceSimple* trace;
-    
+
     typedef map<TraceSimple::FileGroupID, TraceSimple::FileGroupInfo*>::iterator groupIter;
     groupIter::value_type* currentGroup;
-    
-    /* 
+
+    /*
      * Swap content of files. Helper for move file from one group into another.
      */
     static void swapFiles(TraceSimple::FileInfo& file1, TraceSimple::FileInfo& file2)
@@ -354,7 +373,7 @@ private:
             for_each(file.branches.begin(), file.branches.end(), *this);
             for_each(file.functions.begin(), file.functions.end(), *this);
         }
-        
+
         void operator()(const map<int, counter_t>::value_type& line)
         {
             map<int, counter_t>::iterator iter = destFile.lines.find(line.first);
@@ -367,8 +386,8 @@ private:
                 iter->second += line.second;
             }
         }
-        
-        /* 
+
+        /*
          * Combine branch counters.
          * Take into account that '-1' corresponds to '-' in trace file
          * and is "arranged before" '0'.
@@ -390,7 +409,7 @@ private:
         {
             map<TraceSimple::BranchID, counter_t>::iterator iter =
                 destFile.branches.find(branch.first);
-            
+
             if(iter == destFile.branches.end())
             {
                 destFile.branches.insert(branch);
@@ -401,7 +420,7 @@ private:
             }
         }
 
-        /* 
+        /*
          * Update(if needed) function start line 'line' using
          * 'lineAnother'.
          */
@@ -439,7 +458,7 @@ private:
             else
             {
                 updateFuncLine(iter->second.lineStart, func.second.lineStart);
-                
+
                 iter->second.counter += func.second.counter;
             }
         }
@@ -464,17 +483,12 @@ struct CommonPrefixFinder
         prefix(prefix), isPrefixSet(isPrefixSet)
     {
     }
-    
+
     void search(const TraceSimple& trace)
     {
-        for_each(trace.fileGroups.begin(), trace.fileGroups.end(), *this);
+        for_each(trace.files.begin(), trace.files.end(), *this);
     }
-    
-    void operator()(const map<TraceSimple::FileGroupID, TraceSimple::FileGroupInfo*>::value_type& group)
-    {
-        for_each(group.second->files.begin(), group.second->files.end(), *this);
-    }
-    
+
     void operator()(const map<std::string, TraceSimple::FileInfo>::value_type& source)
     {
         if(isPrefixSet)
@@ -495,7 +509,7 @@ struct CommonPrefixFinder
             isPrefixSet = true;
         }
     }
-    
+
     string& prefix;
     /* Prefix is set when first source file found. */
     bool& isPrefixSet;
@@ -505,10 +519,10 @@ string TraceSimple::commonSourcePrefix(void) const
 {
     string prefix;
     bool isPrefixSet = false;
-    
+
     CommonPrefixFinder cpf(prefix, isPrefixSet);
     cpf.search(*this);
-    
+
     return prefix;
 }
 
@@ -517,23 +531,16 @@ struct PrefixFilter
     PrefixFilter(const string& prefix): prefix(prefix) {}
     void filter(TraceSimple& trace)
     {
-        for_each(trace.fileGroups.begin(), trace.fileGroups.end(), *this);
-    }
-    
-    void operator()(map<TraceSimple::FileGroupID, TraceSimple::FileGroupInfo*>::value_type& group)
-    {
-        map<string, TraceSimple::FileInfo>& files = group.second->files;
-        
-        /* 
+        /*
          * All strings lexicographically lower than 'prefix' have not
          * prefixed with it, so should be removed.
          */
         map<std::string, TraceSimple::FileInfo>::iterator
-            iter = files.lower_bound(prefix);
+            iter = trace.files.lower_bound(prefix);
 
-        files.erase(files.begin(), iter);
-        
-        for(; iter != files.end(); ++iter)
+        trace.files.erase(trace.files.begin(), iter);
+
+        for(; iter != trace.files.end(); ++iter)
         {
             if(iter->first.compare(0, prefix.size(), prefix)) break;
         }
@@ -541,7 +548,7 @@ struct PrefixFilter
          * lexicographically bigger than it.
          * This file and all after it should be removed.
          */
-        files.erase(iter, files.end());
+        trace.files.erase(iter, trace.files.end());
     }
 
     string prefix;
@@ -557,129 +564,64 @@ void TraceSimple::filterSources(const string& prefix)
 class TraceSimple::TraceBuilder: private TraceEventProcessor
 {
 public:
-    TraceBuilder(): currentGroupInfo(NULL) {}
-    ~TraceBuilder() {delete currentGroupInfo;}
-
     void build(TraceSimple* trace, istream& is, TraceParser& parser,
         const char* filename)
     {
-        /* Recover from possible previous errors */
-        delete currentGroupInfo;
-        currentGroupInfo = NULL;
-        
         this->trace = trace;
-        
+
         parser.parse(is, *this, filename);
     }
-
-
-    /* TN: <testName> */
-    void onTestStart(const std::string& testName, int /*traceLine*/)
-    {
-        currentGroupInfo = new FileGroupInfo();
-        currentGroupID.testName = testName;
-        currentGroupID.filename.clear();
-    }
-    void onTestEnd(int traceLine)
-    {
-        assert(currentGroupInfo);
-        if(currentGroupID.filename.empty())
-        {
-            cerr << "WARNING: Ignore test '" << currentGroupID.testName
-                << "'without files." << endl;
-            delete currentGroupInfo;
-            currentGroupInfo = NULL;
-            return;
-        }
-        
-        pair<map<FileGroupID, FileGroupInfo*>::iterator, bool> iterNew =
-            trace->fileGroups.insert(make_pair(currentGroupID, currentGroupInfo));
-        if(!iterNew.second)
-        {
-            cout << "NOTE: Ignore duplicate group " << currentGroupID << endl;
-            // trace_error("Information for files group " << currentGroupID
-            //    << " is written twice.");
-        }
-        
-        currentGroupInfo = NULL;
-    }
-    
-
 
     /* SF: <sourcePath> */
     void onSourceStart(const std::string& sourcePath, int traceLine)
     {
-        pair<map<string, FileInfo>::iterator, bool> newIter = 
-            currentGroupInfo->files.insert(make_pair(sourcePath, FileInfo()));
-        if(!newIter.second)
-        {
-            trace_error("Attempt to add information about file '"
-                << sourcePath << "' to group"
-                << currentGroupID << " which already has it.");
-        }
-        
+        pair<map<string, FileInfo>::iterator, bool> newIter =
+            trace->files.insert(make_pair(sourcePath, FileInfo()));
+
         currentFile = &newIter.first->second;
-        
-        if(isSource(sourcePath))
-        {
-            if(currentGroupID.filename.empty())
-            {
-                /* First file in the group - its name may be name of group */
-                currentGroupID.filename = sourcePath;
-            }
-        }
     }
-    
+
     /* FN: <funcLine>, <funcName> */
     void onFunction(const std::string& funcName, int funcLine, int traceLine)
     {
-        pair<map<string, FuncInfo>::iterator, bool> newIter = 
+        pair<map<string, FuncInfo>::iterator, bool> newIter =
             currentFile->functions.insert(make_pair(funcName, funcLine));
         if(!newIter.second)
         {
-            trace_error("Attempt to add function '" + funcName
-                + "' for file which already has it.");
+            FuncInfo& existedFunc = newIter.first->second;
+            if(funcLine >= 0)
+            {
+                if (existedFunc.lineStart < 0)
+                {
+                    existedFunc.lineStart = funcLine;
+                }
+            }
         }
     }
-    
+
     /* FNDA: <counter>, <funcName> */
     void onFunctionCounter(const std::string& funcName,
         counter_t counter, int /*traceLine*/)
     {
-        map<string, FuncInfo>::iterator iter = currentFile->functions.find(funcName);
-        if(iter == currentFile->functions.end())
-        {
-            /* 
-             * Strange, but possible - see definition of 'lineStart'
-             * in 'FuncInfo' structure.
-             */
-            
-            pair<map<string, FuncInfo>::iterator, bool> newIter = 
-                currentFile->functions.insert(make_pair(funcName, -1));
-            iter = newIter.first;
-        }
-        
-        iter->second.counter = counter;
+        /* Create function record, if it wasn't created yet. */
+        pair<map<string, FuncInfo>::iterator, bool> newIter =
+            currentFile->functions.insert(make_pair(funcName, -1));
+
+        updateCounter(newIter.first->second.counter, counter);
     }
-    
-    /* 
+
+    /*
      * BRDA: <branchLine>, <blockNumber>, <branchNumber>, <counter>
      */
     void onBranchCoverage(int branchLine,
         int blockNumber, int branchNumber, counter_t counter, int traceLine)
     {
         BranchID branchID(branchLine, blockNumber, branchNumber);
-        
-        if(branchLine > 1000000)
-            cerr << traceLine << ": Branch with line number " << branchLine << " is found." << endl;
-        
-        pair<map<BranchID, counter_t>::iterator, bool> newIter = 
-            currentFile->branches.insert(make_pair(branchID, counter));
-        if(!newIter.second)
-        {
-            trace_error("Attempt to add counter for branch "
-                "to file which already has it.");
-        }
+
+        pair<map<BranchID, counter_t>::iterator, bool> newIter =
+            currentFile->branches.insert(make_pair(branchID, -1));
+
+        updateCounter(newIter.first->second, counter);
     }
     /*
      * BRDA: <branchLine>, <blockNumber>, <branchNumber>, -
@@ -688,45 +630,26 @@ public:
         int blockNumber, int branchNumber, int traceLine)
     {
         BranchID branchID(branchLine, blockNumber, branchNumber);
-        
-        pair<map<BranchID, counter_t>::iterator, bool> newIter = 
+
+        pair<map<BranchID, counter_t>::iterator, bool> newIter =
             currentFile->branches.insert(make_pair(branchID, -1));
-        if(!newIter.second)
-        {
-            trace_error("Attempt to add '-' taken for branch "
-                "to file which already has it.");
-        }
     }
-    
+
     /* DA: <line>, <counter> */
     void onLineCounter(int line, counter_t counter, int traceLine)
     {
-        pair<map<int, counter_t>::iterator, bool> newIter = 
+        pair<map<int, counter_t>::iterator, bool> newIter =
             currentFile->lines.insert(make_pair(line, counter));
-        if(!newIter.second)
-        {
-            trace_error("Attempt to add counter for line " << line <<
-                " to file which already has it.");
-        }
+
+        updateCounter(newIter.first->second, counter);
     }
 
 private:
     /* Set when need to build trace. */
     TraceSimple* trace;
 
-    /* 
-     * Pointer to the allocated file group information.
-     * 
-     * When store this information to the trace pointer is nullified.
-     */
-    FileGroupInfo* currentGroupInfo;
-    /*
-     * Current information about group identificator.
-     */
-    FileGroupID currentGroupID;
-    
     /* Pointer to file under construction.
-     * 
+     *
      * It points to the information which already added to the
      * corresponded map.
      */
@@ -736,7 +659,7 @@ private:
 void TraceSimple::read(std::istream& is, TraceParser& parser, const char* filename)
 {
     TraceBuilder builder;
-    
+
     builder.build(this, is, parser, filename);
 }
 
@@ -754,7 +677,7 @@ void TraceSimple::read(const char* filename, TraceParser& parser)
         cerr << "Failed to open file '" << filename << "' for read trace." << endl;
         throw runtime_error("Cannot open file");
     }
-    
+
     read(is, parser, filename);
 }
 
@@ -765,9 +688,9 @@ void TraceSimple::read(const char* filename)
 }
 
 
-/* 
+/*
  * Write file information into stream.
- * 
+ *
  * Always start from current line.
  * Always append newline after last line.
  * Always non-empty.
@@ -778,11 +701,11 @@ static void writeFileInfoToStream(const TraceSimple::FileInfo& fileInfo, ostream
 
     map<string, TraceSimple::FuncInfo>::const_iterator funcIter =
         fileInfo.functions.begin(), funcIterEnd = fileInfo.functions.end();
-    
+
     /* Print functions lines */
     for(; funcIter != funcIterEnd; ++funcIter)
     {
-        /* 
+        /*
          * See description of 'lineStart' field in 'FuncInfo' structure
          * for special processing of its -1 value.
          */
@@ -803,10 +726,10 @@ static void writeFileInfoToStream(const TraceSimple::FileInfo& fileInfo, ostream
     /* Print functions statistic */
     os << "FNF:" << functionsTotal << endl;
     os << "FNH:" << functionsTotalHit << endl;
-    
+
     /************/
     int branchesTotal = 0, branchesTotalHit = 0;
-    
+
     map<TraceSimple::BranchID, counter_t>::const_iterator branchIter =
         fileInfo.branches.begin(), branchIterEnd = fileInfo.branches.end();
 
@@ -818,7 +741,7 @@ static void writeFileInfoToStream(const TraceSimple::FileInfo& fileInfo, ostream
             << branchIter->first.line << ','
             << branchIter->first.blockNumber << ','
             << branchIter->first.branchNumber << ',';
-        
+
         counter_t counter = branchIter->second;
 
         if(counter != -1)
@@ -837,15 +760,15 @@ static void writeFileInfoToStream(const TraceSimple::FileInfo& fileInfo, ostream
 
     /********************/
     int linesTotal = 0, linesTotalHit = 0;
-    
-    
+
+
     map<int, counter_t>::const_iterator lineIter = fileInfo.lines.begin(),
         lineIterEnd = fileInfo.lines.end();
     /* Print lines counters */
     for(; lineIter != lineIterEnd; ++lineIter)
     {
         os << "DA:" << lineIter->first << ',' << lineIter->second << endl;
-        
+
         linesTotal++;
         if(lineIter->second > 0) ++linesTotalHit;
     }
@@ -854,62 +777,20 @@ static void writeFileInfoToStream(const TraceSimple::FileInfo& fileInfo, ostream
     os << "LH:" << linesTotalHit << endl;
 }
 
-/*
- * Write file group information into stream.
- * 
- * Always start from current line.
- * Never append newline at the end.
- * Only for group with files, in that case non-empty.
- */
-static void writeFileGroupInfoToStream(
-    const TraceSimple::FileGroupInfo& groupInfo, ostream& os)
-{
-    map<string, TraceSimple::FileInfo>::const_iterator
-        iter = groupInfo.files.begin(),
-        iterEnd = groupInfo.files.end();
-    
-    assert(iter != iterEnd);/* should be non-empty */
-    
-    os << "SF:" << iter->first << endl;
-    writeFileInfoToStream(iter->second, os);
-    os << "end_of_record";
-    
-    for(++iter; iter != iterEnd; ++iter)
-    {
-        os << endl; /* newline after previous record */
-
-        os << "SF:" << iter->first << endl;
-        writeFileInfoToStream(iter->second, os);
-        os << "end_of_record";
-    }
-}
-
 void TraceSimple::write(std::ostream& os) const
 {
-    map<FileGroupID, FileGroupInfo*>::const_iterator iter
-        = fileGroups.begin(), iterEnd = fileGroups.end();
-    /* Found first non-empty group */
-    for(; iter != iterEnd; iter++)
-    {
-        if(!iter->second->files.empty()) break;
-    }
-    
+    map<std::string, FileInfo>::const_iterator iter
+        = files.begin(), iterEnd = files.end();
+
     if(iter == iterEnd)
     {
         /* Empty trace. TODO: is it possible? how to write it?*/
         os << "TN:";
         return;
     }
-    /* Write first group. */
-    os << "TN:" << iter->first.testName << endl;
-    writeFileGroupInfoToStream(*iter->second, os);
-    /* Write other non-empty groups. */
-    for(++iter; iter != iterEnd; iter++)
+    for (;iter != iterEnd; iter++)
     {
-        if(iter->second->files.empty()) continue;
-        
-        os << endl;
-        os << "TN:" << iter->first.testName << endl;
-        writeFileGroupInfoToStream(*iter->second, os);
+        os << "TN:" << endl;
+        writeFileInfoToStream(iter->second, os);
     }
 }

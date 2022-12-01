@@ -21,9 +21,9 @@ struct TraceSimple
 	
 	TraceSimple();
 	
-	/* 
+	/*
 	 * Load trace from the stream.
-	 * 
+	 *
 	 * If non-empty, 'filename' is used for error reporting.
 	 */
 	void read(std::istream& is, const char* filename = "");
@@ -41,30 +41,23 @@ struct TraceSimple
 	struct BranchID;
 	struct FileInfo;
 	
-	/* 
+	/*
 	 * Trace consists from files.
-	 * 
+	 *
 	 * Files are delimited with "SN:" directive in the trace file.
 	 * Every file is assumed to be a single file in the test ("TN:").
 	 */
 	std::map<std::string, FileInfo> files;
 	
-	/* 
+	/*
 	 * Make every group to contain only one file.
-	 * 
+	 *
 	 * Do nothing for the given class.
 	 */
 	void groupFiles(void) {};
 
-	/* 
+	/*
 	 * Useful functions for calculate statistic for all files.
-	 * 
-	 * NOTE: Theese functions assume files with same names different,
-	 * if they belong to file groups with difference name. So, statistic
-	 * for such files sums instead of joined.
-	 * 
-	 * If you want to assume files with same name identical, use
-	 * groupFiles() method before call these functions.
 	 */
 	int linesTotal(void) const;
 	int linesTotalHit(void) const;
@@ -75,9 +68,9 @@ struct TraceSimple
 	int functionsTotal(void) const;
 	int functionsTotalHit(void) const;
 	
-	/* 
+	/*
 	 * Return common prefix for all sources.
-	 * 
+	 *
 	 * For empty trace return "".
 	 */
 	std::string commonSourcePrefix(void) const;
@@ -91,9 +84,9 @@ private:
 /* Information about function in file */
 struct TraceSimple::FuncInfo
 {
-	/* 
+	/*
 	 * Line where function starts.
-	 * 
+	 *
 	 * Sometimes, gcov misses definition of function, while define
 	 * counter for it.
 	 * It may occure, e.g., when inline function calls another
@@ -105,8 +98,7 @@ struct TraceSimple::FuncInfo
 	/* Hit counter for function */
 	counter_t counter;
 	
-	/* 'counter should be set after constructor '*/
-	FuncInfo(int lineStart): lineStart(lineStart) {}
+	FuncInfo(int lineStart): lineStart(lineStart), counter(-1) {}
 };
 
 /* Branch identificator in the file */
@@ -114,7 +106,7 @@ struct TraceSimple::BranchID
 {
 	/* Line of the branch in the file */
 	int line;
-	/* 
+	/*
 	 * Block and branch numbers - gcov internals for uniquely
 	 * identify branch.
 	 */
@@ -137,9 +129,9 @@ struct TraceSimple::FileInfo
 	std::map<std::string, FuncInfo> functions;
 	/* Counter for each line in file. */
 	std::map<int, counter_t> lines;
-	/* 
+	/*
 	 * Counter for each branch in file.
-	 * 
+	 *
 	 * value -1 corresponds to '-' in BRDA directive in trace file.
 	 */
 	std::map<BranchID, counter_t> branches;
