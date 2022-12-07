@@ -22,7 +22,7 @@
 //      MA 02110-1301, USA.
 
 
-#include "trace.hh"
+#include "trace_simple.hh"
 
 #include "test_set_optimizer.hh"
 #include "do_trace_operation.hh"
@@ -45,7 +45,7 @@
 
 #include <dlfcn.h> /* dlopen() and others */
 
-typedef Trace::counter_t counter_t;
+typedef TraceSimple::counter_t counter_t;
 
 /*
  * Usage: See 'usage*' files.
@@ -450,12 +450,12 @@ int OperationProcessor::exec(void)
 {
     int n = traceFiles.size();
     
-    vector<Trace> operands(n);
+    vector<TraceSimple> operands(n);
     
     for(int i = 0; i < n; i++)
         operands[i].read(traceFiles[i]);
     
-    Trace trace;
+    TraceSimple trace;
     
     doTraceOperation(*operation, operands, trace);
     
@@ -729,11 +729,11 @@ int StatProcessor::parseParams(int argc, char** argv)
 class StatPrinter
 {
 public:
-    StatPrinter(Trace& trace, ostream& os);
+    StatPrinter(TraceSimple& trace, ostream& os);
     
     void print(const char* format);
 private:
-    Trace& trace;
+    TraceSimple& trace;
     ostream& os;
     /* Print specificator. Return pointer to the end of specificator. */
     const char* printSpec(const char* specPointer);
@@ -781,7 +781,7 @@ private:
     void printPercent(int a, int A);
 };
 
-StatPrinter::StatPrinter(Trace& trace, ostream& os)
+StatPrinter::StatPrinter(TraceSimple& trace, ostream& os)
     : trace(trace), os(os),
         linesTotal(-1), linesTotalHit(-1),
         functionsTotal(-1), functionsTotalHit(-1),
@@ -912,7 +912,7 @@ void StatPrinter::printPercent(int a, int A)
 /* Exec */
 int StatProcessor::exec()
 {
-    Trace trace;
+    TraceSimple trace;
     trace.read(traceFile);
 
     trace.groupFiles();

@@ -271,7 +271,8 @@ private:
     Trace::FileInfo* currentFile;
 };
 
-void doTraceOperation(TraceOperation& op,
+template<>
+void doTraceOperation<Trace>(TraceOperation& op,
     const std::vector<Trace>& operands, Trace& result)
 {
     DoTraceOperation p(op, operands, result);

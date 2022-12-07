@@ -116,10 +116,15 @@ struct TraceSimple::BranchID
 	BranchID(int line, int blockNumber, int branchNumber):
 		line(line), blockNumber(blockNumber), branchNumber(branchNumber) {}
 
+	// Default constructor for being able to use as a key in a map for MapVectorIterator.
+	// FIXME: Probably, implementation of MapVectorIterator could be changed for avoid default constructor...
+	BranchID(void): line(-1), blockNumber(0), branchNumber(0) {}
+
+
 	/* This operator allows to use branch identificator as key in map. */
 	bool operator<(const BranchID& branchID) const;
 	/* Simple pretty-printing for error reporting */
-	friend std::ostream& operator<<(std::ostream& os, const Trace::BranchID& branchID);
+	friend std::ostream& operator<<(std::ostream& os, const TraceSimple::BranchID& branchID);
 };
 
 /* Information about one file(source or header) in trace */
