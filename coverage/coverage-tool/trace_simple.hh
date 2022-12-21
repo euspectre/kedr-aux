@@ -19,8 +19,6 @@ struct TraceSimple
 	/* Type used for counters. */
 	typedef long counter_t;
 	
-	TraceSimple();
-	
 	/*
 	 * Load trace from the stream.
 	 *

@@ -3,9 +3,6 @@
     @tool_name@ stat
 Output statistic about coverage trace.
 
-    @tool_name@ optimize-tests
-Optimize set of tests for achive minimum total weight without coverage losses.
-
     @tool_name@ operation <op-name>
 Perform per-counter operations with coverage trace(s)
 

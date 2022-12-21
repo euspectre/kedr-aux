@@ -583,7 +583,9 @@ void TraceSimple::write(std::ostream& os) const
     for (;iter != iterEnd; iter++)
     {
         os << "TN:" << endl;
+        os << "SF:" << iter->first << endl;
         writeFileInfoToStream(iter->second, os);
+        os << "end_of_record" << endl;
     }
 }
 
@@ -671,9 +673,40 @@ void doTraceOperation<TraceSimple>(TraceOperation& op,
                 }
             }
 
-            Trace::counter_t newCounter = op.lineOperation(branchCounters);
+            Trace::counter_t newCounter = op.branchOperation(branchCounters);
 
             resultFileInfo.branches.insert(make_pair(branchInfoMapsIter->first, newCounter));
+        }
+
+        std::vector<const std::map<int, counter_t>*> lineInfoMaps(n);
+        for (int i = 0; i < n; i++)
+        {
+            if (fileInfoMapsIter->second[i])
+            {
+                lineInfoMaps[i] = &fileInfoMapsIter->second[i]->lines;
+            }
+        }
+
+        typedef MapVectorIterator<std::map<int, counter_t>> LineInfoMapsIterType;
+        LineInfoMapsIterType lineInfoMapsIterEnd = LineInfoMapsIterType::end(lineInfoMaps);
+        for (LineInfoMapsIterType lineInfoMapsIter = LineInfoMapsIterType::begin(lineInfoMaps); lineInfoMapsIter != lineInfoMapsIterEnd; ++lineInfoMapsIter)
+        {
+            std::vector<counter_t> lineCounters(n);
+            for(int i = 0; i < n; i++)
+            {
+                if (lineInfoMapsIter->second[i])
+                {
+                    lineCounters[i] = *lineInfoMapsIter->second[i];
+                }
+                else
+                {
+                    lineCounters[i] = -1;
+                }
+            }
+
+            Trace::counter_t newCounter = op.lineOperation(lineCounters);
+
+            resultFileInfo.lines.insert(make_pair(lineInfoMapsIter->first, newCounter));
         }
     }
 }

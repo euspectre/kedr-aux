@@ -24,7 +24,6 @@
 
 #include "trace_simple.hh"
 
-#include "test_set_optimizer.hh"
 #include "do_trace_operation.hh"
 
 #include <iostream>
@@ -146,23 +145,6 @@ private:
     static const char* defaultFormat;
 };
 
-/* Program execution for 'optimize-tests' */
-struct OptimizeTestsProcessor: public CommandProcessor
-{
-    const char* testsFile;
-    bool verbose;
-    
-    OptimizeTestsProcessor(void);
-
-    int parseParams(int argc, char** argv);
-    int exec();
-    
-    void usage(void);
-private:
-    /* Load tests from file. */
-    void loadTests(vector<TestCoverageDesc>& tests);
-};
-
 static CommandProcessor* selectCommand(const char* cmd)
 {
 #define isCommand(command) (strcmp(cmd, command) == 0)
@@ -185,10 +167,6 @@ static CommandProcessor* selectCommand(const char* cmd)
     else if(isCommand("stat"))
     {
         return new StatProcessor();
-    }
-    else if(isCommand("optimize-tests"))
-    {
-        return new OptimizeTestsProcessor();
     }
 #undef isCommand
     else return NULL;
@@ -943,103 +921,4 @@ DEFINE_FILE_PRINTER(usage_stat)
 void StatProcessor::usage(void)
 {
     print_usage_stat();
-}
-
-/****************** Optimize-tests implementation *********************/
-/* Params */
-OptimizeTestsProcessor::OptimizeTestsProcessor()
-    : testsFile(NULL), verbose(false) {}
-
-int OptimizeTestsProcessor::parseParams(int argc, char** argv)
-{
-    static const char options[] = "+o:v";
-    
-    for(int opt = getopt(argc, argv, options);
-        opt != -1;
-        opt = getopt(argc, argv, options))
-    {
-        switch(opt)
-        {
-        case '?':
-            //error in options
-            return -1;
-        case 'o':
-            setOutFile(optarg);
-            break;
-        case 'v':
-            verbose = true;
-            break;
-        default:
-            return -1;
-        }
-    }
-    
-    char** argv_rest = argv + optind;
-    int argc_rest = argc - optind;
-    
-    if(argc_rest != 1)
-    {
-        if(argc_rest == 0) cerr << "Tests file is missed." << endl;
-        else cerr << "Exceeded command-line argument: " << argv_rest[1] << endl;
-        return -1;
-    }
-    
-    testsFile = argv_rest[0];
-    
-    return 0;
-}
-
-int OptimizeTestsProcessor::exec()
-{
-    vector<TestCoverageDesc> tests;
-    loadTests(tests);
-    
-    TestSetOptimizer optimizer(tests);
-    const vector<TestCoverageDesc>& optTests = optimizer.optimize(verbose);
-
-    ostream& os = getOutStream();
-    
-    for(int i = 0; i < (int)optTests.size(); i++)
-    {
-        os << optTests[i].traceFile << endl;
-    }
-    return 0;
-}
-
-DEFINE_FILE_PRINTER(usage_optimize_tests)
-void OptimizeTestsProcessor::usage(void)
-{
-    print_usage_optimize_tests();
-}
-
-
-void OptimizeTestsProcessor::loadTests(vector<TestCoverageDesc>& tests)
-{
-    FILE* f = fopen(testsFile, "r");
-    if(f == NULL)
-    {
-        cerr << "Failed to open file with tests." << endl;
-        throw runtime_error("Failed to open file");
-    }
-    
-    char* line = NULL;
-    size_t buffer_size;
-    ssize_t len;
-    while((len = getline(&line, &buffer_size, f)) != -1)
-    {
-        /* Drop delimiter if it is. */
-        if((len > 0) && (line[len - 1] == '\n')) line[len - 1] = '\0';
-        /* Ignore empty lines and lines started with '#' */
-        if((line[0] == '\0') || (line[0] == '#')) continue;
-        
-        char* filename_start;
-        
-        double weight = strtod(line, &filename_start);
-        
-        while(isspace(*filename_start)) ++filename_start;
-        
-        tests.push_back(TestCoverageDesc(filename_start, weight));
-    }
-    
-    free(line);
 }
